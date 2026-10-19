@@ -1,8 +1,8 @@
 # fillmem will be installed on the ptc image 
 # sh allows you to import commands as though they are python functions - pretty cool!
 import sh
-from ptctestsuite.utils import qc_result
-from ptctestsuite.utils import test_base
+from ptctestclient.utils import qc_result
+from ptctestclient.utils import test_base
 
 from loguru import logger as lg
 

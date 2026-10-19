@@ -35,7 +35,7 @@ class qc_board_handler:
 
     # sshclient wrapper function
     def sshclient(self) -> asyncssh.SSHClientConnection:
-        return asyncssh.connect(f"{self.ip_address}", username='root', password='', known_hosts=None)
+        return asyncssh.connect(f"{self.ip_address}", username=parameters.qc_user, password=parameters.qc_password, known_hosts=None)
 
     async def setup_networking(self) -> bool:
         timeout = 1
@@ -51,15 +51,40 @@ class qc_board_handler:
         lg.info(f"Set up QC board networking with status {status}")
         return status
 
-    # TODO once I hear back from adrian figure out how we actually
-    # want to do this
-    async def set_load(self, freq, duty_cycle):
-        # TODO later
-        addr = "0x80020038"
-        val = {}
-        async with self.sshclient() as conn:
-            r = await conn.run(f"poke {addr {val}}")
-    
+    async def poke(self, addr: int, value: int) -> bool:
+        if self.debug_run:
+            lg.info(f"[debug] QC board poke {hex(addr)} {hex(value)}")
+            return True
+        try:
+            async with self.sshclient() as conn:
+                r = await conn.run(f"poke {hex(addr)} {hex(value)}", check=True)
+            return True
+        except (OSError, asyncssh.Error) as e:
+            lg.error(f"QC board poke {hex(addr)} {hex(value)} failed: {e}")
+            return False
+
+    async def set_load(self, converter: int, value: int) -> bool:
+        """Sets the PWM load on one DC-DC converter output (procedure 4.4.1).
+
+        Args:
+            converter (int): DC-DC converter / WIB number, 0-5
+            value (int): PWM register value, e.g. 0x216 for 25% load
+
+        Returns:
+            bool: True if the register writes succeeded
+        """
+        addr = parameters.qc_load_base_addr + 4 * converter
+        # procedure writes 0x316 first, then the load value
+        if not await self.poke(addr, parameters.qc_load_enable_value):
+            return False
+        ok = await self.poke(addr, value)
+        await asyncio.sleep(parameters.load_settle_time)
+        return ok
+
+    async def load_off(self, converter: int) -> bool:
+        addr = parameters.qc_load_base_addr + 4 * converter
+        return await self.poke(addr, parameters.qc_load_off_value)
+
     # have decided to use context managers instead to avoid not closing the SSH
     # session instead we just close it every time :) I don't think it'll be that
     # bad but can refactor later if we need to 

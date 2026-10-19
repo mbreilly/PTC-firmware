@@ -22,3 +22,17 @@ image_crop_height = 720
 # NOTE: if this ever becomes important, read this from environment variables
 ptc_user = 'root'
 ptc_password = 'root'
+
+# QC board load control (procedure 4.4.1). Converter n uses qc_load_base_addr + 4*n
+qc_user = 'root'
+qc_password = ''
+qc_load_base_addr = 0x80020038
+# written before each load value, as in the procedure (poke 0x316 then 0x2xx)
+qc_load_enable_value = 0x316
+# TODO confirm the value that turns the load off
+qc_load_off_value = 0x0
+load_settle_time = 1.0
+
+# GbE throughput test (procedure 4.4.6.2)
+throughput_test_mb = 1000
+throughput_min_mb_s = 12.5

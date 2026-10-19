@@ -30,9 +30,18 @@ class qc_iv_sensors_test(test_base): # pylint: disable=invalid-name
     located on the QC board for monitoring purposes.
     """
 
-    def __init__(self):
+    def __init__(self, converters: list[int] | None = None, i_min: float = 1.4, i_max: float = 1.6):
+        """
+        Args:
+            converters (list[int], optional): which DC-DC converters (0-5) to read. Defaults to all 6.
+            i_min (float, optional): lower current limit in amps. Defaults to 25% load (1.5A - 100mA).
+            i_max (float, optional): upper current limit in amps. Defaults to 25% load (1.5A + 100mA).
+        """
         self.channels = []
         self.sleep_time = 0.1
+        self.converters = list(range(6)) if converters is None else converters
+        self.i_min = i_min
+        self.i_max = i_max
         super().__init__()
 
     def test_init(self) -> bool:
@@ -43,15 +52,18 @@ class qc_iv_sensors_test(test_base): # pylint: disable=invalid-name
         """
         lg.info("Starting QC sensor test...")
 
-        self.channels = [
+        # index in this list is the DC-DC converter / WIB number
+        # TODO confirm mux 0x70 is converter 0 on the QC board
+        all_channels = [
             # (mux_addr, sensor_addr, v_min, v_max, i_min, i_max)
-            IVSensorChannel('0x70', '0x6c', 12, 12.35, 1.4, 1.6),
-            IVSensorChannel('0x71', '0x6b', 12, 12.35, 1.4, 1.6),
-            IVSensorChannel('0x72', '0x6a', 12, 12.35, 1.4, 1.6),
-            IVSensorChannel('0x73', '0x69', 12, 12.35, 1.4, 1.6),
-            IVSensorChannel('0x74', '0x68', 12, 12.35, 1.4, 1.6),
-            IVSensorChannel('0x75', '0x67', 12, 12.35, 1.4, 1.6),
+            IVSensorChannel('0x70', '0x6c', 12, 12.35, self.i_min, self.i_max),
+            IVSensorChannel('0x71', '0x6b', 12, 12.35, self.i_min, self.i_max),
+            IVSensorChannel('0x72', '0x6a', 12, 12.35, self.i_min, self.i_max),
+            IVSensorChannel('0x73', '0x69', 12, 12.35, self.i_min, self.i_max),
+            IVSensorChannel('0x74', '0x68', 12, 12.35, self.i_min, self.i_max),
+            IVSensorChannel('0x75', '0x67', 12, 12.35, self.i_min, self.i_max),
         ]
+        self.channels = [(n, all_channels[n]) for n in self.converters]
         self.sleep_time = 0.1
 
         return True
@@ -73,7 +85,7 @@ class qc_iv_sensors_test(test_base): # pylint: disable=invalid-name
                 check=True
             )
             sleep(0.001)
-        except CalledProcessError as e:
+        except (CalledProcessError, OSError) as e:
             lg.error("Failed to toggle BP_I2C_RESET")
             lg.exception(e)
 
@@ -191,7 +203,7 @@ class qc_iv_sensors_test(test_base): # pylint: disable=invalid-name
 
         self.reset_mux_bus()
 
-        for ch in self.channels:
+        for _, ch in self.channels:
             try:
                 self.open_mux_channel(ch.mux_addr, channel=0)
                 sleep(0.05)
@@ -211,23 +223,30 @@ class qc_iv_sensors_test(test_base): # pylint: disable=invalid-name
                     " was unsuccessful! Marking test as failed"
                 )
                 lg.exception(e)
-                return qc_result.FAIL
+                ch.voltage = None
+                ch.current = None
 
             finally:
                 self.close_mux(ch.mux_addr)
 
-        for ch in self.channels:
+        result = qc_result.PASS
+        for n, ch in self.channels:
+            self.values[f"converter{n}_voltage"] = None if ch.voltage is None else round(ch.voltage, 3)
+            self.values[f"converter{n}_current"] = None if ch.current is None else round(ch.current, 3)
+
             if ch.voltage is None or ch.current is None:
                 lg.error(f"Null reading on mux {ch.mux_addr}")
-                return qc_result.FAIL
+                result = qc_result.FAIL
+                continue
 
             if ch.voltage < ch.v_min or ch.voltage > ch.v_max:
                 lg.error(f"Voltage out of range on mux {ch.mux_addr}: {ch.voltage}V")
-                return qc_result.FAIL
+                result = qc_result.FAIL
 
             if ch.current < ch.i_min or ch.current > ch.i_max:
                 lg.error(f"Current out of range on mux {ch.mux_addr}: {ch.current}A")
-                return qc_result.FAIL
+                result = qc_result.FAIL
 
-        lg.info("QC sensor test passed.")
-        return qc_result.PASS
+        if result == qc_result.PASS:
+            lg.info("QC sensor test passed.")
+        return result

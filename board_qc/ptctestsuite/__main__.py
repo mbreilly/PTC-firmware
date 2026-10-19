@@ -10,7 +10,12 @@ from prompt_toolkit.filters import is_done
 from ptctestsuite.ptctests import dummy_test
 from ptctestsuite.utils import qc_result, qc_record, init_ptc, start_client, async_yesno, manual_test
 from websockets.asyncio.client import connect
-from ptctestsuite.config import manual_tests, test_sequence
+from ptctestsuite.config import test_sequence
+from ptctestsuite.config.test_names import (pre_som_tests, som_boot_tests, alert_led_tests, crate_address_tests,
+                                            timing_tests, ethernet_tests, mcu_tests, ripple_full_load,
+                                            load_steps, load_tolerance)
+from ptctestsuite.ptctests import gbe_test, gbe_throughput_test
+from ptctestsuite.utils.qc_board import qc_board_handler
 from ptctestsuite.utils.hwdb import upload_ptc_image, upload_test_result, create_hwdb_item, renew_token
 from ptctestsuite.utils.image_capture import get_board_image
 
@@ -45,6 +50,75 @@ test_runs = []
 # always renew the to on launch
 renewal_needed.set()
 
+async def ask_float(session: ptk.PromptSession, message: str) -> float:
+    """Prompts until the tester enters a number."""
+    while True:
+        ans = await session.prompt_async(message)
+        try:
+            return float(ans.strip())
+        except ValueError:
+            print("Please enter a number.")
+
+async def run_manual_tests(session: ptk.PromptSession, q: qc_record, tests: list):
+    for t in tests:
+        with manual_test(**t) as test:
+            if test.limits is not None:
+                lo, hi = test.limits
+                unit = f" {test.unit}" if test.unit else ""
+                value = await ask_float(session, f"{test.message} [{lo}-{hi}{unit}]: ")
+                result = test.evaluate(value)
+                print(f"  -> {result.name}")
+                q.add_result(test.test_name, result, value, test.unit, test.limits)
+                continue
+            result = await async_yesno(session, test.message)
+            test_val = None
+            if test.accepts_value:
+                unit = f" ({test.unit})" if test.unit else ""
+                test_val = await session.prompt_async(f"What was the value of the tested parameter{unit}? ")
+            q.add_result(test.test_name, qc_result(int(result)), test_val, test.unit)
+
+async def run_remote_test(ws, q: qc_record | None, test_type: str, test_params: dict | None = None,
+                          test_name: str | None = None, limits=None, unit: str | None = None):
+    """Runs a test on the PTC client and records its result and measured values.
+    Pass q=None for setup steps that should not be recorded."""
+    t = {"test_type": test_type, "test_params": test_params or {}, "test_name": test_name or test_type}
+    print(f"Running {t['test_name']} with parameters {t['test_params']}")
+    lg.info(f"Running {t['test_name']} with parameters {t['test_params']}")
+    await ws.send(json.dumps(t))
+    msg = json.loads(await ws.recv())
+    result = qc_result(int(msg['test_result']))
+    values = msg.get('test_values') or None
+    print(f"  -> {result.name}")
+    if q is not None:
+        q.add_result(msg['test_name'], result, values, unit, limits)
+    return result, values
+
+async def run_load_tests(ws, session: ptk.PromptSession, q: qc_record, qc: qc_board_handler):
+    """DC-DC converter load test (procedure 4.4.1). Steps each converter through the
+    load values and reads the load current from the QC board IV sensors."""
+    for n in range(6):
+        for value, amps in load_steps:
+            pct = round(100 * amps / load_steps[-1][1])
+            name = f"load{n}_{pct}pct"
+            if not await qc.set_load(n, value):
+                q.add_result(name, qc_result.ERROR)
+                continue
+            await run_remote_test(ws, q, "qc_iv_sensors",
+                                  {"converters": [n], "i_min": amps - load_tolerance, "i_max": amps + load_tolerance},
+                                  test_name=name, limits=(amps - load_tolerance, amps + load_tolerance), unit='A')
+        # still at the highest load here
+        await run_manual_tests(session, q, [ripple_full_load(n)])
+        await qc.set_load(n, load_steps[0][0])
+
+def print_summary(q: qc_record):
+    print(f"\n==== PTC {q.serial_number} summary ====")
+    for name, t in q.test_status.items():
+        value = t['value']
+        if isinstance(value, dict):
+            value = ", ".join(f"{k}={v}" for k, v in value.items())
+        print(f"{t['result'].name:6} {name}" + (f": {value}" if value is not None else ""))
+    print(f"Overall: {q.overall_result.name}\n")
+
 async def run_ptc_test():
     global tester_name, test_sequence 
     hwdb_disabled = args.disable_hwdb
@@ -58,6 +132,18 @@ async def run_ptc_test():
     
     session = ptk.PromptSession()
     ptc_serial = await session.prompt_async("PTC Serial Number: ")
+    q = qc_record(ptc_serial, tester_name)
+    lg.info(f"Starting new PTC Test Session.")
+
+    # 4.3 manual tests, done before the SoM is installed
+    if await async_yesno(session, "Run the manual tests without the SoM (4.3)? Answer n if the SoM is already installed"):
+        await run_manual_tests(session, q, pre_som_tests)
+        await session.prompt_async("Set all DIP switches OFF, power off, install the SoM and reinsert the PTC. Press Enter when ready.")
+
+    # 4.3.2 SoM tests
+    q.som_serial = await session.prompt_async("Enclustra SoM Serial Number (scan QR code): ")
+    await run_manual_tests(session, q, som_boot_tests)
+    q.ambient_temperature = await ask_float(session, "Room temperature (C): ")
 
     # try to init the PTC on the default serial port
     net_status = await init_ptc(debug_run=args.debug)
@@ -79,32 +165,52 @@ async def run_ptc_test():
         except asyncio.TimeoutError:
             lg.critical("PTC Application failed to start within 20 seconds!")
             client_task.cancel()
-   
-    
-    q = qc_record(ptc_serial, tester_name)
-    lg.info(f"Starting new PTC Test Session.")
-    # do the manual tests here
+
+    qc = qc_board_handler(debug_run=args.debug)
     async with connect(f"ws://{ptc_ip}:{parameters.ws_port}") as ws:
         for t in test_sequence:
-            print(f"Running {t['test_type']} with parameters {t['test_params']}")
-            lg.info(f"Running {t['test_type']} with parameters {t['test_params']}")
-            await ws.send(json.dumps(t))
-            msg = await ws.recv()
-            msg = json.loads(msg)
-            # TODO need to implement value handling for auto tests - TODO
-            test_val = None
-            q.test_status[msg['test_name']] = {"result": qc_result(int(msg['test_result'])), "value": None}
-    
-    for t in manual_tests:
-        with manual_test(**t) as test:
-            result = await async_yesno(session, test.message)
-            test_val = None
-            if test.accepts_value:
-                test_val = await session.prompt_async("What was the value of the tested parameter? ")
-            q.test_status[test.test_name] = {"result": qc_result(int(result)), "value": test_val}
-    # or here....
+            _, values = await run_remote_test(ws, q, t['test_type'], t['test_params'], t.get('test_name'))
+            if t['test_type'] == 'eeprom' and values:
+                q.eeprom_serial = values.get('eeprom_serial')
+
+        # 4.4.2 sensors: all converters on at 25% load
+        await run_remote_test(ws, None, "wib_power", {"on": True})
+        for n in range(6):
+            await qc.set_load(n, load_steps[0][0])
+        await run_remote_test(ws, q, "iv_sensors")
+        await run_remote_test(ws, q, "qc_iv_sensors", test_name="qc_iv_sensors_25pct")
+        await run_remote_test(ws, q, "temperature", {"ambient": q.ambient_temperature})
+        await run_remote_test(ws, q, "alert")
+        await run_manual_tests(session, q, alert_led_tests)
+
+        # 4.4.1 load test
+        await run_load_tests(ws, session, q, qc)
+        for n in range(6):
+            await qc.load_off(n)
+        await run_remote_test(ws, None, "wib_power", {"on": False})
+
+        # 4.4.3 crate address, 4.4.5 timing
+        await run_manual_tests(session, q, crate_address_tests)
+        await run_remote_test(ws, q, "timing")
+        await run_manual_tests(session, q, timing_tests)
+
+    # 4.4.6 Ethernet, from the host
+    if args.debug:
+        lg.info("Skipping GbE ping and throughput in debug mode")
+    else:
+        with gbe_test() as t:
+            r = t.run_test()
+            q.add_result("gbe_ping", r, t.values)
+        r, rate = await gbe_throughput_test()
+        q.add_result("gbe_throughput", r, rate, "MB/s", (parameters.throughput_min_mb_s, None))
+    await run_manual_tests(session, q, ethernet_tests)
+
+    # 4.4.4 microcontroller and EtherCAT, from the Windows machine
+    await run_manual_tests(session, q, mcu_tests)
+
     # cancel client task
     client_task.cancel()
+    print_summary(q)
     add_notes = await async_yesno(session, "Do you want to add notes?")
     if add_notes:
         note_text = await input_dialog(title="Notes", text="Enter tester notes here:").run_async()

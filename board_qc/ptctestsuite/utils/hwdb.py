@@ -137,7 +137,14 @@ async def upload_test_result(item: qc_record, part_id: str) -> dict:
     test_res.pop('tester_name')
     test_res['Test Location'] = 'University of Pennsylvania'
     test_res.pop('test_location')
-    test_res.pop('tester_notes')
+    test_res.pop('tester_notes', None)
+    test_res['Overall Result'] = test_res.pop('overall_result')
+    if 'som_serial' in test_res:
+        test_res['SoM Serial Number'] = test_res.pop('som_serial')
+    if 'eeprom_serial' in test_res:
+        test_res['EEPROM Serial ID'] = test_res.pop('eeprom_serial')
+    if 'ambient_temperature' in test_res:
+        test_res['Ambient Temperature (C)'] = test_res.pop('ambient_temperature')
 
     req_payload = {
         'comments': item.tester_notes,
