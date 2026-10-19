@@ -3,6 +3,7 @@ import serial_asyncio
 
 from ptctestsuite.config import parameters
 from loguru import logger as lg
+
 import asyncssh
 
 async def init_ptc(serial_port="/dev/ttyUSB0", baudrate=115200, timeout=1, ip_address = parameters.ptc_ip, debug_run = False) -> bool:
@@ -39,17 +40,6 @@ async def init_ptc(serial_port="/dev/ttyUSB0", baudrate=115200, timeout=1, ip_ad
         writer.write(f"{parameters.ptc_password}{line_end}".encode(encoding))
         await writer.drain()
         await asyncio.sleep(sleep_time)
-
-        # assign IP
-        iface_str = f"ifconfig eth1 {ip_address} netmask 255.255.255.0{line_end}"
-        writer.write(iface_str.encode(encoding))
-        await writer.drain()
-        await asyncio.sleep(sleep_time)
-
-        # set correct bit to enable GbE
-        #writer.write(f"poke 0xff0c0004 0x092e2c4a{line_end}".encode(encoding))
-        #await writer.drain()
-        #await asyncio.sleep(sleep_time)
 
         try:
             # again check to see if we are getting anything back
