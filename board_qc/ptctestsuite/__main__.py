@@ -143,7 +143,13 @@ async def run_ptc_test():
         await session.prompt_async("Set all DIP switches OFF, power off, install the SoM and reinsert the PTC. Press Enter when ready.")
 
     # 4.3.2 SoM tests
-    q.som_serial = await session.prompt_async("Enclustra SoM Serial Number (scan QR code): ")
+    # the Enclustra label is a Data Matrix code holding only the 10 digit serial printed beside it
+    while True:
+        q.som_serial = (await session.prompt_async("Enclustra SoM Serial Number (scan the code on the SoM label): ")).strip()
+        if q.som_serial.isdigit() and len(q.som_serial) == 10:
+            break
+        if await async_yesno(session, f"'{q.som_serial}' doesn't look like a 10 digit Enclustra serial. Keep it anyway?"):
+            break
     await run_manual_tests(session, q, som_boot_tests)
     q.ambient_temperature = await ask_float(session, "Room temperature (C): ")
 
