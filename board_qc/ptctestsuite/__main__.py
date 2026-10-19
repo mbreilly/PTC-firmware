@@ -54,23 +54,21 @@ async def run_ptc_test():
             await renew_token()
             renewal_needed.clear()
         
-    ptc_ip = "localhost" if args.debug else parameters.ptc_ip
-    
     session = ptk.PromptSession()
     ptc_serial = await session.prompt_async("PTC Serial Number: ")
 
-    # try to init the PTC on the default serial port
-    net_status = await init_ptc(debug_run=args.debug)
-    if not net_status:
+    # try to init the PTC on the default serial port, discovering its DHCP IP
+    ptc_ip = await init_ptc(debug_run=args.debug)
+    if ptc_ip is None:
         ptc_serial_port = await session.prompt_async("Connection failed on the default serial port. Enter a different port to attempt connection again: ", default="/dev/ttyUSB1")
         # this is kind of goofy, maybe rework this?
-        net_status = await init_ptc(serial_port=ptc_serial_port, debug_run=args.debug)
-        if not net_status:
+        ptc_ip = await init_ptc(serial_port=ptc_serial_port, debug_run=args.debug)
+        if ptc_ip is None:
             lg.critical("PTC Network Configuration Failed!")
             return
     
     server_listening = asyncio.Event()
-    client_task = asyncio.create_task(start_client(server_listening, debug_run=args.debug))
+    client_task = asyncio.create_task(start_client(server_listening, ip_address=ptc_ip, debug_run=args.debug))
     # start client task
     if not args.debug:
         try:

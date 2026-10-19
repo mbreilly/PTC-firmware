@@ -1,5 +1,4 @@
 from ptctestsuite.utils import test_base, qc_result
-from ptctestsuite.config import parameters
 from pythonping import ping
 
 from loguru import logger as lg
@@ -13,14 +12,17 @@ from loguru import logger as lg
 
 class gbe_test(test_base):
 
+    def __init__(self, ip: str):
+        self._ip = ip
+
     def test_init(self):
         # nothing to init anymore
         return True
 
     def run_test(self):
         try:
-            response = ping(parameters.ptc_ip, verbose=True, count=3)
-            lg.info(f"Attempting to ping PTC. Response is: {response}")
+            response = ping(self._ip, verbose=True, count=3)
+            lg.info(f"Attempting to ping PTC at {self._ip}. Response is: {response}")
         except Exception as e:
             lg.error(e)
             return qc_result.FAIL

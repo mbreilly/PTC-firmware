@@ -40,16 +40,20 @@ class qc_board_handler:
     async def setup_networking(self) -> bool:
         timeout = 1
         lg.info("Setting up QC Board Networking")
-        # error handling?
-        status = await init_ptc(
+        # init_ptc now returns the discovered DHCP IP (or None on failure), so
+        # we treat a present IP as success. Note: the QC board may use a
+        # different interface than `end1`; this will be revisited when QC DHCP
+        # discovery is added.
+        discovered_ip = await init_ptc(
             serial_port=self.serial_port,
             baudrate=self.baudrate,
             timeout=timeout,
-            ip_address=self.ip_address,
             debug_run = self.debug_run 
         )
-        lg.info(f"Set up QC board networking with status {status}")
-        return status
+        if discovered_ip is not None:
+            self.ip_address = discovered_ip
+        lg.info(f"Set up QC board networking with status {discovered_ip}")
+        return discovered_ip is not None
 
     # TODO once I hear back from adrian figure out how we actually
     # want to do this
@@ -58,7 +62,7 @@ class qc_board_handler:
         addr = "0x80020038"
         val = {}
         async with self.sshclient() as conn:
-            r = await conn.run(f"poke {addr {val}}")
+            r = await conn.run(f"poke {addr} {val}")
     
     # have decided to use context managers instead to avoid not closing the SSH
     # session instead we just close it every time :) I don't think it'll be that
