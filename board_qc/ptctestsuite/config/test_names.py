@@ -117,5 +117,21 @@ test_sequence = [
     {"test_type": "eeprom", "test_params": {}},
 ]
 
+# 4.1 reception checks. These are done once per delivery, not per board, so they are
+# recorded in their own shipment record instead of each board's QC record.
+# The "count vs purchase order" check is built in for every shipment type.
+reception_checks = {
+    "front_panels": [
+        man_test("fp_microscope_sample", "[4.1.1] 10% sample under the microscope: clean, no damage, thumb screws included?"),
+        man_test("fp_mechanical_fit_sample", "[4.1.1] 10% sample: dimensions, mounting holes and connector openings match the drawings?"),
+    ],
+    "bare_pcbs": [
+        man_test("bare_pcb_certificate_review", "[4.1.2] Vendor quality certificate and test reports reviewed with no problems?"),
+    ],
+    "assembled_pcbs": [
+        man_test("assembled_pcb_certificate_review", "[4.1.3] Vendor quality certificate and test reports reviewed with no problems?"),
+    ],
+}
+
 # kept for backwards compatibility with older imports
 manual_tests = pre_som_tests

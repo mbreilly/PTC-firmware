@@ -16,7 +16,9 @@ from ptctestsuite.config.test_names import (pre_som_tests, som_boot_tests, alert
                                             load_steps, load_tolerance)
 from ptctestsuite.ptctests import gbe_test, gbe_throughput_test
 from ptctestsuite.utils.qc_board import qc_board_handler
-from ptctestsuite.utils.hwdb import upload_ptc_image, upload_test_result, create_hwdb_item, renew_token
+from ptctestsuite.utils.hwdb import upload_ptc_image, upload_test_result, create_hwdb_item, renew_token, upload_reception_record
+from ptctestsuite.utils.reception import reception_record, shipment_types, already_recorded, save_locally
+from ptctestsuite.config.test_names import reception_checks
 from ptctestsuite.utils.image_capture import get_board_image
 
 from argparse import ArgumentParser
@@ -111,7 +113,7 @@ async def run_load_tests(ws, session: ptk.PromptSession, q: qc_record, qc: qc_bo
         await qc.set_load(n, load_steps[0][0])
 
 def print_summary(q: qc_record):
-    print(f"\n==== PTC {q.serial_number} summary ====")
+    print(f"\n==== {q.serial_number} summary ====")
     for name, t in q.test_status.items():
         value = t['value']
         if isinstance(value, dict):
@@ -229,13 +231,49 @@ async def run_ptc_test():
         board_img = await get_board_image()
         await upload_ptc_image(r['part_id'], board_img)
 
+async def run_reception_check():
+    """Production shipment entry: the 7 reception checks (procedure 4.1), recorded
+    once per delivery instead of for every board."""
+    session = ptk.PromptSession()
+    po = await session.prompt_async("Purchase order number: ")
+    if already_recorded(po):
+        print(f"Shipment for PO {po} was already recorded. Nothing to do.")
+        return
+    r = reception_record(po, tester_name)
+    r.batch_number = await session.prompt_async("Production batch number (if any): ")
+
+    for shipment_type, label in shipment_types.items():
+        print(f"\n--- {label} ---")
+        # count vs purchase order, every shipment type
+        ordered = await ask_float(session, f"{label}: quantity on the purchase order: ")
+        received = await ask_float(session, f"{label}: quantity received: ")
+        count_ok = qc_result.PASS if received == ordered else qc_result.FAIL
+        print(f"  -> {count_ok.name}")
+        r.add_result(f"{shipment_type}_count_vs_po", count_ok, {"ordered": ordered, "received": received})
+        await run_manual_tests(session, r, reception_checks[shipment_type])
+
+    if await async_yesno(session, "Do you want to add notes?"):
+        r.tester_notes = await session.prompt_async("Notes: ")
+    print_summary(r)
+    save_locally(r)
+    if not args.disable_hwdb:
+        if renewal_needed.is_set():
+            await renew_token()
+            renewal_needed.clear()
+        await upload_reception_record(r)
+
 async def async_entry():
-    test_again = True
     renewal_task = asyncio.create_task(token_renew_signal())
-    while(test_again):
-        await run_ptc_test()
-        resp = input("Do you want to run another test? (y/n)")
-        test_again = resp.lower() in ('y', 'yes')
+    session = ptk.PromptSession()
+    while True:
+        print("\n1. Production board entry (test a PTC)\n2. Production shipment entry (reception checks, once per delivery)\n3. Quit")
+        sel = (await session.prompt_async("Choose 1, 2 or 3: ")).strip()
+        if sel == '1':
+            await run_ptc_test()
+        elif sel == '2':
+            await run_reception_check()
+        elif sel == '3':
+            break
     renewal_task.cancel()
 
 if __name__ == "__main__":

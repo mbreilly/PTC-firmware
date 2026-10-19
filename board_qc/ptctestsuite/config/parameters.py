@@ -36,3 +36,9 @@ load_settle_time = 1.0
 # GbE throughput test (procedure 4.4.6.2)
 throughput_test_mb = 1000
 throughput_min_mb_s = 12.5
+
+# Shipment reception checks (procedure 4.1), recorded once per delivery
+reception_log_file = "reception_records.jsonl"
+# TODO HWDB item that shipment records are attached to. Left empty, records are only
+# saved locally in reception_log_file
+reception_hwdb_part_id = ""
