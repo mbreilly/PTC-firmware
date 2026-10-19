@@ -66,8 +66,7 @@ async def start_client(ready_signal: asyncio.Event, debug_run=False) -> bool:
     venv_python = f'{parameters.ptc_client_path}/.env/bin/python'
 
     command = (
-        f"test -f {venv_python} &&"
-        f"cd /home/root && {venv_python} -u -m ptctestclient"
+        f"python3 -u -m ptctestclient"
     )
 
     try:
