@@ -8,7 +8,7 @@ from loguru import logger as lg
 
 from ptctestsuite.utils.qc_record import qc_record
 from ptctestsuite.utils.qc_result import qc_result
-from ptctestsuite.config.parameters import reception_hwdb_part_id, ptc_part_type_id, ptc_qc_test_id, bearer_token_path, dune_hwdb_api_path, local_cache_file, token_renewal_interval
+from ptctestsuite.config.parameters import reception_part_type_id, reception_serial_prefix, ptc_part_type_id, ptc_qc_test_id, bearer_token_path, dune_hwdb_api_path, local_cache_file, token_renewal_interval
 from collections.abc import Buffer
 
 from datetime import datetime
@@ -92,34 +92,35 @@ async def check_item_exists(item: qc_record) -> bool:
         return True
     return False
 
-async def create_hwdb_item(item: qc_record) -> dict:
+async def create_hwdb_item(item: qc_record, part_type_id: str = ptc_part_type_id, serial_number: str | None = None) -> dict:
     item_exists = await check_item_exists(item)
     if item_exists:
         lg.error("Item Already Exists in HWDB!")
         return dict()
+    serial_number = serial_number or str(item.serial_number)
     # first, craft the request
-    p = f"{dune_hwdb_api_path}/component-types/{ptc_part_type_id}/components"
+    p = f"{dune_hwdb_api_path}/component-types/{part_type_id}/components"
     # hardcoding some things for now, we can change later if needed (unlikely)
     req_payload = {
         'comments': 'Test', 
         'country_code': "US", 
         'institution': {"id": 191}, 
         'manufacturer': {"id": 67}, 
-        'serial_number': str(item.serial_number), 
-        'component_type': {"part_type_id": ptc_part_type_id},
+        'serial_number': serial_number, 
+        'component_type': {"part_type_id": part_type_id},
         'specifications': {'DATA': {}}
     }
     ah = await auth_header()
     async with httpx.AsyncClient() as client:
-        lg.info(f'Creating HWDB entry for board {item.serial_number}')
+        lg.info(f'Creating HWDB entry for {serial_number}')
         resp = await client.post(p, json=req_payload, headers=ah)
 
     if resp.status_code == httpx.codes.OK:
         rj = resp.json()
-        lg.info(f'Created HWDB entry for board {item.serial_number}, has component id {rj['component_id']}')
+        lg.info(f'Created HWDB entry for {serial_number}, has component id {rj['component_id']}')
         return rj
     else:
-        lg.critical(f"Failed to create entry for board {item.serial_number} in HWDB!")
+        lg.critical(f"Failed to create entry for {serial_number} in HWDB!")
         print(resp.json())
         return dict()
 
@@ -186,12 +187,13 @@ async def upload_ptc_image(part_id: str, image: Buffer) -> dict:
 
 
 async def upload_reception_record(record) -> dict:
-    """Posts a one-time shipment reception record (procedure 4.1) to the HWDB item
-    set in `reception_hwdb_part_id`. Does nothing if that isn't configured."""
-    if not reception_hwdb_part_id:
-        lg.warning("reception_hwdb_part_id not set, shipment record only saved locally")
+    """Creates an entry for the shipment in the same HWDB as the boards and attaches
+    the one-time reception checks (procedure 4.1) to it as a test."""
+    item = await create_hwdb_item(record, part_type_id=reception_part_type_id,
+                                  serial_number=f"{reception_serial_prefix}{record.serial_number}")
+    if not item:
         return dict()
-    p = f"{dune_hwdb_api_path}/components/{reception_hwdb_part_id}/tests"
+    p = f"{dune_hwdb_api_path}/components/{item['part_id']}/tests"
     test_res = record.gen_hwdb_datasheet()
     test_res['Test Date'] = test_res.pop('test_date')
     test_res['Test Time'] = test_res.pop('test_time')

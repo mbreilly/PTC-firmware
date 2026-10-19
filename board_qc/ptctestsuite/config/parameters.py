@@ -39,6 +39,8 @@ throughput_min_mb_s = 12.5
 
 # Shipment reception checks (procedure 4.1), recorded once per delivery
 reception_log_file = "reception_records.jsonl"
-# TODO HWDB item that shipment records are attached to. Left empty, records are only
-# saved locally in reception_log_file
-reception_hwdb_part_id = ""
+# Each shipment gets its own entry in the same HWDB as the boards, with serial
+# number reception_serial_prefix + PO number, and the checks are attached to it.
+# TODO a dedicated shipment part type would keep these out of the PTC board list
+reception_part_type_id = ptc_part_type_id
+reception_serial_prefix = "SHIPMENT-"
