@@ -1,0 +1,4 @@
+# The top-level .gitignore ignores every file type it does not list.
+# The test station also needs its GUI page and docs.
+!*.html
+!*.md

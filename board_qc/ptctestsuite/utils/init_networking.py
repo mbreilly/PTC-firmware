@@ -30,7 +30,13 @@ async def init_ptc(serial_port="/dev/ttyUSB0", baudrate=115200, timeout=1, ip_ad
             return False
 
         # log into the ptc
-        writer.write(f"root{line_end}".encode(encoding))
+        # send username
+        writer.write(f"{parameters.ptc_user}{line_end}".encode(encoding))
+        await writer.drain()
+        await asyncio.sleep(sleep_time)
+
+        # send password
+        writer.write(f"{parameters.ptc_password}{line_end}".encode(encoding))
         await writer.drain()
         await asyncio.sleep(sleep_time)
 
@@ -77,7 +83,7 @@ async def start_client(ready_signal: asyncio.Event, debug_run=False) -> bool:
     try:
         # TODO potentially need to make user/pass configurable
         # TODO set up STDERR handling
-        async with asyncssh.connect(f"{parameters.ptc_ip}", username='root', password='', known_hosts=None) as conn:
+        async with asyncssh.connect(f"{parameters.ptc_ip}", username=parameters.ptc_user, password=parameters.ptc_password, known_hosts=None) as conn:
             lg.info(f"Connected to PTC @ {parameters.ptc_ip}")
             async with conn.create_process(command, stderr=asyncssh.STDOUT) as proc:
                 # look for server printout when ready and set signal
