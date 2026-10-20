@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PTC QC Test Station</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Design from the PTC QC GUI designer. Names match the designer summary.
+   Preset: Lab dark. Text size 100 %. Step list left. Large buttons. Rounded corners.
+   Acceptance limits shown. Database keys hidden. */
+:root {
+  --g-bg: #0F1418;     /* Window */
+  --g-panel: #172026;  /* Main panel */
+  --g-side: #121A1F;   /* Step list and bars */
+  --g-line: #2A363E;   /* Lines */
+  --g-ink: #E6EDF1;    /* Main text */
+  --g-dim: #8A9AA5;    /* Secondary text */
+  --g-accent: #3BA7C9; /* Accent */
+  --g-pass: #3FB767;   /* Pass */
+  --g-fail: #E5534B;   /* Fail */
+  --g-warn: #E0A33A;   /* Manual check */
+  --g-auto: #9A8AEA;   /* Automatic test */
+  --g-field: #0B1013;  /* Input boxes */
+  --g-on-accent: #0B0D0E; --g-on-pass: #0B0D0E; --g-on-fail: #FFFFFF;
+  --g-s: 1;            /* text size */
+  --g-r: 6px;          /* corners */
+  --g-bh: 62px;        /* button height */
+  --g-side-w: 320px;
+  --g-font: "IBM Plex Sans", "Segoe UI", Ubuntu, Arial, sans-serif;
+  --g-mono: "IBM Plex Mono", Consolas, "DejaVu Sans Mono", Menlo, monospace;
+  --show-limits: 1; --show-keys: 0;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--g-bg); color: var(--g-ink); font-family: var(--g-font); font-size: calc(15px * var(--g-s)); line-height: 1.4; }
+.mono { font-family: var(--g-mono); }
+#app { height: 100%; display: flex; flex-direction: column; }
+
+.top { display: flex; align-items: center; gap: 22px; min-height: 62px; padding: 8px 22px; border-bottom: 1px solid var(--g-line); background: var(--g-side); flex: none; }
+.title { font-weight: 600; font-size: 1.15em; }
+.sub { color: var(--g-dim); font-size: .86em; }
+.meta { display: flex; gap: 26px; margin-left: auto; color: var(--g-dim); font-size: .78em; }
+.meta b { display: block; color: var(--g-ink); font: 500 1.15em var(--g-mono); }
+.pill { border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 4px 10px; font-size: .8em; color: var(--g-dim); white-space: nowrap; }
+.pill i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 0; background: var(--g-dim); }
+.pill.on i { background: var(--g-pass); }
+.top .stop { height: 36px; padding: 0 14px; font-size: .88em; }
+.only-run { display: none; }
+.run .only-run { display: inline-block; }
+.top .pill.first { margin-left: auto; }
+
+.conn { display: none; padding: 8px 22px; background: color-mix(in srgb, var(--g-fail) 22%, var(--g-bg)); color: var(--g-ink); font-size: .9em; }
+.conn.show { display: block; }
+
+.body { flex: 1; display: flex; min-height: 0; }
+.side { width: var(--g-side-w); flex: none; background: var(--g-side); border-right: 1px solid var(--g-line); overflow: auto; padding: 8px 0 18px; }
+.grp { padding: 14px 18px 4px; color: var(--g-dim); font-size: .78em; font-weight: 600; }
+.item { display: flex; align-items: center; gap: 10px; padding: 5px 18px; font-size: .88em; color: var(--g-dim); }
+.item.done { color: var(--g-ink); }
+.item.cur { background: color-mix(in srgb, var(--g-accent) 16%, transparent); color: var(--g-ink); box-shadow: inset 3px 0 var(--g-accent); font-weight: 500; }
+.dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--g-dim); flex: none; }
+.dot.PASS { background: var(--g-pass); border-color: var(--g-pass); }
+.dot.FAIL, .dot.ERROR { background: var(--g-fail); border-color: var(--g-fail); }
+.dot.SAVED { background: var(--g-dim); border-color: var(--g-dim); }
+.dot.SKIPPED { border-style: dashed; opacity: .6; }
+.dot.cur { border-color: var(--g-accent); background: var(--g-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--g-accent) 30%, transparent); }
+.tag { margin-left: auto; font-size: .76em; color: var(--g-auto); border: 1px solid color-mix(in srgb, var(--g-auto) 60%, transparent); border-radius: var(--g-r); padding: 0 5px; }
+
+.main { flex: 1; min-width: 0; padding: 36px 52px 24px; display: flex; flex-direction: column; gap: 16px; overflow: auto; background: var(--g-panel); }
+.sec { color: var(--g-dim); font: 500 .9em var(--g-mono); display: flex; gap: 12px; align-items: center; min-height: 1.4em; }
+.kind { font-family: var(--g-font); font-size: .9em; border-radius: var(--g-r); padding: 1px 8px; }
+.kind.manual { color: var(--g-warn); background: color-mix(in srgb, var(--g-warn) 14%, transparent); }
+.kind.auto { color: var(--g-auto); background: color-mix(in srgb, var(--g-auto) 14%, transparent); }
+h1.name { font-size: 2em; font-weight: 600; line-height: 1.15; margin: 0; }
+.prompt { font-size: 1.12em; max-width: 64ch; margin: 0; }
+.limits { display: flex; flex-wrap: wrap; gap: 22px; font-size: .92em; color: var(--g-dim); }
+.limits b { color: var(--g-ink); font: 500 1.05em var(--g-mono); margin-left: 6px; }
+.key { font: .82em var(--g-mono); color: var(--g-dim); }
+.entry { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 6px; }
+.fl { display: flex; flex-direction: column; gap: 5px; font-size: .82em; color: var(--g-dim); }
+.field { background: var(--g-field); border: 1px solid var(--g-line); border-radius: var(--g-r); color: var(--g-ink); font: 500 1.45em var(--g-mono); padding: 0 14px; height: var(--g-bh); width: 240px; }
+.field:focus { outline: 2px solid var(--g-accent); outline-offset: 1px; }
+textarea.field { font: 1.05em var(--g-font); height: 140px; width: 100%; max-width: 680px; padding: 10px 14px; resize: vertical; }
+.unit { align-self: center; font: 1.25em var(--g-mono); color: var(--g-dim); }
+.btn { height: var(--g-bh); padding: 0 26px; border-radius: var(--g-r); border: 1px solid var(--g-line); background: transparent; color: var(--g-ink); font: 600 1.05em var(--g-font); cursor: pointer; }
+.btn:hover:not(:disabled) { filter: brightness(1.1); }
+.btn:focus-visible { outline: 2px solid var(--g-ink); outline-offset: 2px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn.pri { background: var(--g-accent); border-color: var(--g-accent); color: var(--g-on-accent); }
+.btn.pass { background: var(--g-pass); border-color: var(--g-pass); color: var(--g-on-pass); min-width: 170px; }
+.btn.fail { background: var(--g-fail); border-color: var(--g-fail); color: var(--g-on-fail); min-width: 170px; }
+.msg { font-size: .95em; min-height: 1.4em; }
+.msg.err { color: var(--g-fail); } .msg.warn { color: var(--g-warn); } .msg.run { color: var(--g-auto); }
+.keys { font-size: .8em; color: var(--g-dim); }
+.last { margin-top: auto; padding: 10px 14px; border: 1px solid var(--g-line); border-radius: var(--g-r); font-size: .9em; color: var(--g-dim); display: flex; gap: 12px; align-items: center; }
+.last b { color: var(--g-ink); font-weight: 500; }
+.badge { font: 600 .82em var(--g-mono); padding: 2px 8px; border-radius: var(--g-r); white-space: nowrap; }
+.badge.PASS { background: color-mix(in srgb, var(--g-pass) 20%, transparent); color: var(--g-pass); }
+.badge.FAIL, .badge.ERROR { background: color-mix(in srgb, var(--g-fail) 20%, transparent); color: var(--g-fail); }
+.badge.SAVED, .badge.SKIPPED, .badge.PENDING { background: color-mix(in srgb, var(--g-dim) 20%, transparent); color: var(--g-dim); }
+@keyframes pulse { 50% { opacity: .35; } }
+.spin { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--g-auto); margin-right: 8px; animation: pulse 1s infinite; }
+@media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+.foot { height: 36px; flex: none; display: flex; align-items: center; gap: 14px; padding: 0 22px; border-top: 1px solid var(--g-line); background: var(--g-side); font-size: .82em; color: var(--g-dim); }
+.bar { flex: 1; height: 6px; background: var(--g-line); border-radius: 3px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--g-accent); transition: width .3s; }
+
+.center { flex: 1; display: flex; align-items: center; justify-content: center; background: var(--g-panel); overflow: auto; padding: 24px; }
+.form { width: 560px; max-width: 100%; display: flex; flex-direction: column; gap: 20px; }
+.form h1 { margin: 0; font-size: 1.7em; font-weight: 600; }
+.form .field { width: 100%; font-size: 1.2em; }
+.lbl { display: block; font-size: .86em; color: var(--g-dim); margin-bottom: 6px; }
+.seg { display: flex; border: 1px solid var(--g-line); border-radius: var(--g-r); overflow: hidden; }
+.seg button { flex: 1; height: var(--g-bh); background: transparent; border: 0; color: var(--g-dim); font: 600 1em var(--g-font); cursor: pointer; padding: 0 10px; }
+.seg button + button { border-left: 1px solid var(--g-line); }
+.seg button.on { background: var(--g-accent); color: var(--g-on-accent); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+.res { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding: 26px 40px 20px; background: var(--g-panel); }
+.verdict { display: flex; align-items: center; gap: 20px; }
+.word { font: 600 2.6em var(--g-mono); padding: 2px 18px; border-radius: var(--g-r); }
+.word.PASS { color: var(--g-on-pass); background: var(--g-pass); }
+.word.FAIL, .word.ERROR { color: var(--g-on-fail); background: var(--g-fail); }
+.tbl { flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--g-line); border-radius: var(--g-r); }
+table { width: 100%; border-collapse: collapse; font-size: .9em; }
+th { position: sticky; top: 0; background: var(--g-side); text-align: left; color: var(--g-dim); font-weight: 500; padding: 8px 12px; border-bottom: 1px solid var(--g-line); }
+td { padding: 6px 12px; border-bottom: 1px solid color-mix(in srgb, var(--g-line) 60%, transparent); vertical-align: top; }
+td.mono { font-family: var(--g-mono); word-break: break-word; }
+tr.grp-row td { color: var(--g-dim); font-size: .85em; font-weight: 600; padding-top: 12px; }
+.upload { padding: 10px 14px; border-radius: var(--g-r); border: 1px solid var(--g-line); }
+.upload.ok { border-color: color-mix(in srgb, var(--g-pass) 60%, transparent); }
+.upload.bad { border-color: var(--g-fail); color: var(--g-ink); }
+.actions { display: flex; gap: 12px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top" id="top"></div>
+  <div class="conn" id="conn" role="status">Lost connection to the test program. Reconnecting… If this doesn’t clear, check that the terminal running ptctestsuite is still open.</div>
+  <div id="screen" style="flex:1;display:flex;flex-direction:column;min-height:0"></div>
+</div>
+<script>
+const SHOW_LIMITS = getComputedStyle(document.documentElement).getPropertyValue("--show-limits").trim() !== "0";
+const SHOW_KEYS = getComputedStyle(document.documentElement).getPropertyValue("--show-keys").trim() === "1";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const unitText = u => u === "us" ? "µs" : (u || "");
+const accText = s => s && s.acceptance ? s.acceptance.replace(/ us$/, " µs") : null;
+
+let ws, S = null, sentId = null, viewKey = "", pendingWarn = null, startMode = "board";
+const top = document.getElementById("top"), screen = document.getElementById("screen"), conn = document.getElementById("conn");
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen = () => conn.classList.remove("show");
+  ws.onmessage = e => { const m = JSON.parse(e.data); if (m.type === "state") { S = m.state; render(); } };
+  ws.onclose = () => { conn.classList.add("show"); setTimeout(connect, 1000); };
+}
+function answer(value) {
+  if (!S.ask || sentId === S.ask.id || ws.readyState !== 1) return;
+  sentId = S.ask.id;
+  ws.send(JSON.stringify({ type: "answer", id: S.ask.id, value }));
+  screen.querySelectorAll("button.btn, .seg button").forEach(b => b.disabled = true);
+}
+
+// ---- top bar ----
+function renderTop() {
+  const plan = S.plan || [], done = plan.filter(p => S.results[p.key]).length;
+  const isRun = S.screen === "run";
+  const meta = S.screen === "start" ? "" : `<div class="meta"><div>Tester<b>${esc(S.tester)}</b></div>
+    <div>${S.mode === "ship" ? "Purchase order" : "PTC serial"}<b>${esc(S.ident)}</b></div>
+    ${isRun ? `<div>Step<b>${Math.min(done + 1, plan.length)} of ${plan.length}</b></div>` : ""}</div>`;
+  top.className = "top" + (isRun ? " run" : "");
+  top.innerHTML = `<div><div class="title">${esc(S.title)}</div><div class="sub">${esc(S.station)}</div></div>${meta}
+    <div class="pill ${S.hwdb.on ? "on" : ""} ${meta ? "" : "first"}"><i></i>${esc(S.hwdb.label)}</div>
+    <button class="btn stop only-run" id="stop" type="button">Stop test</button>`;
+  const stop = document.getElementById("stop");
+  if (stop) stop.onclick = () => {
+    if (confirm("Stop this test? Nothing will be uploaded for this run.")) ws.send(JSON.stringify({ type: "abort" }));
+  };
+}
+
+// ---- step list ----
+function currentKey() { return S.ask && S.ask.step ? S.ask.step.key : S.running ? S.running.key : null; }
+function renderSide() {
+  const cur = currentKey(); let html = "", grp = null;
+  const firstPending = (S.plan.find(p => !S.results[p.key]) || {}).key;
+  const hl = cur && S.plan.some(p => p.key === cur) ? cur : firstPending;
+  S.plan.forEach(p => {
+    if (p.group !== grp) { grp = p.group; html += `<div class="grp">${esc(grp)}</div>`; }
+    const r = S.results[p.key], isCur = p.key === hl;
+    html += `<div class="item ${isCur ? "cur" : r ? "done" : ""}" ${isCur ? 'id="cur"' : ""}><span class="dot ${isCur ? "cur" : r ? r.result : ""}"></span><span>${esc(p.title)}</span>${p.kind === "auto" ? '<span class="tag">auto</span>' : ""}</div>`;
+  });
+  return html;
+}
+
+// ---- main panel ----
+function stepHead(st, kindLabel) {
+  const kind = kindLabel === "auto" ? '<span class="kind auto">Automatic</span>' : kindLabel === "manual" ? '<span class="kind manual">Manual check</span>' : "";
+  const acc = accText(st);
+  return `<div class="sec">${st.section ? `<span>Section ${esc(st.section)}</span>` : ""}${kind}</div>
+    <h1 class="name">${esc(st.title)}</h1><p class="prompt">${esc(st.prompt)}</p>
+    ${SHOW_LIMITS && acc ? `<div class="limits"><span>Accept<b>${esc(acc)}</b></span></div>` : ""}
+    ${SHOW_KEYS ? `<div class="key">Database key: ${esc(st.key)}</div>` : ""}`;
+}
+function askHTML(a) {
+  const st = a.step, u = st ? unitText(st.unit) : "";
+  const unit = u ? `<span class="unit">${esc(u)}</span>` : "";
+  switch (a.kind) {
+    case "number": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" inputmode="decimal" autocomplete="off">${unit}<button class="btn pri" data-a="record">Record</button></div>`;
+    case "yesno": return stepHead(st, "manual") + `<div class="entry"><button class="btn pass" data-a="yes">Pass</button><button class="btn fail" data-a="no">Fail</button></div><div class="keys">Keys: P or Y for Pass, F or N for Fail</div>`;
+    case "judged": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" inputmode="decimal" autocomplete="off">${unit}<button class="btn pass" data-a="jyes">Pass</button><button class="btn fail" data-a="jno">Fail</button></div>`;
+    case "text": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" autocomplete="off" style="width:360px" value="${esc(a.default)}"><button class="btn pri" data-a="text">Record</button></div>`;
+    case "counts": return stepHead(st, "manual") + `<div class="entry"><label class="fl">Ordered<input class="field" id="a" inputmode="numeric" autocomplete="off" style="width:160px"></label><label class="fl">Received<input class="field" id="b" inputmode="numeric" autocomplete="off" style="width:160px"></label><button class="btn pri" data-a="counts">Record</button></div>`;
+    case "notes": return stepHead(st, "") + `<div class="entry" style="flex-direction:column;align-items:stretch"><textarea class="field" id="v" placeholder="Anything unusual about this run"></textarea><div><button class="btn pri" data-a="notes">Finish and save</button></div></div>`;
+    case "instruct": return `<div class="sec"><span class="kind manual">Do this now</span></div><h1 class="name">${esc(a.title)}</h1><p class="prompt">${esc(a.text)}</p><div class="entry"><button class="btn pri" data-a="ok">Done, continue</button></div>`;
+    case "confirm": return `<div class="sec"></div><h1 class="name">${esc(a.title)}</h1><p class="prompt">${esc(a.text)}</p><div class="entry"><button class="btn pri" data-a="yes">${esc(a.yes)}</button><button class="btn" data-a="no">${esc(a.no)}</button></div>`;
+  }
+  return "";
+}
+function lastHTML() {
+  const k = S.last, r = k && S.results[k]; if (!r) return "";
+  const p = S.plan.find(x => x.key === k);
+  return `<div class="last"><span>Last step</span><b>${esc(p ? p.title : k)}</b><span class="mono">${esc(r.value)}</span><span class="badge ${r.result}">${r.result}</span></div>`;
+}
+function mainHTML() {
+  if (S.ask) return askHTML(S.ask);
+  if (S.running) return stepHead(S.running, "auto") + `<div class="msg run"><span class="spin"></span>Running on the PTC…</div>`;
+  if (S.status) return `<div class="sec"></div><h1 class="name">Please wait</h1><div class="msg run"><span class="spin"></span>${esc(S.status)}</div>`;
+  return `<div class="msg run"><span class="spin"></span>Working…</div>`;
+}
+
+function renderRun() {
+  const plan = S.plan, done = plan.filter(p => S.results[p.key]).length;
+  const key = JSON.stringify(["run", S.ask && S.ask.id, S.running && S.running.key, S.status]);
+  if (key !== viewKey || !screen.querySelector(".body")) {
+    viewKey = key; pendingWarn = null;
+    screen.innerHTML = `<div class="body"><aside class="side" id="side"></aside><main class="main"><div id="mainc" style="display:flex;flex-direction:column;gap:16px"></div><div class="msg" id="msg" role="status"></div><div id="lastc" style="margin-top:auto"></div></main></div>
+      <div class="foot"><span id="cnt"></span><div class="bar"><i id="barfill"></i></div><span>${S.mode === "ship" ? "Shipment entry" : "Production board"}</span></div>`;
+    document.getElementById("mainc").innerHTML = mainHTML();
+    bindMain();
+    const f = screen.querySelector("#v, #a"); if (f) f.focus();
+  }
+  document.getElementById("side").innerHTML = renderSide();
+  document.getElementById("lastc").innerHTML = lastHTML();
+  document.getElementById("cnt").textContent = `${done} of ${plan.length} recorded`;
+  document.getElementById("barfill").style.width = `${Math.round(done / Math.max(1, plan.length) * 100)}%`;
+  showError();
+  const cur = document.getElementById("cur"); if (cur) cur.scrollIntoView({ block: "nearest" });
+}
+function say(text, kind) { const m = document.getElementById("msg"); if (m) { m.textContent = text; m.className = "msg " + (kind || ""); } }
+function showError() {
+  if (S.ask && S.ask.error) { say(S.ask.error, "err"); sentId = null; screen.querySelectorAll("button.btn, .seg button").forEach(b => b.disabled = false); }
+}
+
+function bindMain() {
+  const a = S.ask; if (!a) return;
+  const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  const act = name => {
+    const st = a.step;
+    switch (name) {
+      case "record": {
+        const raw = val("v"), n = Number(raw);
+        if (raw === "" || !isFinite(n)) { say("Enter a number.", "err"); return; }
+        if (st.limits) {
+          const [lo, hi] = st.limits, out = n < lo || (hi !== null && n > hi);
+          if (out && pendingWarn !== raw) { pendingWarn = raw; say(`${raw} ${unitText(st.unit)} is outside ${accText(st)}. Press Record again to save it as FAIL, or correct it.`, "warn"); return; }
+        }
+        answer(n); return; }
+      case "yes": answer(true); return;
+      case "no": answer(false); return;
+      case "ok": answer(true); return;
+      case "jyes": case "jno": {
+        const raw = val("v"); if (!raw) { say("Enter the reading first.", "err"); return; }
+        answer({ ok: name === "jyes", value: raw }); return; }
+      case "text": {
+        const raw = val("v");
+        if (!raw && st.key !== "batch_number") { say("Enter or scan a value first.", "err"); return; }
+        answer(raw); return; }
+      case "counts": {
+        const x = val("a"), y = val("b");
+        if (x === "" || y === "" || !isFinite(+x) || !isFinite(+y)) { say("Enter both quantities as numbers.", "err"); return; }
+        answer({ ordered: +x, received: +y }); return; }
+      case "notes": answer(val("v")); return;
+    }
+  };
+  screen.querySelectorAll("[data-a]").forEach(b => b.onclick = () => act(b.dataset.a));
+  screen.querySelectorAll("input.field").forEach(f => {
+    f.oninput = () => { if (document.getElementById("msg").className.includes("err")) say(""); };
+    f.onkeydown = e => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      if (a.kind === "counts" && f.id === "a") { document.getElementById("b").focus(); return; }
+      if (["number", "text", "counts"].includes(a.kind)) act(a.kind === "number" ? "record" : a.kind);
+    };
+  });
+}
+document.addEventListener("keydown", e => {
+  const typing = e.target instanceof Element && e.target.closest("input, textarea");
+  if (!S || !S.ask || S.ask.kind !== "yesno" || typing || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  if (k === "p" || k === "y") { e.preventDefault(); answer(true); }
+  if (k === "f" || k === "n") { e.preventDefault(); answer(false); }
+});
+
+// ---- start screen ----
+function renderStart() {
+  const key = JSON.stringify(["start", S.ask && S.ask.id]);
+  if (key === viewKey && screen.querySelector(".form")) { showStartError(); return; }
+  viewKey = key;
+  const draw = () => {
+    const b = startMode === "board";
+    const keep = id => { const el = document.getElementById(id); return el ? el.value : ""; };
+    const tester = keep("f-tester") || (S.ask && S.ask.tester) || "";
+    screen.innerHTML = `<div class="center"><div class="form">
+      <h1>Start a test</h1>
+      <div><span class="lbl">What are you entering?</span>
+        <div class="seg"><button type="button" data-m="board" class="${b ? "on" : ""}">Production board</button><button type="button" data-m="ship" class="${b ? "" : "on"}">Production shipment</button></div></div>
+      <label><span class="lbl">Tester name</span><input class="field" id="f-tester" autocomplete="off" value="${esc(tester)}"></label>
+      ${b ? `<label><span class="lbl">PTC serial number</span><input class="field" id="f-serial" autocomplete="off" placeholder="Scan the PTC barcode"></label>`
+          : `<div class="two"><label><span class="lbl">Purchase order</span><input class="field" id="f-po" autocomplete="off"></label><label><span class="lbl">Batch number, if any</span><input class="field" id="f-batch" autocomplete="off"></label></div>`}
+      <div class="msg" id="msg" role="status"></div>
+      <button class="btn pri" id="go" type="button">${b ? "Start board test" : "Start shipment entry"}</button>
+    </div></div>`;
+    screen.querySelectorAll("[data-m]").forEach(x => x.onclick = () => { startMode = x.dataset.m; draw(); });
+    const go = () => {
+      const v = id => (document.getElementById(id) || { value: "" }).value.trim();
+      const val = { mode: startMode, tester: v("f-tester"), serial: v("f-serial"), po: v("f-po"), batch: v("f-batch") };
+      if (!val.tester) return say("Enter the tester name first.", "err");
+      if (startMode === "board" && !val.serial) return say("Scan the PTC serial first.", "err");
+      if (startMode === "ship" && !val.po) return say("Enter the purchase order number first.", "err");
+      answer(val);
+    };
+    document.getElementById("go").onclick = go;
+    screen.querySelectorAll("input.field").forEach(f => f.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); go(); } });
+    const first = tester ? document.getElementById(b ? "f-serial" : "f-po") : document.getElementById("f-tester");
+    if (first) first.focus();
+  };
+  draw();
+  showStartError();
+}
+function showStartError() { if (S.ask && S.ask.error) { say(S.ask.error, "err"); sentId = null; screen.querySelectorAll("button").forEach(b => b.disabled = false); } }
+
+// ---- results and stopped ----
+function renderResults() {
+  const key = JSON.stringify(["results", S.ask && S.ask.id, S.final]);
+  if (key === viewKey) return; viewKey = key;
+  const F = S.final, ov = F.overall;
+  const failed = S.plan.filter(p => { const r = S.results[p.key]; return r && (r.result === "FAIL" || r.result === "ERROR"); }).length;
+  const words = { PASS: "Every step passed.", FAIL: `${failed} ${failed === 1 ? "step" : "steps"} failed. Check the rows marked FAIL.`, ERROR: `${failed} ${failed === 1 ? "step" : "steps"} couldn’t run. Check the rows marked ERROR.` };
+  let rows = "", grp = null;
+  const planKeys = new Set(S.plan.map(p => p.key));
+  const items = S.plan.filter(p => p.kind !== "notes").concat(Object.keys(S.results).filter(k => !planKeys.has(k)).map(k => ({ key: k, title: k, group: "Other results" })));
+  items.forEach(p => {
+    if (p.group !== grp) { grp = p.group; rows += `<tr class="grp-row"><td colspan="${SHOW_KEYS ? 5 : 4}">${esc(grp)}</td></tr>`; }
+    const r = S.results[p.key] || { result: "PENDING", value: "Not run" };
+    rows += `<tr><td>${esc(p.title)}</td>${SHOW_KEYS ? `<td class="mono">${esc(p.key)}</td>` : ""}<td class="mono">${esc(r.value)}</td>${SHOW_LIMITS ? `<td>${esc(accText(p) || "")}</td>` : ""}<td><span class="badge ${r.result}">${r.result === "PENDING" ? "NOT RUN" : r.result}</span></td></tr>`;
+  });
+  const up = F.ok === true ? "ok" : F.ok === false ? "bad" : "";
+  screen.innerHTML = `<div class="res">
+    <div class="verdict"><span class="word ${ov}">${ov}</span><div><div style="font-size:1.4em;font-weight:600">${esc(S.mode === "ship" ? "Shipment " + S.ident : S.ident)}</div><div style="color:var(--g-dim)">${esc(words[ov] || "")}</div></div></div>
+    ${F.message ? `<div class="upload ${up}">${esc(F.message)}</div>` : ""}
+    <div class="tbl"><table><thead><tr><th>Step</th>${SHOW_KEYS ? "<th>Database key</th>" : ""}<th>Value</th>${SHOW_LIMITS ? "<th>Accept</th>" : ""}<th>Result</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${F.notes ? `<div><span class="lbl">Notes</span>${esc(F.notes)}</div>` : ""}
+    <div class="actions"><button class="btn pri" id="next" type="button">${S.mode === "ship" ? "New entry" : "Test next board"}</button></div></div>`;
+  document.getElementById("next").onclick = () => answer(true);
+  document.getElementById("next").focus();
+}
+function renderStopped() {
+  const key = JSON.stringify(["stopped", S.ask && S.ask.id, S.final]);
+  if (key === viewKey) return; viewKey = key;
+  screen.innerHTML = `<div class="center"><div class="form"><h1>The test stopped</h1><p class="prompt">${esc(S.final.message)}</p>
+    <div><button class="btn pri" id="next" type="button">Back to start</button></div></div></div>`;
+  document.getElementById("next").onclick = () => answer(true);
+  document.getElementById("next").focus();
+}
+
+function render() {
+  document.title = S.title;
+  if (!S.ask || S.ask.id !== sentId) sentId = null;
+  renderTop();
+  if (S.screen === "start") renderStart();
+  else if (S.screen === "run") renderRun();
+  else if (S.screen === "results") renderResults();
+  else renderStopped();
+}
+connect();
+</script>
+</body>
+</html>

@@ -44,3 +44,11 @@ reception_log_file = "reception_records.jsonl"
 # TODO a dedicated shipment part type would keep these out of the PTC board list
 reception_part_type_id = ptc_part_type_id
 reception_serial_prefix = "SHIPMENT-"
+
+# Results that failed to upload to the HWDB are kept here, one JSON record per line
+unuploaded_results_file = "unuploaded_results.jsonl"
+
+# GUI (python -m ptctestsuite). The GUI is a local web page served on this port.
+gui_port = 8080
+gui_title = "PTC QC Test Station"
+gui_station = "Penn, bench 1"
