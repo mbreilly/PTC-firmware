@@ -10,7 +10,7 @@ TIMING_STAT_GOOD = 0x8
 
 
 class timing_test(test_base):
-    """Timing RX test (procedure 4.4.5.1a). Resets the timing endpoint and checks it
+    """Timing RX test (procedure 4.5.4.1a). Resets the timing endpoint and checks it
     comes back with status 0x8 and timing_lock set. Needs the timing master running."""
 
     def __init__(self, settle_time: float = 1.0):

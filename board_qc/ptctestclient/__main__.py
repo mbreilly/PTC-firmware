@@ -1,5 +1,5 @@
 from ptctestclient.comm import send_test_result
-from ptctestclient.ptctests import dummy_client, eeprom, temperature_test, iv_sensors_test, qc_iv_sensors_test, alert_test, timing_test, wib_power
+from ptctestclient.ptctests import dummy_client, eeprom, temperature_test, iv_sensors_test, qc_iv_sensors_test, alert_test, timing_test, wib_power, memory
 from ptctestclient.utils import qc_result
 
 import asyncio
@@ -17,6 +17,7 @@ test_registry = {
     "alert": alert_test,
     "timing": timing_test,
     "wib_power": wib_power,
+    "memory": memory,
 }
 
 async def run_test(ws):

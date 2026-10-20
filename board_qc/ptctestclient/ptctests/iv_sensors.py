@@ -46,16 +46,16 @@ class iv_sensors_test(test_base):  # pylint: disable=invalid-name
 
         self.channels = [
             # Main sensors (12V rail, 0.005 ohm sense resistor)
-            # current limits are 1.5A +/- 100mA at 25% load (procedure 4.4.2.2)
+            # current limits are 1.5A +/- 100mA at 25% load (procedure 4.5.1.2)
             IVSensorChannel("0x67", 12.0, 12.35, 1.4, 1.6, 0.005),
             IVSensorChannel("0x68", 12.0, 12.35, 1.4, 1.6, 0.005),
             IVSensorChannel("0x69", 12.0, 12.35, 1.4, 1.6, 0.005),
             IVSensorChannel("0x6a", 12.0, 12.35, 1.4, 1.6, 0.005),
             IVSensorChannel("0x6b", 12.0, 12.35, 1.4, 1.6, 0.005),
             IVSensorChannel("0x6c", 12.0, 12.35, 1.4, 1.6, 0.005),
-            # SoM sensor (<= 2A, procedure 4.4.2.3)
+            # SoM sensor (<= 2A, procedure 4.5.1.3)
             IVSensorChannel("0x6d", 12.0, 12.35, 0.0, 2.0, 0.005),
-            # Aux sensors (2.5V and 3.3V rails, 0.02 ohm sense resistor, <= 2A, procedure 4.4.2.4)
+            # Aux sensors (2.5V and 3.3V rails, 0.02 ohm sense resistor, <= 2A, procedure 4.5.1.4)
             IVSensorChannel("0x6e", 2.4, 2.6, 0.0, 2.0, 0.02),
             IVSensorChannel("0x6f", 3.2, 3.4, 0.0, 2.0, 0.02),
         ]
