@@ -16,6 +16,14 @@ from loguru import logger as lg
 
 class test_base(ABC):
 
+    # measured values recorded alongside the result.
+    # Created lazily since not every test calls super().__init__
+    @property
+    def values(self) -> dict:
+        if not hasattr(self, '_values'):
+            self._values = {}
+        return self._values
+
     # writing this so the method can be called easily from an overrided init
     def log_test_init(self):
         lg.info(f"Starting {test_pretty_names[self.__class__.__name__]} test...")

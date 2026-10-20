@@ -46,17 +46,18 @@ class iv_sensors_test(test_base):  # pylint: disable=invalid-name
 
         self.channels = [
             # Main sensors (12V rail, 0.005 ohm sense resistor)
-            IVSensorChannel("0x67", 12.0, 12.35, 1.35, 1.65, 0.005),
-            IVSensorChannel("0x68", 12.0, 12.35, 1.35, 1.65, 0.005),
-            IVSensorChannel("0x69", 12.0, 12.35, 1.35, 1.65, 0.005),
-            IVSensorChannel("0x6a", 12.0, 12.35, 1.35, 1.65, 0.005),
-            IVSensorChannel("0x6b", 12.0, 12.35, 1.35, 1.65, 0.005),
-            IVSensorChannel("0x6c", 12.0, 12.35, 1.35, 1.65, 0.005),
-            # SoM sensor (wider current range)
+            # current limits are 1.5A +/- 100mA at 25% load (procedure 4.4.2.2)
+            IVSensorChannel("0x67", 12.0, 12.35, 1.4, 1.6, 0.005),
+            IVSensorChannel("0x68", 12.0, 12.35, 1.4, 1.6, 0.005),
+            IVSensorChannel("0x69", 12.0, 12.35, 1.4, 1.6, 0.005),
+            IVSensorChannel("0x6a", 12.0, 12.35, 1.4, 1.6, 0.005),
+            IVSensorChannel("0x6b", 12.0, 12.35, 1.4, 1.6, 0.005),
+            IVSensorChannel("0x6c", 12.0, 12.35, 1.4, 1.6, 0.005),
+            # SoM sensor (<= 2A, procedure 4.4.2.3)
             IVSensorChannel("0x6d", 12.0, 12.35, 0.0, 2.0, 0.005),
-            # Aux sensors (2.5V and 3.3V rails, 0.02 ohm sense resistor)
-            IVSensorChannel("0x6e", 2.4, 2.6, 0.5, 2.0, 0.02),
-            IVSensorChannel("0x6f", 3.2, 3.4, 0.5, 2.0, 0.02),
+            # Aux sensors (2.5V and 3.3V rails, 0.02 ohm sense resistor, <= 2A, procedure 4.4.2.4)
+            IVSensorChannel("0x6e", 2.4, 2.6, 0.0, 2.0, 0.02),
+            IVSensorChannel("0x6f", 3.2, 3.4, 0.0, 2.0, 0.02),
         ]
 
         self.sleep_time = 0.1
@@ -141,8 +142,7 @@ class iv_sensors_test(test_base):  # pylint: disable=invalid-name
 
         for ch in self.channels:
             try:
-                ch.voltage = self.read_voltage(ch.sensor_addr)
-
+                # select the mux channel first so voltage and current come from the same bus
                 if ch.sensor_addr in ["0x6e", "0x6f"]:
                     subprocess.run(
                         ["i2cset", "-y", "-r", "0", mux_addr, hex(aux_mux_channel)],
@@ -156,6 +156,7 @@ class iv_sensors_test(test_base):  # pylint: disable=invalid-name
                     )
                     sleep(1)
 
+                ch.voltage = self.read_voltage(ch.sensor_addr)
                 ch.current = self.read_current(ch.sensor_addr, ch.resistor)
                 sleep(self.sleep_time)
 
@@ -165,24 +166,32 @@ class iv_sensors_test(test_base):  # pylint: disable=invalid-name
                 # The previous functions will return more detailed errors,
                 # making this error test-specific.
                 lg.critical(
-                    "Reading at least one voltage or current sensor"
-                    " was unsuccessful! Marking test as failed"
+                    f"Reading sensor {ch.sensor_addr} was unsuccessful!"
+                    " Marking test as failed"
                 )
                 lg.exception(e)
-                return qc_result.FAIL
+                ch.voltage = None
+                ch.current = None
 
+        # check every channel so all readings get recorded, even after a failure
+        result = qc_result.PASS
         for ch in self.channels:
+            self.values[f"{ch.sensor_addr}_voltage"] = None if ch.voltage is None else round(ch.voltage, 3)
+            self.values[f"{ch.sensor_addr}_current"] = None if ch.current is None else round(ch.current, 3)
+
             if ch.voltage is None or ch.current is None:
                 lg.error(f"Null reading on sensor {ch.sensor_addr}")
-                return qc_result.FAIL
+                result = qc_result.FAIL
+                continue
 
             if ch.voltage < ch.v_min or ch.voltage > ch.v_max:
                 lg.error(f"Voltage out of range on {ch.sensor_addr}: {ch.voltage}V")
-                return qc_result.FAIL
+                result = qc_result.FAIL
 
             if ch.current < ch.i_min or ch.current > ch.i_max:
                 lg.error(f"Current out of range on {ch.sensor_addr}: {ch.current}A")
-                return qc_result.FAIL
+                result = qc_result.FAIL
 
-        lg.info("Voltage and current monitoring test passed.")
-        return qc_result.PASS
+        if result == qc_result.PASS:
+            lg.info("Voltage and current monitoring test passed.")
+        return result

@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 from .qc_result import qc_result
 
-from ptctestsuite.config.test_names import test_pretty_names
-
 from loguru import logger as lg
 
 # Here, we lay out the interface definition for a test.
@@ -16,9 +14,17 @@ from loguru import logger as lg
 
 class test_base(ABC):
 
+    # measured values reported back to the host alongside the result, e.g.
+    # {"0x67_voltage": 12.1}. Created lazily since not every test calls super().__init__
+    @property
+    def values(self) -> dict:
+        if not hasattr(self, '_values'):
+            self._values = {}
+        return self._values
+
     # writing this so the method can be called easily from an overrided init
     def log_test_init(self):
-        lg.info(f"Starting {test_pretty_names[self.__class__.__name__]} test...")
+        lg.info(f"Starting {self.__class__.__name__} test...")
     
     def test_init(self) -> bool:
         """ Test Init Stub. Returns boolean indicating if initialization passed or failed"""
@@ -35,7 +41,7 @@ class test_base(ABC):
     def log_test_end(self) -> None:
         """Add log message that the test has finished running.
         """
-        lg.info(f"Finished {test_pretty_names[self.__class__.__name__]} test.")
+        lg.info(f"Finished {self.__class__.__name__} test.")
 
     def test_end(self) -> bool:
         """Test de-init stub. Returns boolean indicating status"""
@@ -47,12 +53,12 @@ class test_base(ABC):
         test_init_status = self.test_init()
         if not test_init_status:
             # TODO maybe change these to use logging instead of throwing a runtime error?
-            raise RuntimeError(f"{test_pretty_names[self.__class__.__name__]} Test Initialization Failed") 
+            raise RuntimeError(f"{self.__class__.__name__} Test Initialization Failed") 
         return self
 
     def __exit__(self, exception_type, exception_value, exception_traceback):
         test_end_status = self.test_end()
         if not test_end_status:
             # TODO maybe change these to use logging instead of throwing a runtime error?
-            raise RuntimeError(f"{test_pretty_names[self.__class__.__name__]} Test Exit Failed")
+            raise RuntimeError(f"{self.__class__.__name__} Test Exit Failed")
 

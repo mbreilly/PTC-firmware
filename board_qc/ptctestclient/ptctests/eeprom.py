@@ -23,6 +23,8 @@ class eeprom(test_base):
             except ValueError as ee:
                 lg.exception(ee)
                 return qc_result.FAIL
+        # 6 byte globally unique ID, stored as hex so it reads like the label/MAC
+        self.values['eeprom_serial'] = f"{eeprom_serial:012x}"
         return qc_result.PASS
         # in Elliot's initial test he uses the EEPROM to assign
         # an IP address. I don't think this will be necessary here

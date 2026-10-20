@@ -38,6 +38,18 @@ This respository contains firmware and software source for PTCv4. Firmware runs 
 | reference_design/src/ | Verilog source files, pin/timing constraint files |
 | reference_design/scripts/ | Build scripts |
 | reference_design/ip_repo/ | User-generated IP |
+| board_qc/ | Board QC test station: GUI and terminal app that runs PTC_QC_Procedures_v1.0 and records the results in the DUNE HWDB. See [board_qc/README.md](board_qc/README.md). |
+
+### Board QC test station
+The `board_qc/` folder has the software used to test each production PTC on the QC board and record the results in the DUNE hardware database (HWDB). It covers both production board entries (one per PTC, following PTC_QC_Procedures_v1.0) and production shipment entries (the reception checks, once per delivery). To run it:
+
+```
+cd board_qc
+pip install -r ptctestsuite/requirements.txt
+python -m ptctestsuite
+```
+
+This opens the test station in the browser. See [board_qc/README.md](board_qc/README.md) for the full list of steps, the HWDB setup and how to try it without hardware.
 
 ### Git instructions and building firmware
 This project uses Vivado 2022.2 and petalinux 2022.2 in a Linux environment (Ubuntu 20.04.1 is used for development).
