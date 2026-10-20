@@ -17,14 +17,17 @@ from loguru import logger as lg
 
 class gbe_test(test_base):
 
+    def __init__(self, ip: str):
+        self._ip = ip
+
     def test_init(self):
         # nothing to init anymore
         return True
 
     def run_test(self):
         try:
-            response = ping(parameters.ptc_ip, verbose=True, count=3)
-            lg.info(f"Attempting to ping PTC. Response is: {response}")
+            response = ping(self._ip, verbose=True, count=3)
+            lg.info(f"Attempting to ping PTC at {self._ip}. Response is: {response}")
         except Exception as e:
             lg.error(e)
             return qc_result.FAIL
@@ -38,7 +41,7 @@ class gbe_test(test_base):
         return True
 
 
-async def gbe_throughput_test(size_mb: int = parameters.throughput_test_mb) -> tuple[qc_result, float | None]:
+async def gbe_throughput_test(ip: str, size_mb: int = parameters.throughput_test_mb) -> tuple[qc_result, float | None]:
     """Streams `size_mb` megabytes from the host to /dev/null on the PTC over ssh and
     measures the rate (procedure 4.4.6.2, acceptance > 12.5 MB/s).
 
@@ -47,7 +50,7 @@ async def gbe_throughput_test(size_mb: int = parameters.throughput_test_mb) -> t
     """
     chunk = bytes(1024 * 1024)
     try:
-        async with asyncssh.connect(parameters.ptc_ip, username=parameters.ptc_user,
+        async with asyncssh.connect(ip, username=parameters.ptc_user,
                                     password=parameters.ptc_password, known_hosts=None) as conn:
             async with conn.create_process("dd of=/dev/null bs=1M", encoding=None) as proc:
                 start = time.monotonic()

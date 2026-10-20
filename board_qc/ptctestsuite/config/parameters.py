@@ -1,7 +1,8 @@
-ptc_ip = "192.168.20.100"
+# ptc_ip is discovered at runtime (DHCP on end1) and passed explicitly to the
+# functions that need it, so it is left as a placeholder here.
+ptc_ip = None
 qc_ip = "192.168.20.101"
 ws_port = 8765
-ptc_client_path = "/home/root/ptctestclient"
 
 # HWDB
 ptc_part_type_id = "D08104300001"

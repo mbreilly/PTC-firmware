@@ -29,10 +29,11 @@ code and presses Enter.
 | `--port N` | GUI port (default `gui_port` in `config/parameters.py`) |
 | `--no-browser` | Don't open the browser; go to the address printed in the terminal |
 
-The PTC (`ptc_ip`, 192.168.20.100) and QC board (`qc_ip`, 192.168.20.101) addresses are in
-`ptctestsuite/config/parameters.py`. The test suite starts the on-board client over ssh from
-`ptc_client_path` on the PTC, so `ptctestclient/` must be copied there with its virtual
-environment in `.env` (`pip install -r ptctestclient/requirements.txt`).
+The PTC gets its address from DHCP: the test suite logs in over the serial port, reads the
+address of `end1`, and uses it for the rest of the run. The QC board address (`qc_ip`,
+192.168.20.101) is in `ptctestsuite/config/parameters.py`. The test suite starts the on-board
+client over ssh with `python3 -m ptctestclient`, so the QC image on the PTC must include
+`ptctestclient/` and its requirements (`ptctestclient/requirements.txt`).
 
 ## The two kinds of entry
 

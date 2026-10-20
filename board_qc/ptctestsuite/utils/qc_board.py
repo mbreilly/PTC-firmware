@@ -40,16 +40,20 @@ class qc_board_handler:
     async def setup_networking(self) -> bool:
         timeout = 1
         lg.info("Setting up QC Board Networking")
-        # error handling?
-        status = await init_ptc(
+        # init_ptc now returns the discovered DHCP IP (or None on failure), so
+        # we treat a present IP as success. Note: the QC board may use a
+        # different interface than `end1`; this will be revisited when QC DHCP
+        # discovery is added.
+        discovered_ip = await init_ptc(
             serial_port=self.serial_port,
             baudrate=self.baudrate,
             timeout=timeout,
-            ip_address=self.ip_address,
             debug_run = self.debug_run 
         )
-        lg.info(f"Set up QC board networking with status {status}")
-        return status
+        if discovered_ip is not None:
+            self.ip_address = discovered_ip
+        lg.info(f"Set up QC board networking with status {discovered_ip}")
+        return discovered_ip is not None
 
     async def poke(self, addr: int, value: int) -> bool:
         if self.debug_run:

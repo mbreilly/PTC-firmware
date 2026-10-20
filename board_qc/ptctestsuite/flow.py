@@ -93,7 +93,7 @@ def board_plan() -> list[Step]:
     plan += [Step.from_man_test(t, g) for t in timing_tests]
     g = "Ethernet"
     plan += [
-        _auto("gbe_ping", "4.4.6", f"Pings the PTC at {parameters.ptc_ip}.", g),
+        _auto("gbe_ping", "4.4.6", "Pings the PTC at the address it got from DHCP.", g),
         _auto("gbe_throughput", "4.4.6", f"Sends {parameters.throughput_test_mb} MB to the PTC and measures the speed.",
               g, (parameters.throughput_min_mb_s, None), "MB/s"),
     ] + [Step.from_man_test(t, g) for t in ethernet_tests]
@@ -191,7 +191,6 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
         ui.status("Renewing the HWDB token…")
         await renew_token_if_needed()
 
-    ptc_ip = "localhost" if debug else parameters.ptc_ip
     q = qc_record(entry["serial"].strip(), entry["tester"])
     watch(q, ui)
     plan_list = board_plan()
@@ -226,24 +225,24 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
     q.ambient_temperature = await ui.ask_number(STEP_AMBIENT)
     ui.saved("ambient_temperature", f"{q.ambient_temperature:g} °C")
 
-    # try to init the PTC on the default serial port
+    # try to init the PTC on the default serial port, discovering its DHCP IP
     ui.status("Setting up the PTC network over the serial port…")
-    net_status = await init_ptc(debug_run=debug)
-    if not net_status:
+    ptc_ip = await init_ptc(debug_run=debug)
+    if ptc_ip is None:
         port_step = Step("serial_port", "PTC serial port", "4.2",
                          "The PTC didn’t answer on /dev/ttyUSB0. Check the USB serial cable, then enter the port to try.",
                          kind="scan")
         ptc_serial_port = await ui.ask_text(port_step, default="/dev/ttyUSB1")
         ui.status("Setting up the PTC network over the serial port…")
-        net_status = await init_ptc(serial_port=ptc_serial_port, debug_run=debug)
-        if not net_status:
+        ptc_ip = await init_ptc(serial_port=ptc_serial_port, debug_run=debug)
+        if ptc_ip is None:
             lg.critical("PTC Network Configuration Failed!")
             await ui.stopped("The PTC network setup failed on both serial ports. Check the serial cable and power, "
                              "then start the test again.")
             return
 
     server_listening = asyncio.Event()
-    client_task = asyncio.create_task(start_client(server_listening, debug_run=debug))
+    client_task = asyncio.create_task(start_client(server_listening, ip_address=ptc_ip, debug_run=debug))
     if not debug:
         try:
             ui.status("Starting the test program on the PTC…")
@@ -294,11 +293,11 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
         else:
             from ptctestsuite.ptctests import gbe_test, gbe_throughput_test
             ui.running(plan["gbe_ping"])
-            with gbe_test() as t:
+            with gbe_test(ptc_ip) as t:
                 r = await asyncio.to_thread(t.run_test)
                 q.add_result("gbe_ping", r, t.values)
             ui.running(plan["gbe_throughput"])
-            r, rate = await gbe_throughput_test()
+            r, rate = await gbe_throughput_test(ptc_ip)
             q.add_result("gbe_throughput", r, rate, "MB/s", (parameters.throughput_min_mb_s, None))
         await run_manual_tests(ui, q, ethernet_tests)
 
