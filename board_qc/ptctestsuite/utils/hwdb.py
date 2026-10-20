@@ -68,10 +68,44 @@ async def renew_token():
         print(line)
     await process.wait()
 
+class HwdbError(Exception):
+    """The HWDB couldn't be reached or refused a request. The message is shown to the tester."""
+
+
 async def auth_header():
-    async with aiofiles.open(Path(bearer_token_path), 'r') as f:
-        token = (await f.read()).strip()
+    try:
+        async with aiofiles.open(Path(bearer_token_path), 'r') as f:
+            token = (await f.read()).strip()
+    except OSError as e:
+        raise HwdbError(f"Can't read the HWDB token at {bearer_token_path} ({e.strerror}). "
+                        "Run htgettoken to get a new one.") from e
     return {"Authorization": f"Bearer {token}"}
+
+
+async def _request(method: str, path: str, what: str, **kwargs) -> dict:
+    """Sends one request to the HWDB and returns the JSON reply.
+
+    Raises HwdbError when the HWDB can't be reached or doesn't answer with 200 OK,
+    so a failed upload is never reported as a success.
+    """
+    ah = await auth_header()
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.request(method, path, headers=ah, **kwargs)
+    except httpx.HTTPError as e:
+        raise HwdbError(f"Can't connect to the HWDB at {dune_hwdb_api_path} while trying to {what} "
+                        f"({type(e).__name__}). Check the network connection.") from e
+    if resp.status_code in (httpx.codes.UNAUTHORIZED, httpx.codes.FORBIDDEN):
+        raise HwdbError(f"The HWDB refused the request to {what} (HTTP {resp.status_code}). "
+                        "The token has probably expired; run htgettoken to renew it.")
+    if resp.status_code != httpx.codes.OK:
+        raise HwdbError(f"The HWDB couldn't {what} (HTTP {resp.status_code}): {resp.text.strip().splitlines()[0][:200] if resp.text.strip() else "no details"}")
+    return resp.json()
+
+
+async def check_connection() -> None:
+    """Raises HwdbError if the HWDB can't be reached with the current token."""
+    await _request("GET", f"{dune_hwdb_api_path}/users/whoami", "check the connection")
     
 
 async def check_item_exists(item: qc_record) -> bool:
@@ -95,8 +129,7 @@ async def check_item_exists(item: qc_record) -> bool:
 async def create_hwdb_item(item: qc_record, part_type_id: str = ptc_part_type_id, serial_number: str | None = None) -> dict:
     item_exists = await check_item_exists(item)
     if item_exists:
-        lg.error("Item Already Exists in HWDB!")
-        return dict()
+        raise HwdbError(f"{item.serial_number} already exists in the HWDB.")
     serial_number = serial_number or str(item.serial_number)
     # first, craft the request
     p = f"{dune_hwdb_api_path}/component-types/{part_type_id}/components"
@@ -110,19 +143,10 @@ async def create_hwdb_item(item: qc_record, part_type_id: str = ptc_part_type_id
         'component_type': {"part_type_id": part_type_id},
         'specifications': {'DATA': {}}
     }
-    ah = await auth_header()
-    async with httpx.AsyncClient() as client:
-        lg.info(f'Creating HWDB entry for {serial_number}')
-        resp = await client.post(p, json=req_payload, headers=ah)
-
-    if resp.status_code == httpx.codes.OK:
-        rj = resp.json()
-        lg.info(f'Created HWDB entry for {serial_number}, has component id {rj['component_id']}')
-        return rj
-    else:
-        lg.critical(f"Failed to create entry for {serial_number} in HWDB!")
-        print(resp.json())
-        return dict()
+    lg.info(f'Creating HWDB entry for {serial_number}')
+    rj = await _request("POST", p, f"create the entry for {serial_number}", json=req_payload)
+    lg.info(f'Created HWDB entry for {serial_number}, has component id {rj['component_id']}')
+    return rj
 
 
 async def upload_test_result(item: qc_record, part_id: str) -> dict:
@@ -156,16 +180,9 @@ async def upload_test_result(item: qc_record, part_id: str) -> dict:
     }
     lg.info(f"Posting test result for board {item.serial_number} to HWDB")
 
-    ah = await auth_header()
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(p, json=req_payload, headers=ah)
-    #print(resp.json())
-    if resp.status_code == httpx.codes.OK:
-        lg.info(f"Successfully posted test results for board {item.serial_number}")
-        return resp.json()
-    else:
-        lg.critical(f"Failed to add test results for board {item.serial_number} to HWDB!")
-        return dict()
+    rj = await _request("POST", p, f"add the test results for board {item.serial_number}", json=req_payload)
+    lg.info(f"Successfully posted test results for board {item.serial_number}")
+    return rj
 
 
 async def upload_ptc_image(part_id: str, image: Buffer) -> dict:
@@ -173,17 +190,9 @@ async def upload_ptc_image(part_id: str, image: Buffer) -> dict:
     data = {'image': (f'boardimage-{part_id}.png', image, 'application/png')}
     json_payload = {"comments": "Board Image"}
 
-    ah = await auth_header()
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(p, headers=ah, data=json_payload, files=data)
-    
-
-    if resp.status_code == httpx.codes.OK:
-        lg.info(f"Successfully uploaded image for part {part_id}")
-        return resp.json()
-    else:
-        lg.critical(f"Failed to upload image for part {part_id}!")
-        return dict()
+    rj = await _request("POST", p, f"upload the image for part {part_id}", data=json_payload, files=data)
+    lg.info(f"Successfully uploaded image for part {part_id}")
+    return rj
 
 
 async def upload_reception_record(record) -> dict:
@@ -191,8 +200,6 @@ async def upload_reception_record(record) -> dict:
     the one-time reception checks (procedure 4.1) to it as a test."""
     item = await create_hwdb_item(record, part_type_id=reception_part_type_id,
                                   serial_number=f"{reception_serial_prefix}{record.serial_number}")
-    if not item:
-        return dict()
     p = f"{dune_hwdb_api_path}/components/{item['part_id']}/tests"
     test_res = record.gen_hwdb_datasheet()
     test_res['Test Date'] = test_res.pop('test_date')
@@ -206,11 +213,6 @@ async def upload_reception_record(record) -> dict:
         'test_data': test_res,
         'test_type': 'Reception Check'
     }
-    ah = await auth_header()
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(p, json=req_payload, headers=ah)
-    if resp.status_code == httpx.codes.OK:
-        lg.info(f"Posted reception record for PO {record.serial_number}")
-        return resp.json()
-    lg.critical(f"Failed to post reception record for PO {record.serial_number} to HWDB!")
-    return dict()
+    rj = await _request("POST", p, f"add the reception record for PO {record.serial_number}", json=req_payload)
+    lg.info(f"Posted reception record for PO {record.serial_number}")
+    return rj

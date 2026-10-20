@@ -20,6 +20,7 @@ from websockets.http11 import Response
 from ptctestsuite.ui.base import TesterUI, Step, TestAborted, format_value
 
 PAGE = Path(__file__).with_name("static") / "index.html"
+FONTS = PAGE.with_name("fonts")
 
 
 def _is_number(v) -> bool:
@@ -68,6 +69,13 @@ class GuiUI(TesterUI):
             return Response(200, "OK", Headers([("Content-Type", "text/html; charset=utf-8"),
                                                 ("Content-Length", str(len(body))),
                                                 ("Cache-Control", "no-store")]), body)
+        if path.startswith("/fonts/"):
+            font = FONTS / Path(path).name
+            if font.suffix == ".woff2" and font.is_file():
+                body = font.read_bytes()
+                return Response(200, "OK", Headers([("Content-Type", "font/woff2"),
+                                                    ("Content-Length", str(len(body))),
+                                                    ("Cache-Control", "max-age=86400")]), body)
         return connection.respond(404, "Not found\n")
 
     async def _handler(self, ws):

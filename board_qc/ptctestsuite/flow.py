@@ -31,6 +31,24 @@ async def renew_token_if_needed():
         renewal_needed.clear()
 
 
+async def check_hwdb(ui: TesterUI) -> None:
+    """Tells the tester before the run starts if the HWDB can't be reached, so they
+    know the results won't upload. They can carry on and upload the saved results later."""
+    from ptctestsuite.utils.hwdb import check_connection, HwdbError
+    ui.status("Checking the HWDB connection…")
+    try:
+        await check_connection()
+    except HwdbError as e:
+        lg.error(f"HWDB connection check failed: {e}")
+        if not await ui.confirm("Can't reach the HWDB",
+                                f"{e} You can still run the test. The results will be saved on this computer, "
+                                "but they won't be uploaded.",
+                                yes="Continue without the HWDB", no="Stop"):
+            raise TestAborted()
+        return
+    ui.status("Connected to the HWDB.")
+
+
 # ---- the plan: every step in order, for the GUI step list ---------------------
 
 def _auto(key, section, prompt, group, limits=None, unit=None) -> Step:
@@ -180,6 +198,8 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
     plan = {s.key: s for s in plan_list}
     ui.begin("board", q.serial_number, q.tester_name, plan_list)
     lg.info(f"Starting new PTC Test Session for {q.serial_number}")
+    if not disable_hwdb:
+        await check_hwdb(ui)
 
     # 4.3 manual tests, done before the SoM is installed
     if await ui.confirm("Power checks without the SoM",
@@ -312,7 +332,7 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
     except Exception as e:
         lg.exception(e)
         _save_unuploaded(q)
-        await ui.finish(q, f"The HWDB upload failed: {e}. The results were saved to "
+        await ui.finish(q, f"The HWDB upload failed. {e} The results were saved to "
                            f"{parameters.unuploaded_results_file} so they can be uploaded later.", False)
         return
     await ui.finish(q, "Uploaded to the HWDB with the board photo.", True)
@@ -331,6 +351,9 @@ async def run_reception_check(ui: TesterUI, entry: dict, disable_hwdb: bool = Fa
     watch(r, ui)
     plan_list = ship_plan()
     ui.begin("ship", po, r.tester_name, plan_list)
+    if not disable_hwdb:
+        await renew_token_if_needed()
+        await check_hwdb(ui)
 
     batch = entry.get("batch")
     r.batch_number = batch if batch is not None else await ui.ask_text(STEP_BATCH)
@@ -356,7 +379,7 @@ async def run_reception_check(ui: TesterUI, entry: dict, disable_hwdb: bool = Fa
         await upload_reception_record(r)
     except Exception as e:
         lg.exception(e)
-        await ui.finish(r, f"The HWDB upload failed: {e}. The shipment is saved in {parameters.reception_log_file}.",
+        await ui.finish(r, f"The HWDB upload failed. {e} The shipment is saved in {parameters.reception_log_file}.",
                         False)
         return
     await ui.finish(r, f"Saved to the HWDB as {parameters.reception_serial_prefix}{po}.", True)
