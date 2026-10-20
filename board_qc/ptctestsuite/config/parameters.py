@@ -24,17 +24,23 @@ image_crop_height = 720
 ptc_user = 'root'
 ptc_password = 'root'
 
-# QC board load control (procedure 4.4.1). Converter n uses qc_load_base_addr + 4*n
+# QC board load control (procedure 4.4.1). Since procedures v1.4 the registers run backwards:
+# converter 0 is 0x8002004c and converter 5 is 0x80020038, so converter n uses qc_load_conv0_addr - 4*n
 qc_user = 'root'
 qc_password = ''
-qc_load_base_addr = 0x80020038
+qc_load_conv0_addr = 0x8002004c
 # written before each load value, as in the procedure (poke 0x316 then 0x2xx)
 qc_load_enable_value = 0x316
 # TODO confirm the value that turns the load off
 qc_load_off_value = 0x0
 load_settle_time = 1.0
 
-# GbE throughput test (procedure 4.4.6.2)
+# QC board timing endpoint lock (procedure 4.5.4, channel 0 only for now)
+qc_timing_ctrl_addr = 0x80020004
+qc_timing_status_addr = 0x80020104
+qc_timing_locked_value = 0x18000000
+
+# GbE throughput test (procedure 4.5.5.2)
 throughput_test_mb = 1000
 throughput_min_mb_s = 12.5
 

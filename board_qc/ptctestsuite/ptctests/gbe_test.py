@@ -43,7 +43,7 @@ class gbe_test(test_base):
 
 async def gbe_throughput_test(ip: str, size_mb: int = parameters.throughput_test_mb) -> tuple[qc_result, float | None]:
     """Streams `size_mb` megabytes from the host to /dev/null on the PTC over ssh and
-    measures the rate (procedure 4.4.6.2, acceptance > 12.5 MB/s).
+    measures the rate (procedure 4.5.5.2, acceptance > 12.5 MB/s).
 
     Returns:
         tuple[qc_result, float | None]: result and throughput in MB/s

@@ -17,7 +17,7 @@ class qc_record:
     test_datetime: datetime = field(default_factory=datetime.now)
     # Enclustra SoM serial, scanned before the SoM tests (procedure 4.3.2)
     som_serial: str | None = None
-    # globally unique ID read from the PTC EEPROM (procedure 4.4.3)
+    # globally unique ID read from the PTC EEPROM (procedure 4.5.2)
     eeprom_serial: str | None = None
     # room temperature entered by the tester, reference for the temperature sensors
     ambient_temperature: float | None = None

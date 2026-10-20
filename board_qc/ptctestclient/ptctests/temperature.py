@@ -12,7 +12,7 @@ class temperature_test(test_base):
         Args:
             sensors (list[str], optional): I2C addresses to read. Defaults to the 4 local sensors.
             ambient (float, optional): Room temperature in degC entered by the tester. When given,
-                                       the acceptance window is ambient +/- tolerance (procedure 4.4.2.5).
+                                       the acceptance window is ambient +/- tolerance (procedure 4.5.1.5).
                                        Otherwise falls back to a 15-30 C window.
             tolerance (float, optional): Allowed deviation from ambient in degC. Defaults to 5.
         """

@@ -1,4 +1,4 @@
-"""ALERT assert test (procedure 4.4.2.6a). Ported from
+"""ALERT assert test (procedure 4.5.1.6a). Ported from
 qc_firmware/scripts/test_scripts/ptc_board_tests/alert_assert.py.
 
 For each LTC2945 IV sensor, set the max VIN threshold to its minimum so the

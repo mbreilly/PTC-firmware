@@ -41,7 +41,8 @@ def wib_led(num: int):
     return man_test(f'wib{num}_led', f"[4.3.1] Is the WIB {num} front panel LED on?")
 
 def ripple_full_load(num: int):
-    return man_test(f'ripple{num}_full_load', f"[4.4.1] RIPPLE_{num} AC ripple at full load on the scope (AC, 200mV, 200ns), peak",
+    return man_test(f'ripple{num}_full_load', f"[4.4.1] RIPPLE_{num} AC ripple at full load, RMS on the scope (AC, 200mV, 200ns). "
+                    "Measure promptly: loads over 50% shouldn't run for more than a few minutes",
                     limits=(0, 200), unit='mV')
 
 # 4.3 Manual QC tests, PTC on the QC board without the SoM installed
@@ -66,41 +67,41 @@ som_boot_tests = [
              limits=(5, 5), unit='boots'),
 ]
 
-# 4.4.2 shown right after the automated alert test
+# 4.5.1 shown right after the automated alert test
 alert_led_tests = [
-    man_test("over_temp_led", "[4.4.2] Did the OVER TEMP front panel LED light red during the alert test?"),
+    man_test("over_temp_led", "[4.5.1] Did the OVER TEMP front panel LED light red during the alert test?"),
 ]
 
-# 4.4.3 crate address DIP switches (SWT2)
+# 4.5.2 crate address DIP switches (SWT2)
 crate_address_tests = [
-    man_test(f"crate_addr_{n}", f"[4.4.3] Set SWT2 switch {n + 1} ON (others OFF). Is crate address ID {n} lit?")
+    man_test(f"crate_addr_{n}", f"[4.5.2] Set SWT2 switch {n + 1} ON (others OFF). Is crate address ID {n} lit?")
     for n in range(8)
 ]
 
-# 4.4.5 timing, shown after the automated timing lock test
+# 4.5.4 timing, shown after the automated timing lock test
 timing_tests = [
-    man_test("timing_link_led", "[4.4.5] Is the timing LINK front panel LED on?"),
-    man_test("timing_rx_led", "[4.4.5] Is the RX front panel LED on?"),
-    man_test("timing_rtt", "[4.4.5] Run 'dtsbutler -c local.xml mst MST_FMC align measure-delay 0'. Round trip in clock ticks (expect ~100)",
+    man_test("timing_link_led", "[4.5.4] Is the timing LINK front panel LED on?"),
+    man_test("timing_rx_led", "[4.5.4] Is the RX front panel LED on?"),
+    man_test("timing_rtt", "[4.5.4] Run 'dtsbutler -c local.xml mst MST_FMC align measure-delay 0'. Round trip in clock ticks (expect ~100)",
              True, unit='ticks'),
-    man_test("timing_tx_led", "[4.4.5] Did the TX front panel LED light during the round trip test?"),
+    man_test("timing_tx_led", "[4.5.4] Did the TX front panel LED light during the round trip test?"),
 ]
 
-# 4.4.6 Ethernet, shown after the automated ping and throughput tests
+# 4.5.5 Ethernet, shown after the automated ping and throughput tests
 ethernet_tests = [
-    man_test("gbe_link_led", "[4.4.6] Is the GbE LINK front panel LED on?"),
+    man_test("gbe_link_led", "[4.5.5] Is the GbE LINK front panel LED on?"),
     # TODO register for the AUX LED is still TBD in the procedure
-    man_test("aux_led", "[4.4.6] Is the AUX front panel LED on after writing its register?"),
+    man_test("aux_led", "[4.5.5] Is the AUX front panel LED on after writing its register?"),
 ]
 
-# 4.4.4 microcontroller and EtherCAT, done from the Windows machine with TwinCAT
+# 4.5.3 microcontroller and EtherCAT, done from the Windows machine with TwinCAT
 mcu_tests = [
-    man_test("mcu_program_jtag", "[4.4.4] Did programming the MCU over the XMC Link (J14) from DAVE succeed?"),
-    man_test("mcu_program_insitu", "[4.4.4] Did in-situ programming with openocd (ptc-flash.cfg) succeed?"),
-    man_test("ecat_link_led", "[4.4.4] Is the EtherCAT LINK front panel LED on after Toggle Free-Run?"),
-    man_test("ecat_lost_frames", "[4.4.4] TwinCAT in Op mode: number of lost frames", limits=(0, 0), unit='frames'),
-    man_test("ecat_debug_leds", "[4.4.4] Debug LEDs show ERR=GREEN, LINKB=GREEN, PHY LED2=BLINK GREEN?"),
-    man_test("ecat_run_led", "[4.4.4] Is the ECAT RUN front panel LED on?"),
+    man_test("mcu_program_jtag", "[4.5.3] Did programming the MCU over the XMC Link (J14) from DAVE succeed?"),
+    man_test("mcu_program_insitu", "[4.5.3] Did in-situ programming with openocd (ptc-flash.cfg) succeed?"),
+    man_test("ecat_link_led", "[4.5.3] Is the EtherCAT LINK front panel LED on after Toggle Free-Run?"),
+    man_test("ecat_lost_frames", "[4.5.3] TwinCAT in Op mode: number of lost frames", limits=(0, 0), unit='frames'),
+    man_test("ecat_debug_leds", "[4.5.3] Debug LEDs show ERR=GREEN, LINKB=GREEN, PHY LED2=BLINK GREEN?"),
+    man_test("ecat_run_led", "[4.5.3] Is the ECAT RUN front panel LED on?"),
 ]
 
 # 4.4.1 DC-DC load test: QC board PWM register value -> expected load current in amps
@@ -115,6 +116,7 @@ load_tolerance = 0.1  # amps
 # automated tests on the PTC that don't need any setup, run first
 test_sequence = [
     {"test_type": "eeprom", "test_params": {}},
+    {"test_type": "memory", "test_params": {}},
 ]
 
 # 4.1 reception checks. These are done once per delivery, not per board, so they are

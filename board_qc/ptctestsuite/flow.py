@@ -57,7 +57,7 @@ def _auto(key, section, prompt, group, limits=None, unit=None) -> Step:
 
 STEP_SOM_SERIAL = Step("som_serial", "Scan SoM serial", "4.3.2",
                        "Scan the Data Matrix code on the Enclustra SoM label.", "SoM and boot", kind="scan")
-STEP_AMBIENT = Step("ambient_temperature", "Room temperature", "4.4.2",
+STEP_AMBIENT = Step("ambient_temperature", "Room temperature", "4.5.1",
                     "Enter the room temperature. The board temperature sensors are compared with it.",
                     "SoM and boot", kind="number", unit="°C")
 STEP_BATCH = Step("batch_number", "Batch number", "4.1", "Enter the production batch number, if there is one.",
@@ -74,11 +74,12 @@ def board_plan() -> list[Step]:
     plan += [STEP_SOM_SERIAL] + [Step.from_man_test(t, g) for t in som_boot_tests] + [STEP_AMBIENT]
     g = "Automatic tests"
     plan += [
-        _auto("eeprom", "4.4.3", "Reads the unique serial ID from the EEPROM.", g),
-        _auto("iv_sensors", "4.4.2", "Reads the voltage and current sensors on the PTC with all WIB outputs on.", g),
-        _auto("qc_iv_sensors_25pct", "4.4.2", "Reads the 6 QC board sensors with every converter at 25% load.", g),
-        _auto("temperature", "4.4.2", "Reads the board temperature sensors and compares them with the room.", g),
-        _auto("alert", "4.4.2", "Triggers each sensor alert and checks the sensor and FPGA both flag it.", g),
+        _auto("eeprom", "4.5.2", "Reads the unique serial ID from the EEPROM.", g),
+        _auto("memory", "4.5", "Runs fillmem on the PTC to check its memory.", g),
+        _auto("iv_sensors", "4.5.1", "Reads the voltage and current sensors on the PTC with all WIB outputs on.", g),
+        _auto("qc_iv_sensors_25pct", "4.5.1", "Reads the 6 QC board sensors with every converter at 25% load.", g),
+        _auto("temperature", "4.5.1", "Reads the board temperature sensors and compares them with the room.", g),
+        _auto("alert", "4.5.1", "Triggers each sensor alert and checks the sensor and FPGA both flag it.", g),
     ] + [Step.from_man_test(t, g) for t in alert_led_tests]
     g = "DC-DC load test"
     for n in range(6):
@@ -89,12 +90,13 @@ def board_plan() -> list[Step]:
         plan.append(Step.from_man_test(ripple_full_load(n), g))
     g = "Crate address and timing"
     plan += [Step.from_man_test(t, g) for t in crate_address_tests]
-    plan += [_auto("timing", "4.4.5", "Reads the timing status register. It should read 0x8, locked.", g)]
+    plan += [_auto("timing", "4.5.4", "Reads the timing status register. It should read 0x8, locked.", g),
+             _auto("qc_timing_lock", "4.5.4", "Resets the QC board timing endpoint (channel 0). It should read 0x18000000.", g)]
     plan += [Step.from_man_test(t, g) for t in timing_tests]
     g = "Ethernet"
     plan += [
-        _auto("gbe_ping", "4.4.6", "Pings the PTC at the address it got from DHCP.", g),
-        _auto("gbe_throughput", "4.4.6", f"Sends {parameters.throughput_test_mb} MB to the PTC and measures the speed.",
+        _auto("gbe_ping", "4.5.5", "Pings the PTC at the address it got from DHCP.", g),
+        _auto("gbe_throughput", "4.5.5", f"Sends {parameters.throughput_test_mb} MB to the PTC and measures the speed.",
               g, (parameters.throughput_min_mb_s, None), "MB/s"),
     ] + [Step.from_man_test(t, g) for t in ethernet_tests]
     g = "MCU and EtherCAT"
@@ -202,7 +204,7 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
 
     # 4.3 manual tests, done before the SoM is installed
     if await ui.confirm("Power checks without the SoM",
-                        "Run the manual checks without the SoM (4.3)? Skip them if the SoM is already installed.",
+                        "Run the manual checks without the SoM (4.3)? The SoM must not be installed for these. Skip them if it already is.",
                         yes="Run them", no="Skip, SoM is installed"):
         await run_manual_tests(ui, q, pre_som_tests)
         await ui.instruct("Install the SoM", "Set all DIP switches OFF, power off, install the SoM and put the PTC "
@@ -263,7 +265,7 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
                 if t['test_type'] == 'eeprom' and values:
                     q.eeprom_serial = values.get('eeprom_serial')
 
-            # 4.4.2 sensors: all converters on at 25% load
+            # 4.5.1 sensors: all converters on at 25% load
             ui.status("Turning on the WIB outputs and setting 25% load…")
             await run_remote_test(ui, plan, ws, None, "wib_power", {"on": True})
             for n in range(6):
@@ -281,12 +283,17 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
                 await qc.load_off(n)
             await run_remote_test(ui, plan, ws, None, "wib_power", {"on": False})
 
-            # 4.4.3 crate address, 4.4.5 timing
+            # 4.5.2 crate address, 4.5.4 timing
             await run_manual_tests(ui, q, crate_address_tests)
             await run_remote_test(ui, plan, ws, q, "timing")
+            ui.running(plan["qc_timing_lock"])
+            locked, status = await qc.timing_lock()
+            q.add_result("qc_timing_lock",
+                         qc_result.ERROR if locked is None else qc_result.PASS if locked else qc_result.FAIL,
+                         {"status": hex(status)} if status is not None else None)
             await run_manual_tests(ui, q, timing_tests)
 
-        # 4.4.6 Ethernet, from the host
+        # 4.5.5 Ethernet, from the host
         if debug:
             lg.info("Skipping GbE ping and throughput in debug mode")
             ui.skipped(["gbe_ping", "gbe_throughput"])
@@ -301,7 +308,7 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
             q.add_result("gbe_throughput", r, rate, "MB/s", (parameters.throughput_min_mb_s, None))
         await run_manual_tests(ui, q, ethernet_tests)
 
-        # 4.4.4 microcontroller and EtherCAT, from the Windows machine
+        # 4.5.3 microcontroller and EtherCAT, from the Windows machine
         await run_manual_tests(ui, q, mcu_tests)
     finally:
         client_task.cancel()

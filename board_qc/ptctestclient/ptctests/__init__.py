@@ -6,3 +6,4 @@ from ptctestclient.ptctests.qc_iv_sensors import qc_iv_sensors_test
 from ptctestclient.ptctests.alert import alert_test
 from ptctestclient.ptctests.timing import timing_test
 from ptctestclient.ptctests.wib_power import wib_power
+from ptctestclient.ptctests.memory import memory
