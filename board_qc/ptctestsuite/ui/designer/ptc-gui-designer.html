@@ -38,6 +38,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.mock { display: flex; gap: 8px; align-items: center; font-weight: 600; font-size: 0.88rem; margin-left: auto; }
+.mock select { font: 0.9rem var(--f-body); padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--fg); max-width: 100%; }
+.note { border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--surface); font-size: 0.92rem; }
 
 .colors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; }
 @media (max-width: 640px) { .colors { grid-template-columns: minmax(0, 1fr); } }
@@ -140,6 +143,108 @@ button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accen
 .g-tbl td { padding: 6px 12px; border-bottom: 1px solid color-mix(in srgb, var(--g-line) 60%, transparent); }
 .g-tbl td.mono { font-family: var(--g-mono); }
 .g-actions { display: flex; gap: 12px; }
+.g-how { background: var(--g-side); border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 16px 20px; font-size: .92em; }
+.g-how h4 { margin: 0 0 10px; font-size: .78em; font-weight: 600; color: var(--g-dim); letter-spacing: .05em; text-transform: uppercase; }
+.g-how ol { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 7px; }
+.g-how li::marker { color: var(--g-dim); font-family: var(--g-mono); }
+.g-how b { font-weight: 600; }
+.g-start2 { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 36px; padding: 28px 40px; background: var(--g-panel); overflow: auto; align-items: start; }
+.g-start2 .g-form { width: auto; gap: 16px; }
+.g-clh { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.g-clh h4 { margin: 0; font-size: 1.15em; font-weight: 600; }
+.g-clh span { font: .85em var(--g-mono); color: var(--g-dim); }
+.g-cl { display: flex; flex-direction: column; gap: 6px; }
+.g-ci { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 7px 12px; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); cursor: pointer; }
+.g-ci:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 1px; }
+.g-ci .box { width: 26px; height: 26px; border: 2px solid var(--g-dim); border-radius: calc(var(--g-r) / 2 + 1px); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--g-on-pass); font-size: .9em; }
+.g-ci.on { border-color: color-mix(in srgb, var(--g-pass) 55%, var(--g-line)); }
+.g-ci.on .box { background: var(--g-pass); border-color: var(--g-pass); }
+.g-ci.auto { cursor: default; border-style: dashed; }
+.g-ci.auto .box { background: var(--g-auto); border-color: var(--g-auto); color: #fff; }
+.g-ci .t { font-weight: 500; }
+.g-ci .d { display: block; font-size: .84em; color: var(--g-dim); }
+.g-ci .g-tag2 { font-size: .76em; color: var(--g-auto); white-space: nowrap; }
+.g-ci .g-field { height: 40px; width: 96px; font-size: 1.05em; padding: 0 10px; }
+.g-ci .g-unit { font-size: 1em; }
+.g-field:disabled { opacity: .45; }
+.g-hint { font-size: .86em; color: var(--g-dim); }
+.g-sh { font-size: .78em; font-weight: 600; color: var(--g-dim); letter-spacing: .05em; text-transform: uppercase; margin: 0 0 8px; }
+.g-rows { display: flex; flex-direction: column; border: 1px solid var(--g-line); border-radius: var(--g-r); overflow: hidden; }
+.g-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 9px 14px; background: var(--g-field); border: 0; border-top: 1px solid var(--g-line); cursor: pointer; text-align: left; color: var(--g-ink); font: inherit; width: 100%; }
+.g-row:first-child { border-top: 0; }
+.g-row:hover { background: color-mix(in srgb, var(--g-accent) 8%, var(--g-field)); }
+.g-row .s { font-family: var(--g-mono); font-weight: 500; }
+.g-row .d { color: var(--g-dim); font-size: .85em; }
+.g-pane { flex: 1; min-height: 0; overflow: auto; padding: 24px 40px; background: var(--g-panel); display: flex; flex-direction: column; gap: 14px; }
+.g-pane h3 { margin: 0; font-size: 1.6em; font-weight: 600; }
+.g-hhead { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.g-hhead .ser { font: 600 1.6em var(--g-mono); }
+.g-facts { display: flex; gap: 26px; color: var(--g-dim); font-size: .8em; flex-wrap: wrap; }
+.g-facts b { display: block; color: var(--g-ink); font: 500 1.15em var(--g-mono); }
+.g-hcols { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 18px; }
+.g-tl { display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.g-tli { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 12px; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); cursor: pointer; text-align: left; color: var(--g-ink); font: inherit; }
+.g-tli.sel { border-color: var(--g-accent); box-shadow: inset 3px 0 var(--g-accent); }
+.g-tli .k { font-weight: 600; } .g-tli .d { display: block; font-size: .82em; color: var(--g-dim); }
+.g-tli .ic { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 600 .76em var(--g-mono); background: var(--g-side); border: 1px solid var(--g-line); color: var(--g-dim); }
+.g-tli .ic.rep { color: var(--g-warn); border-color: color-mix(in srgb, var(--g-warn) 60%, transparent); }
+.g-det { min-height: 0; overflow: auto; border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; background: var(--g-side); }
+.g-det h4 { margin: 0; font-size: 1.25em; font-weight: 600; }
+.g-kv { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 6px 16px; font-size: .92em; margin: 0; }
+.g-kv dt { color: var(--g-dim); } .g-kv dd { margin: 0; }
+.g-mini { width: 100%; border-collapse: collapse; font-size: .9em; }
+.g-mini th { text-align: left; color: var(--g-dim); font-weight: 500; padding: 5px 10px 5px 0; border-bottom: 1px solid var(--g-line); }
+.g-mini td { padding: 6px 10px 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--g-line) 60%, transparent); }
+.g-mini td.mono { font-family: var(--g-mono); }
+.g-ph { width: 132px; height: 84px; border-radius: var(--g-r); border: 1px solid var(--g-line); background: linear-gradient(135deg, #1d5c3a, #0f3d26); position: relative; display: flex; align-items: flex-end; padding: 5px 8px; font-size: .74em; color: #d7f0e0; }
+.g-ph::before { content: ""; position: absolute; inset: 12px 16px 24px; border: 1px dashed rgba(215,240,224,.4); border-radius: 3px; }
+.g-ph.close { background: linear-gradient(135deg, #3a3f22, #23260f); }
+.g-phs { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.g-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 800px; }
+.g-choice { min-height: var(--g-bh); padding: 12px 18px; text-align: left; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); color: var(--g-ink); font: inherit; cursor: pointer; }
+.g-choice b { display: block; font-size: 1.05em; font-weight: 600; } .g-choice span { color: var(--g-dim); font-size: .86em; }
+.g-choice.pri { border-color: var(--g-accent); background: color-mix(in srgb, var(--g-accent) 14%, var(--g-field)); }
+.g-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.g-chip { display: flex; gap: 8px; align-items: center; padding: 6px 12px; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); font: inherit; font-size: .9em; color: var(--g-dim); cursor: pointer; }
+.g-chip.on { border-color: var(--g-fail); color: var(--g-ink); background: color-mix(in srgb, var(--g-fail) 14%, var(--g-field)); }
+.g-ta { background: var(--g-field); border: 1px solid var(--g-line); border-radius: var(--g-r); color: var(--g-ink); font: 1em var(--g-font); padding: 8px 12px; width: 100%; resize: vertical; min-height: 70px; }
+.g-in { background: var(--g-field); border: 1px solid var(--g-line); border-radius: var(--g-r); color: var(--g-ink); font: 1em var(--g-font); padding: 0 12px; height: 42px; width: 100%; }
+.g-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; }
+.g-warnbox { border: 1px solid var(--g-warn); border-radius: var(--g-r); padding: 12px 16px; background: color-mix(in srgb, var(--g-warn) 10%, var(--g-panel)); display: flex; flex-direction: column; gap: 10px; max-width: 720px; }
+.g-warnbox b { color: var(--g-warn); }
+.g-main.with-how { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 24px; align-items: start; }
+.g-stepcol { display: flex; flex-direction: column; gap: 14px; min-width: 0; min-height: 100%; }
+.g-howcard { background: var(--g-side); border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 14px 16px; font-size: .86em; position: sticky; top: 0; }
+.g-howhd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.g-howhd span { font-size: .86em; font-weight: 600; color: var(--g-dim); letter-spacing: .05em; text-transform: uppercase; }
+.g-howhd button, .g-howopen { background: none; border: 1px solid var(--g-line); border-radius: var(--g-r); color: var(--g-dim); font: .85em var(--g-font); padding: 3px 9px; cursor: pointer; }
+.g-howopen { align-self: flex-start; }
+.g-howcard ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 7px; }
+.g-howcard li::marker { color: var(--g-dim); font-family: var(--g-mono); }
+.g-cam { display: flex; flex-direction: column; gap: 10px; }
+.g-cambox { position: relative; width: min(100%, 560px); aspect-ratio: 16 / 9; background: #2b2f2a; border: 1px solid var(--g-line); border-radius: var(--g-r); overflow: hidden; }
+.g-cambox svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.g-cambox .ghost { pointer-events: none; }
+.g-camtag { position: absolute; left: 8px; top: 8px; font-size: .74em; padding: 2px 8px; border-radius: var(--g-r); background: rgba(0,0,0,.6); color: #fff; }
+.g-camnote { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; color: #c9d1cc; font-size: .9em; pointer-events: none; }
+.g-camtools { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; font-size: .86em; color: var(--g-dim); }
+.g-camtools label { display: flex; gap: 8px; align-items: center; }
+.g-camtools select { background: var(--g-field); color: var(--g-ink); border: 1px solid var(--g-line); border-radius: var(--g-r); height: 36px; padding: 0 8px; font: .95em var(--g-font); }
+.g-camtools input[type=range] { width: 130px; accent-color: var(--g-accent); }
+.g-btn.pri:disabled { background: var(--g-line); border-color: var(--g-line); color: var(--g-dim); cursor: not-allowed; filter: none; }
+.g-btn.opt { min-width: 170px; background: transparent; }
+.g-btn.opt.p { border-color: var(--g-pass); color: var(--g-pass); } .g-btn.opt.f { border-color: var(--g-fail); color: var(--g-fail); }
+.g-btn.opt.y { border-color: var(--g-accent); color: var(--g-ink); } .g-btn.opt.y.on { background: var(--g-accent); color: var(--g-on-accent); }
+.g-btn.opt.p.on { background: var(--g-pass); color: var(--g-on-pass); } .g-btn.opt.f.on { background: var(--g-fail); color: var(--g-on-fail); }
+.g-nextbar { margin-top: auto; display: flex; align-items: flex-end; gap: 16px; padding-top: 8px; }
+.g-nextbar .g-last { margin-top: 0; flex: 1; min-width: 0; }
+.g-nextwrap { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; margin-left: auto; }
+.g-next { min-width: 210px; }
+.g-nexthint { font-size: .84em; color: var(--g-dim); min-height: 1.2em; text-align: right; }
+.g-autores { display: flex; gap: 12px; align-items: center; font-size: 1.05em; }
+.g-autores b { font-family: var(--g-mono); font-weight: 500; }
+.g-check2 { display: flex; gap: 10px; align-items: center; font-size: .92em; cursor: pointer; }
+.g-check2 input { width: 22px; height: 22px; accent-color: var(--g-accent); }
 </style>
 </head>
 <body>
@@ -154,9 +259,11 @@ button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accen
       <button type="button" data-screen="start">Start screen</button>
       <button type="button" data-screen="run">Test in progress</button>
       <button type="button" data-screen="results">Results</button>
+      <label class="mock">Test mockups <select id="mock" aria-label="Show a mockup of a test"><option value="">Choose a test…</option></select></label>
     </div>
+    <div class="note" id="mockNote" hidden></div>
     <div class="frame" id="frame"><div class="gui" id="gui"></div></div>
-    <div class="hint">The preview works like the real thing: record values, press Pass or Fail, run the automatic tests. Leave a value box empty and press Record to use the example reading. Barcode scanners press Enter, so Enter records too.</div>
+    <div class="hint">The preview works like the real thing. Each step fills in first (Pass or Fail, a reading, a photo) and <b>Next test</b> stays greyed out until the page is complete; Enter presses it. <button type="button" id="fillex" style="margin-left:6px">Fill this step with an example</button></div>
   </section>
 
   <section>
@@ -221,18 +328,47 @@ const PRESETS = {
 };
 const DEFAULT_OPTS = { title:"PTC QC Test Station", station:"Penn, bench 1", size:100, font:"plex", side:"left", btn:"large", corners:"rounded", limits:true, keys:false };
 
+const PHOTO_HOW = {
+  front: [
+    "Take the PTC out of the test stand, if it’s in. Wear your ESD strap.",
+    "Lay it on the mat under the camera, front side (components and front panel) up. The SoM isn’t fitted yet.",
+    "Move the board until its edges, connectors and mounting holes sit under the ghost outline. Use the Ghost slider to fade it in and out.",
+    "Check there’s no glare on the chips and the serial label is readable.",
+    "Press Take photo, or Space. Look at it and press Retake if it’s blurry or out of line.",
+    "No ghost yet? This is the first board. If the photo is well lined up, leave “Save as the ghost” ticked so the next boards line up to it.",
+    "Took the photo with another camera? Use Choose file instead.",
+  ],
+  back: [
+    "Turn the board over without moving the camera or lights.",
+    "Line it up with the back ghost the same way.",
+    "Press Take photo, check it, and retake if needed.",
+    "No back ghost yet? Leave “Save as the ghost” ticked on a good photo.",
+  ],
+};
 const BOARD_STEPS = [
+  { grp:"Board photos", sec:"4.1.3", key:"photo_front", name:"Front photo", side:"front", type:"photo", acc:"No pass or fail; saved with the results",
+    prompt:"Put the board front side up under the camera, line it up with the ghost image and take the photo.", how:PHOTO_HOW.front },
+  { grp:"Board photos", sec:"4.1.3", key:"photo_back", name:"Back photo", side:"back", type:"photo", acc:"No pass or fail; saved with the results",
+    prompt:"Turn the board over, line it up with the ghost image and take the photo.", how:PHOTO_HOW.back },
+  { grp:"Test stand preparation", sec:"4.2.3", key:"prep", name:"Prepare the test stand", type:"checklist",
+    prompt:"Seat the PTC on the QC board and power the QC board up. Tick each step as you do it.",
+    acc:"Every step done; QC board 23.5–24.5 V and 350–450 mA",
+    how:["Work down the list. Each row says what to check.",
+         "Read the voltage and current on the 24 V supply’s display once the amber LED on the QC board starts blinking.",
+         "If the amber LED stays solid or doesn’t light, stop and call a Penn electronics engineer.",
+         "The network check runs by itself once the QC board has booted.",
+         "Every row and both readings go to the HWDB with the results."] },
   { grp:"Power checks, no SoM", sec:"4.3.1a", key:"bare_power", name:"48 V input current", prompt:"With no SoM fitted, read the current on the 48 V supply.", type:"value", unit:"mA", lo:0, hi:100, acc:"0–100 mA", demo:"62" },
   { grp:"Power checks, no SoM", sec:"4.3.1c", key:"vp12_local", name:"VP12_LOCAL voltage", prompt:"Measure the voltage at test point VP12 LOCAL.", type:"value", unit:"V", lo:12.00, hi:12.35, acc:"12.00–12.35 V", demo:"12.18" },
-  { grp:"Power checks, no SoM", sec:"4.3.1d", key:"local_led_12v", name:"12V LOCAL LED", prompt:"Is the 12V LOCAL LED on the front panel lit?", type:"yn", acc:"LED on" },
+  { grp:"Power checks, no SoM", sec:"4.3.1d", key:"local_led_12v", name:"12V LOCAL LED", prompt:"Is the 12V LOCAL LED on the front panel lit?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Power checks, no SoM", sec:"4.3.1", key:"ripple0", name:"DC-DC 0 output", prompt:"Measure the voltage at test point RIPPLE 0.", type:"value", unit:"V", lo:12.00, hi:12.35, acc:"12.00–12.35 V", demo:"12.21" },
   { grp:"Power checks, no SoM", sec:"4.3.1", key:"ripple0_switch_period", name:"DC-DC 0 switching period", prompt:"Read the switching period at RIPPLE 0 on the scope.", type:"value", unit:"µs", lo:1.0, hi:1.1, acc:"1.0–1.1 µs", demo:"1.04" },
-  { grp:"Power checks, no SoM", sec:"4.3.1", key:"wib0_led", name:"WIB 0 LED", prompt:"Is the WIB 0 LED on the front panel lit?", type:"yn", acc:"LED on" },
+  { grp:"Power checks, no SoM", sec:"4.3.1", key:"wib0_led", name:"WIB 0 LED", prompt:"Is the WIB 0 LED on the front panel lit?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Power checks, no SoM", sec:"4.3.1", key:"ripple1", name:"DC-DC 1 output", prompt:"Measure the voltage at test point RIPPLE 1.", type:"value", unit:"V", lo:12.00, hi:12.35, acc:"12.00–12.35 V", demo:"12.19" },
   { grp:"Power checks, no SoM", sec:"4.3.1", key:"ripple1_switch_period", name:"DC-DC 1 switching period", prompt:"Read the switching period at RIPPLE 1 on the scope.", type:"value", unit:"µs", lo:1.0, hi:1.1, acc:"1.0–1.1 µs", demo:"1.05" },
-  { grp:"Power checks, no SoM", sec:"4.3.1", key:"wib1_led", name:"WIB 1 LED", prompt:"Is the WIB 1 LED on the front panel lit?", type:"yn", acc:"LED on" },
+  { grp:"Power checks, no SoM", sec:"4.3.1", key:"wib1_led", name:"WIB 1 LED", prompt:"Is the WIB 1 LED on the front panel lit?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"SoM and boot", sec:"4.3.2", key:"som_serial", name:"Scan SoM serial", prompt:"Scan the Data Matrix code on the Enclustra SoM.", type:"scan", acc:"10 digits", demo:"2503804780" },
-  { grp:"SoM and boot", sec:"4.3.2", key:"som_insertion", name:"SoM insertion", prompt:"Fit the SoM. Is it seated correctly? Check the connector keying.", type:"yn", acc:"Seated, keyed" },
+  { grp:"SoM and boot", sec:"4.3.2", key:"som_insertion", name:"SoM insertion", prompt:"Fit the SoM. Is it seated correctly? Check the connector keying.", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"SoM and boot", sec:"4.3.2", key:"boot_current", name:"Boot current", prompt:"Power on and read the boot current. Is the amber LED blinking?", type:"value", judge:true, unit:"mA", acc:"About 100–200 mA, tester decides", demo:"148" },
   { grp:"SoM and boot", sec:"4.3.2", key:"repeat_boots", name:"Repeat boot", prompt:"Power cycle 5 times. How many boots succeeded?", type:"value", unit:"of 5", lo:5, hi:5, acc:"5 of 5", demo:"5" },
   { grp:"Automatic tests", sec:"4.5.2", key:"eeprom", name:"EEPROM read", prompt:"Reads the unique serial ID from the EEPROM.", type:"auto", acc:"Readable", demo:"0x4A21C93F07E1", ok:true },
@@ -243,17 +379,17 @@ const BOARD_STEPS = [
   { grp:"Automatic tests", sec:"4.5.4", key:"timing", name:"Timing lock", prompt:"Reads the timing status register.", type:"auto", acc:"0x8, locked", demo:"0x8, locked", ok:true },
   { grp:"Automatic tests", sec:"4.5.4", key:"qc_timing_lock", name:"QC board timing lock", prompt:"Resets the QC board timing endpoint (channel 0) and reads its status.", type:"auto", acc:"0x18000000", demo:"0x18000000", ok:true },
   { grp:"Automatic tests", sec:"4.5.5", key:"gbe_throughput", name:"Ethernet throughput", prompt:"Sends 1000 MB to the PTC and measures the speed.", type:"auto", acc:"More than 12.5 MB/s", demo:"38.2 MB/s", ok:true },
-  { grp:"Front panel and address", sec:"4.5.2", key:"crate_addr_0", name:"Crate address switch 1", prompt:"Set DIP switch 1. Did the address change as expected?", type:"yn", acc:"Address follows switch" },
+  { grp:"Front panel and address", sec:"4.5.2", key:"crate_addr_0", name:"Crate address switch 1", prompt:"Set DIP switch 1. Did the address change as expected?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Finish", sec:"End", key:"overall_result", name:"Notes and finish", prompt:"Add any notes for this board, then finish the test.", type:"notes", acc:"Pass if every step passed" },
 ];
 const SHIP_STEPS = [
   { grp:"Front panels", sec:"4.1.1", key:"front_panels_count_vs_po", name:"Front panel count", prompt:"Count the front panels received and compare with the purchase order.", type:"po", acc:"Received equals ordered", demo:[50,50] },
-  { grp:"Front panels", sec:"4.1.1", key:"fp_microscope_sample", name:"Microscope sample", prompt:"Inspect 10% under the microscope. Thumb screws present and no defects?", type:"yn", acc:"No defects" },
-  { grp:"Front panels", sec:"4.1.1", key:"fp_mechanical_fit_sample", name:"Mechanical fit sample", prompt:"Check 10% against the drawings. Do they fit?", type:"yn", acc:"Matches drawings" },
+  { grp:"Front panels", sec:"4.1.1", key:"fp_microscope_sample", name:"Microscope sample", prompt:"Inspect 10% under the microscope. Thumb screws present and no defects?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
+  { grp:"Front panels", sec:"4.1.1", key:"fp_mechanical_fit_sample", name:"Mechanical fit sample", prompt:"Check 10% against the drawings. Do they fit?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Bare PCBs", sec:"4.1.2", key:"bare_pcbs_count_vs_po", name:"Bare PCB count", prompt:"Count the bare PCBs received and compare with the purchase order.", type:"po", acc:"Received equals ordered", demo:[52,52] },
-  { grp:"Bare PCBs", sec:"4.1.2", key:"bare_pcb_certificate_review", name:"Vendor certificate", prompt:"Review the vendor quality certificate. Is it complete and acceptable?", type:"yn", acc:"Acceptable" },
+  { grp:"Bare PCBs", sec:"4.1.2", key:"bare_pcb_certificate_review", name:"Vendor certificate", prompt:"Review the vendor quality certificate. Is it complete and acceptable?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Assembled PCBs", sec:"4.1.3", key:"assembled_pcbs_count_vs_po", name:"Assembled PCB count", prompt:"Count the assembled PCBs received and compare with the purchase order.", type:"po", acc:"Received equals ordered", demo:[50,50] },
-  { grp:"Assembled PCBs", sec:"4.1.3", key:"assembled_pcb_certificate_review", name:"Vendor certificate", prompt:"Review the vendor quality certificate. Is it complete and acceptable?", type:"yn", acc:"Acceptable" },
+  { grp:"Assembled PCBs", sec:"4.1.3", key:"assembled_pcb_certificate_review", name:"Vendor certificate", prompt:"Review the vendor quality certificate. Is it complete and acceptable?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Finish", sec:"End", key:"overall_result", name:"Notes and finish", prompt:"Add any notes for this shipment, then save it.", type:"notes", acc:"Pass if every check passed" },
 ];
 
@@ -269,7 +405,7 @@ const onColor = h => lum(h) > 0.35 ? "#0B0D0E" : "#FFFFFF";
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
 
 // ---- GUI run state ----
-const run = { screen:"start", mode:"board", tester:"Mike Reilly", serial:"PTC-0042", po:"", batch:"", idx:0, results:{}, notes:"", msg:"", msgKind:"", scanWarned:false, running:false };
+const run = { screen:"start", mode:"board", tester:"Mike Reilly", serial:"PTC-0042", po:"", batch:"", idx:0, results:{}, notes:"", msg:"", msgKind:"", scanWarned:false, running:false, review:null, ticks:{}, qccur:"", qcvolt:"", runLabel:null, sel:0, chips:{}, closeups:0, mockSom:false, howOpen:true, choice:null, autoDone:false, photoReview:false, photoSrc:"camera", ghostOp:40, hasGhost:{ front:true, back:true }, off:{ x:9, y:-6, r:1.4 } };
 const steps = () => run.mode === "board" ? BOARD_STEPS : SHIP_STEPS;
 const gui = document.getElementById("gui"), frame = document.getElementById("frame");
 
@@ -286,9 +422,10 @@ function applyStyle() {
 
 function topBar() {
   const O = state.opts, st = steps();
-  const who = run.screen === "start" ? "" :
-    `<div class="g-meta"><div>Tester<b>${esc(run.tester || "None")}</b></div>${run.mode === "board" ? `<div>PTC serial<b>${esc(run.serial)}</b></div>` : `<div>Purchase order<b>${esc(run.po || "PO-2026-118")}</b></div>`}${run.screen === "run" ? `<div>Step<b>${Math.min(run.idx + 1, st.length)} of ${st.length}</b></div>` : ""}</div>`;
-  return `<div class="g-top"><div><div class="g-title">${esc(O.title)}</div><div class="g-sub">${esc(O.station)}</div></div>${who}<div class="g-pill"${run.screen === "start" ? ' style="margin-left:auto"' : ""}><i></i>HWDB dev connected</div></div>`;
+  const plain = run.screen === "start" || run.screen === "review";
+  const who = plain ? "" :
+    `<div class="g-meta"><div>Tester<b>${esc(run.tester || "None")}</b></div>${run.mode === "board" ? `<div>PTC serial<b>${esc(run.serial)}</b></div>` : `<div>Purchase order<b>${esc(run.po || "PO-2026-118")}</b></div>`}${run.runLabel && run.screen === "run" ? `<div>Run<b>${esc(run.runLabel)}</b></div>` : ""}${run.screen === "run" ? `<div>Step<b>${Math.min(run.idx + 1, st.length)} of ${st.length}</b></div>` : ""}</div>`;
+  return `<div class="g-top"><div><div class="g-title">${esc(O.title)}</div><div class="g-sub">${esc(O.station)}</div></div>${who}<div class="g-pill"${plain ? ' style="margin-left:auto"' : ""}><i></i>HWDB dev connected</div></div>`;
 }
 
 function startHTML() {
@@ -318,19 +455,118 @@ function sideHTML() {
 
 function entryHTML(s) {
   const unit = s.unit ? `<span class="g-unit">${esc(s.unit)}</span>` : "";
+  const yesno = s.ask === "yesno", L1 = yesno ? "Yes" : "Pass", L0 = yesno ? "No" : "Fail";
+  const pick = `<button class="g-btn opt ${yesno ? "y" : "p"} ${run.choice === true ? "on" : ""}" data-act="pick" data-v="1" data-label="${L1}">${run.choice === true ? "✓ " : ""}${L1}</button><button class="g-btn opt ${yesno ? "y" : "f"} ${run.choice === false ? "on" : ""}" data-act="pick" data-v="0" data-label="${L0}">${run.choice === false ? "✓ " : ""}${L0}</button>`;
   switch (s.type) {
-    case "yn": return `<div class="g-entry"><button class="g-btn pass" data-act="yn" data-v="1">Pass</button><button class="g-btn fail" data-act="yn" data-v="0">Fail</button></div>`;
+    case "yn": return `<div class="g-entry">${pick}</div><div class="g-hint">${yesno ? "Keys: Y for Yes, N for No, Enter for Next test." : "Keys: P or Y for Pass, F or N for Fail, Enter for Next test."}</div>`;
     case "value": return s.judge
-      ? `<div class="g-entry"><input class="g-field" data-in="v" inputmode="decimal" placeholder="${esc(s.demo)}">${unit}<button class="g-btn pass" data-act="judge" data-v="1">Pass</button><button class="g-btn fail" data-act="judge" data-v="0">Fail</button></div>`
-      : `<div class="g-entry"><input class="g-field" data-in="v" inputmode="decimal" placeholder="${esc(s.demo)}">${unit}<button class="g-btn pri" data-act="record">Record</button></div>`;
-    case "scan": return `<div class="g-entry"><input class="g-field" data-in="v" placeholder="${esc(s.demo)}" style="width:320px"><button class="g-btn pri" data-act="record">Record</button></div>`;
-    case "po": return `<div class="g-entry"><label class="g-fl">Ordered<input class="g-field" data-in="a" inputmode="numeric" placeholder="${s.demo[0]}" style="width:150px"></label><label class="g-fl">Received<input class="g-field" data-in="b" inputmode="numeric" placeholder="${s.demo[1]}" style="width:150px"></label><button class="g-btn pri" data-act="record">Record</button></div>`;
-    case "auto": return `<div class="g-entry"><button class="g-btn pri" data-act="auto"${run.running ? " disabled" : ""}>${run.running ? "Running…" : "Run test"}</button></div>`;
-    case "notes": return `<div class="g-entry" style="flex-direction:column;align-items:stretch;max-width:640px"><textarea class="g-field" data-in="notes" style="height:120px;width:100%;padding:10px 14px;font-size:1.05em;font-family:var(--g-font)" placeholder="Anything unusual about this board">${esc(run.notes)}</textarea><div><button class="g-btn pri" data-act="finish">Finish and save</button></div></div>`;
+      ? `<div class="g-entry"><input class="g-field" data-in="v" inputmode="decimal" placeholder="${esc(s.demo)}">${unit}${pick}</div>`
+      : `<div class="g-entry"><input class="g-field" data-in="v" inputmode="decimal" placeholder="${esc(s.demo)}">${unit}</div>`;
+    case "scan": if (run.mockSom) return `<div class="g-warnbox"><div><b>This SoM is already recorded on another board.</b></div>
+        <div>SoM <span class="mono">2503804780</span> was recorded on <span class="mono">PTC-0031</span> in run 1 on 2026-10-02. A SoM should only be on one PTC.</div>
+        <div>If it was moved to this board on purpose, keep it and the move is noted on both boards. Otherwise scan the SoM again.</div>
+        <div class="g-entry" style="margin:0"><button class="g-btn pri" data-act="somkeep">Keep it, the SoM was moved</button><button class="g-btn" data-act="somagain">Scan again</button></div></div>`;
+      return `<div class="g-entry"><input class="g-field" data-in="v" placeholder="${esc(s.demo)}" style="width:320px"></div>`;
+    case "po": return `<div class="g-entry"><label class="g-fl">Ordered<input class="g-field" data-in="a" inputmode="numeric" placeholder="${s.demo[0]}" style="width:150px"></label><label class="g-fl">Received<input class="g-field" data-in="b" inputmode="numeric" placeholder="${s.demo[1]}" style="width:150px"></label></div>`;
+    case "auto": return run.autoDone
+      ? `<div class="g-autores"><span>Result</span><b>${esc(s.demo)}</b><span class="g-badge ${s.ok ? "pass" : "fail"}">${s.ok ? "PASS" : "FAIL"}</span><button class="g-btn" data-act="auto" style="height:40px;padding:0 14px;font-size:.9em">Run again</button></div>`
+      : `<div class="g-entry"><button class="g-btn pri" data-act="auto"${run.running ? " disabled" : ""}>${run.running ? "Running…" : "Run test"}</button></div>`;
+    case "photo": return photoEntry(s);
+    case "checklist": return checklistHTML();
+    case "notes": return `<div class="g-entry" style="flex-direction:column;align-items:stretch;max-width:640px"><textarea class="g-field" data-in="notes" style="height:110px;width:100%;padding:10px 14px;font-size:1.05em;font-family:var(--g-font)" placeholder="Anything unusual about this board">${esc(run.notes)}</textarea></div>`;
   }
   return "";
 }
+function checklistHTML() {
+  const done = PREP.filter((p, i) => p.auto || run.ticks[i]).length;
+  const rows = PREP.map((p, i) => {
+    if (p.auto) return `<div class="g-ci auto"><span class="box">✓</span><span><span class="t">${esc(p.t)}</span><span class="d">${esc(p.d)}</span>${keyLine(p)}</span><span class="g-tag2">Checked automatically</span></div>`;
+    const on = !!run.ticks[i];
+    const extra = p.input ? `<span style="display:flex;gap:6px;align-items:center"><input class="g-field mono" data-f="qcvolt" inputmode="decimal" placeholder="24.0" value="${esc(run.qcvolt)}" aria-label="QC board supply voltage" style="width:76px"><span class="g-unit">V</span><input class="g-field mono" data-f="qccur" inputmode="decimal" placeholder="400" value="${esc(run.qccur)}" aria-label="QC board current" style="width:76px"><span class="g-unit">mA</span></span>` : "";
+    return `<div class="g-ci ${on ? "on" : ""}" data-act="tick" data-v="${i}" role="checkbox" aria-checked="${on}" tabindex="0"><span class="box">${on ? "✓" : ""}</span><span><span class="t">${esc(p.t)}</span><span class="d">${esc(p.d)}</span>${keyLine(p)}</span>${extra}</div>`;
+  }).join("");
+  return `<div><div class="g-clh"><h4 style="font-size:1em">Checklist</h4><span>${done} of ${PREP.length} done</span></div><div class="g-cl">${rows}</div></div>`;
+}
 
+// what a step still needs before Next test unlocks
+function stepReady(s) {
+  const v = n => { const f = gui.querySelector(`[data-in="${n}"]`); return f ? f.value.trim() : ""; };
+  switch (s.type) {
+    case "yn": return run.choice === null ? { ok:false, hint: s.ask === "yesno" ? "Answer Yes or No." : "Choose Pass or Fail." } : { ok:true };
+    case "value": {
+      const raw = v("v"), n = Number(raw);
+      if (raw === "") return { ok:false, hint:"Enter the reading." };
+      if (!isFinite(n)) return { ok:false, hint:"Enter a number." };
+      if (s.judge) return run.choice === null ? { ok:false, hint:"Choose Pass or Fail." } : { ok:true };
+      if (n < s.lo || n > s.hi) return { ok:true, warn:true, hint:`Outside ${s.acc}, so it will be saved as FAIL. Check it first.` };
+      return { ok:true };
+    }
+    case "scan": {
+      if (run.mockSom) return { ok:false, hint:"Answer the warning first." };
+      const raw = v("v"); if (!raw) return { ok:false, hint:"Scan or type the serial." };
+      if (s.key === "som_serial" && !/^\d{10}$/.test(raw)) return { ok:true, warn:true, hint:"That isn’t 10 digits. Check it before going on." };
+      return { ok:true };
+    }
+    case "po": {
+      const a = v("a"), b = v("b");
+      if (a === "" || b === "" || !isFinite(+a) || !isFinite(+b)) return { ok:false, hint:"Enter both quantities." };
+      return +a === +b ? { ok:true } : { ok:true, warn:true, hint:"The counts differ, so it will be saved as FAIL." };
+    }
+    case "auto": return run.autoDone ? { ok:true } : { ok:false, hint: run.running ? "The test is running." : "Run the test first." };
+    case "photo": return run.photoReview ? { ok:true } : { ok:false, hint:"Take the photo or choose a file." };
+    case "checklist": {
+      const left = PREP.filter((p, i) => !p.auto && !run.ticks[i]).length;
+      if (left) return { ok:false, hint:`${left} ${left === 1 ? "row" : "rows"} left to tick.` };
+      const V = Number(run.qcvolt), I = Number(run.qccur);
+      if (run.qcvolt.trim() === "" || run.qccur.trim() === "" || !isFinite(V) || !isFinite(I)) return { ok:false, hint:"Enter the QC board voltage and current." };
+      if (V < 23.5 || V > 24.5 || I < 350 || I > 450) return { ok:true, warn:true, hint:"A reading is outside 23.5–24.5 V or 350–450 mA, so it will be saved as FAIL." };
+      return { ok:true };
+    }
+  }
+  return { ok:true };
+}
+function updateNext() {
+  if (run.screen !== "run") return;
+  const s = steps()[run.idx], r = stepReady(s);
+  const b = gui.querySelector('[data-act="nextstep"]'); if (b) b.disabled = !r.ok;
+  const h = gui.querySelector("[data-nexthint]"); if (h) { h.textContent = r.hint || ""; h.style.color = r.warn ? "var(--g-warn)" : ""; }
+}
+
+function pcbSVG(outline, dx, dy, rot, side) {
+  const f = c => outline ? "none" : c, st = outline ? 'stroke="#ffffff" stroke-width="2.2"' : 'stroke="#0b2f1c" stroke-width="1"';
+  const chips = side === "back"
+    ? `<rect x="60" y="56" width="120" height="70" rx="3" fill="${f("#2a7a50")}" ${st}/><text x="66" y="72" font-size="8" fill="${outline ? "#fff" : "#cfe8d8"}" font-family="monospace">PTC rev B</text>`
+    : `<rect x="44" y="44" width="64" height="48" rx="2" fill="${f("#1b1b1b")}" ${st}/><rect x="124" y="40" width="86" height="58" rx="2" fill="${f("#0f0f0f")}" ${st} stroke-dasharray="${outline ? "0" : "4 3"}"/>
+       ${[0,1,2,3,4,5].map(i => `<rect x="${44 + i * 40}" y="122" width="28" height="28" rx="2" fill="${f("#3a3a3a")}" ${st}/>`).join("")}
+       <rect x="226" y="44" width="58" height="20" rx="2" fill="${f("#f2f2ee")}" ${st}/><text x="231" y="58" font-size="9" fill="${outline ? "#fff" : "#222"}" font-family="monospace">PTC-0042</text>`;
+  return `<svg viewBox="0 0 320 180" class="${outline ? "ghost" : ""}" style="${outline ? `opacity:${run.ghostOp / 100}` : ""}" aria-hidden="true">
+    <g transform="translate(${dx} ${dy}) rotate(${rot} 160 95)">
+      <rect x="22" y="22" width="276" height="146" rx="5" fill="${f("#1f6b43")}" ${st}/>
+      <rect x="${side === "back" ? 284 : 22}" y="40" width="14" height="110" fill="${f("#b9b9b0")}" ${st}/>
+      ${[[32, 32], [288, 32], [32, 158], [288, 158]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4" fill="${f("#d9c98a")}" ${st}/>`).join("")}
+      ${chips}
+    </g></svg>`;
+}
+function photoEntry(s) {
+  const has = run.hasGhost[s.side], rv = run.photoReview;
+  const ghost = has ? pcbSVG(true, 0, 0, 0, s.side) : "";
+  const board = pcbSVG(false, run.off.x, run.off.y, run.off.r, s.side);
+  return `<div class="g-cam">
+    <div class="g-cambox">${board}${ghost}<span class="g-camtag">${rv ? (run.photoSrc === "file" ? "Chosen file" : "Photo") : "Live"}</span>
+      ${!has && !rv ? `<div class="g-camnote" style="align-items:flex-end;padding-bottom:12px">No ${s.side} ghost yet</div>` : ""}</div>
+    <div class="g-camtools">
+      <label>Camera <select aria-label="Camera"><option>USB camera</option></select></label>
+      <label>Ghost <input type="range" min="0" max="100" step="5" value="${run.ghostOp}" data-op ${has ? "" : "disabled"} aria-label="Ghost opacity"><span class="mono" data-opout>${run.ghostOp} %</span></label>
+      <button class="g-btn" style="height:36px;padding:0 12px;font-size:.88em">${has ? "Change ghost…" : "Set ghost from file…"}</button>
+      ${has ? '<button class="g-btn" style="height:36px;padding:0 12px;font-size:.88em">Remove ghost</button>' : ""}
+    </div>
+    ${rv ? `<div class="g-entry" style="margin:0"><button class="g-btn" data-act="retake">Retake</button>
+        <label class="g-check2"><input type="checkbox" id="asghost" ${has ? "" : "checked"}>${has ? "Replace the ghost with this photo" : "Save as the ghost for the next boards"}</label></div>
+        <div class="g-hint">Next test keeps this photo. The ghost isn’t part of the photo.</div>`
+      : `<div class="g-entry" style="margin:0"><button class="g-btn pri" data-act="take">Take photo</button><button class="g-btn" data-act="pfile">Choose file…</button></div>
+        <div class="g-hint">Space takes the photo. In this mockup the arrow keys move the board.</div>`}
+  </div>`;
+}
 function lastHTML() {
   const st = steps(); if (run.idx === 0) return "";
   const p = st[run.idx - 1], r = run.results[p.key]; if (!r) return "";
@@ -341,19 +577,21 @@ function lastHTML() {
 function runHTML() {
   const O = state.opts, st = steps(), s = st[run.idx];
   const done = Object.keys(run.results).length, pct = Math.round(done / st.length * 100);
-  const kind = s.type === "auto" ? '<span class="g-kind auto">Automatic</span>' : s.type === "notes" ? "" : '<span class="g-kind manual">Manual check</span>';
+  const kind = s.type === "auto" ? '<span class="g-kind auto">Automatic</span>' : s.type === "notes" ? "" : s.type === "photo" ? '<span class="g-kind manual">Photo</span>' : '<span class="g-kind manual">Manual check</span>';
+  const how = s.how && run.howOpen;
   return `<div class="g-body ${O.side === "right" ? "right" : ""}">${sideHTML()}
-    <main class="g-main">
-      <div class="g-sec"><span>Section ${esc(s.sec)}</span>${kind}</div>
+    <main class="g-main ${how ? "with-how" : ""}"><div class="g-stepcol">
+      <div class="g-sec"><span>Section ${esc(s.sec)}</span>${kind}${s.how && !run.howOpen ? '<button class="g-howopen" data-act="howtoggle" style="margin-left:auto">How to run this test</button>' : ""}</div>
       <h3 class="g-name">${esc(s.name)}</h3>
       <p class="g-prompt">${esc(s.prompt)}</p>
       ${O.limits ? `<div class="g-limits"><span>Accept<b>${esc(s.acc)}</b></span></div>` : ""}
       ${O.keys ? `<div class="g-key">Database key: ${esc(s.key)}</div>` : ""}
       ${entryHTML(s)}
       <div class="g-msg ${run.msgKind}">${esc(run.msg)}</div>
-      ${lastHTML()}
+      <div class="g-nextbar">${lastHTML()}<div class="g-nextwrap"><button class="g-btn pri g-next" data-act="nextstep" disabled>${s.type === "notes" ? "Finish and save" : "Next test"}</button><span class="g-nexthint" data-nexthint></span></div></div>
+    </div>${how ? `<aside class="g-howcard"><div class="g-howhd"><span>How to run this test</span><button data-act="howtoggle">Hide</button></div><ol>${s.how.map(h => `<li>${esc(h)}</li>`).join("")}</ol></aside>` : ""}
     </main></div>
-    <div class="g-foot"><span>${done} of ${st.length} recorded</span><div class="g-bar"><i style="width:${pct}%"></i></div><span>${run.mode === "board" ? "Production board" : "Shipment entry"}</span></div>`;
+    <div class="g-foot"><span>${done} of ${st.length} recorded</span><div class="g-bar"><i style="width:${pct}%"></i></div><span>${run.runLabel ? esc(run.runLabel) : run.mode === "board" ? "Production board" : "Shipment entry"}</span></div>`;
 }
 
 function resultsHTML() {
@@ -375,16 +613,201 @@ function resultsHTML() {
   </div>`;
 }
 
+// ---- test mockups: one entry per test we review ----
+const PREP = [
+  { k:"prep_cables_connected", t:"Cables plugged in, power off", d:"The strain relief holds the cables coming down from the supply hutch." },
+  { k:"prep_ptc_seated", t:"PTC seated on the QC board", d:"In the black guardrails, pressed down evenly until the Samtec connectors are flush." },
+  { k:"prep_qc_board_power", t:"QC board powered", d:"Read the 24 V supply’s display. After a few seconds the amber LED on the QC board’s Enclustra blinks.", input:true },
+  { k:"prep_qc_board_network", t:"QC board on the network", d:"Answered at 192.168.200.12.", auto:true },
+  { k:"prep_fans_on", t:"Fans on", d:"12 V fan supply, CH2 on the lab supply." },
+  { k:"prep_sd_card", t:"SD card inserted in the PTC", d:"Pushed in until it clicks. If it won’t go in, it may be upside down. Don’t force it." },
+  { k:"prep_jumpers", t:"Jumpers fitted", d:"JT9, JT10 and JT11 at position 2–3. No other jumpers." },
+  { k:"prep_dip_film_removed", t:"Film removed from SWT1 and SWT2", d:"Peel the amber film off both DIP switches." },
+];
+const HIST = { serial:"PTC-0042", part:"D08104300001-00042", som:"2503804780", eeprom:"0x4A21C93F07E1",
+  items:[
+    { kind:"run", n:2, title:"Run 2, retest after repair 1", date:"2026-10-17 10:42", who:"Mike Reilly", result:"PASS", failed:[] },
+    { kind:"repair", n:1, title:"Repair 1", date:"2026-10-16 15:10", who:"A. Nikolica", failed:["DC-DC 3 output", "WIB 3 LED"],
+      fault:"Cold solder joint on U43 (LTM8064, converter 3), pin E7.", action:"Reflowed U43 and checked the joints around it under the microscope.", parts:"None" },
+    { kind:"run", n:1, title:"Run 1, first test", date:"2026-10-14 09:05", who:"Mike Reilly", result:"FAIL",
+      failed:[["DC-DC 3 output", "11.82 V", "12.00–12.35 V"], ["WIB 3 LED", "No", "LED on"]] },
+  ] };
+const WAITING = [["PTC-0051", "FAIL", "2026-10-20", "Run 1: DC-DC 5 switching period, OVER TEMP LED"], ["PTC-0057", "FAIL", "2026-10-21", "Run 1: Ethernet throughput"]];
+const RECENT = [["PTC-0058", "PASS", "2026-10-21", "Run 1"], ["PTC-0042", "PASS", "2026-10-17", "Run 2, after repair 1"], ["PTC-0055", "PASS", "2026-10-16", "Run 1"], ["PTC-0053", "PASS", "2026-10-16", "Run 1"]];
+const R1_FAILED = [["DC-DC 5 switching period", "1.21 µs", "1.0–1.1 µs"], ["OVER TEMP LED", "No", "LED on"]];
+
+const MOCKS = [
+  { id:"t1", label:"Test 1: start, tester and serial",
+    note:"Test 1. The start screen: tester name and the PTC serial, scanned while the board is on the bench. The photos come next, then the test stand checklist." },
+  { id:"t2", label:"Test 2: front photo",
+    note:"The photo step with the “How to run this test” panel on the right (Hide folds it away and the camera view widens). The ghost outline sits over the live view; the board is slightly out of line. Try the Ghost slider, and the arrow keys to line the board up, then Take photo, Retake and Use this photo." },
+  { id:"t2n", label:"Test 2: front photo, first board (no ghost yet)",
+    note:"The very first board: no ghost exists, so the slider is off and “Save as the ghost for the next boards” is ticked after the photo is taken. Use this photo and the back step shows how the next boards would look." },
+  { id:"t4", label:"Test 4: prepare the test stand (checklist)",
+    note:"Test 4, after the front and back photos. Tick each row and enter the QC board’s 24 V supply voltage and current. Next test stays greyed out, with a note saying what’s missing, until every row is ticked and both readings are in. A reading outside 23.5–24.5 V or 350–450 mA is allowed but flagged as FAIL." },
+  { id:"l1", label:"Look up a board: search",
+    note:"A third choice on the start screen. Scan or type a serial (* matches any part of it). The lists show boards whose latest run failed and the boards tested most recently. Click any board to open its history. Read-only." },
+  { id:"l2", label:"Look up a board: board history",
+    note:"Every run and repair for one serial, newest first, from the HWDB. Nothing here is ever overwritten: run 1 still shows its failures after the repair and the passing run 2. Click an entry on the left to see it. Retest and Record a repair start those flows for this board." },
+  { id:"r1", label:"Retest: serial already tested",
+    note:"Shown after Start board test when the scanned serial already has runs in the HWDB. The new run is added to the same board as run 2; run 1 is untouched." },
+  { id:"r2", label:"Retest: record a repair",
+    note:"The repair record, saved as its own HWDB entry on the board. The failed steps from the last run are filled in. Save repair and retest starts the full test as run 2, after repair 1; the run number shows in the top bar and footer." },
+  { id:"r3", label:"Duplicate serial in the HWDB",
+    note:"If the HWDB already holds two boards with this serial, the program stops rather than add to either. Someone with HWDB admin rights has to remove or merge the extra entry first." },
+  { id:"r4", label:"SoM serial already on another board",
+    note:"At the SoM scan step. A warning, not a block: the tester can keep the SoM if it was moved on purpose, and the move is noted on both boards." },
+];
+function startRetest(serial, label) {
+  run.serial = serial; run.mode = "board"; run.runLabel = label; run.review = null; run.mockSom = false;
+  run.idx = 0; run.results = {}; run.notes = ""; say(""); run.screen = "run"; render();
+}
+const prepDone = () => PREP.every((p, i) => p.auto || run.ticks[i]) && run.qccur.trim() !== "" && run.qcvolt.trim() !== "";
+const keyLine = p => state.opts.keys ? `<span class="d mono">Database key: ${p.k}</span>` : "";
+
+function startFields(locked) {
+  return `<h3>Start a test</h3>
+    <div><span class="g-lbl">What are you entering?</span>
+      <div class="g-seg"><button data-act="mode" data-v="board" class="on">Production board</button><button data-act="mode" data-v="ship">Production shipment</button></div></div>
+    <label><span class="g-lbl">Tester name</span><input class="g-field" data-f="tester" value="${esc(run.tester)}"></label>
+    <label><span class="g-lbl">PTC serial number</span><input class="g-field" data-f="serial" placeholder="Scan the PTC barcode" value="${esc(run.serial)}"${locked ? " disabled" : ""}></label>
+    ${locked ? `<div class="g-hint">Finish the preparation list to scan the serial.</div>` : ""}
+    <div class="g-msg ${run.msgKind}">${esc(run.msg)}</div>
+    <button class="g-btn pri" data-act="begin"${locked ? " disabled" : ""}>Start board test</button>`;
+}
+
+const badge = r => `<span class="g-badge ${r === "PASS" ? "pass" : "fail"}">${r}</span>`;
+function failedTable(rows) {
+  return `<table class="g-mini"><thead><tr><th>Step</th><th>Value</th><th>Accept</th></tr></thead><tbody>${rows.map(r => `<tr><td>${esc(r[0])}</td><td class="mono">${esc(r[1])}</td><td>${esc(r[2])}</td></tr>`).join("")}</tbody></table>`;
+}
+function boardRows(list) {
+  return `<div class="g-rows">${list.map(r => `<button class="g-row" data-act="open"><span class="s">${r[0]}</span><span class="d">${esc(r[3])}<br>${r[2]}</span>${badge(r[1])}</button>`).join("")}</div>`;
+}
+function lookupHTML() {
+  return `<div class="g-start2"><div class="g-form">
+      <h3>Look up a board</h3>
+      <div><span class="g-lbl">What are you doing?</span>
+        <div class="g-seg"><button data-act="home">Production board</button><button data-act="home">Production shipment</button><button class="on">Look up a board</button></div></div>
+      <label><span class="g-lbl">PTC serial number</span><input class="g-field" placeholder="Scan or type, * matches any part" value="PTC-0042"></label>
+      <button class="g-btn pri" data-act="open">Show history</button>
+      <div class="g-hint">Read-only. Results come from the HWDB; if it can’t be reached, from this station’s own records, and the screen says so.</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div><div class="g-sh">Waiting for a retest</div>${boardRows(WAITING)}</div>
+      <div><div class="g-sh">Recently tested</div>${boardRows(RECENT)}</div>
+    </div></div>`;
+}
+function historyHTML() {
+  const it = HIST.items[run.sel];
+  const tl = HIST.items.map((x, i) => `<button class="g-tli ${i === run.sel ? "sel" : ""}" data-act="tl" data-v="${i}">
+      <span class="ic ${x.kind === "repair" ? "rep" : ""}">${x.kind === "repair" ? "R" : ""}${x.n}</span>
+      <span><span class="k">${esc(x.title)}</span><span class="d">${esc(x.date)}, ${esc(x.who)}</span></span>${x.result ? badge(x.result) : ""}</button>`).join("");
+  let det;
+  if (it.kind === "run") {
+    det = `<h4>${esc(it.title)} ${badge(it.result)}</h4>
+      <dl class="g-kv"><dt>Date</dt><dd>${esc(it.date)}</dd><dt>Tester</dt><dd>${esc(it.who)}</dd><dt>Steps</dt><dd>${it.failed.length ? `${95 - it.failed.length} of 95 passed` : "All 95 passed"}</dd></dl>
+      ${it.failed.length ? `<div><div class="g-sh">Failed steps</div>${failedTable(it.failed)}</div>` : ""}
+      <div><div class="g-sh">Photos</div><div class="g-phs"><div class="g-ph">Front, run ${it.n}</div><div class="g-ph">Back, run ${it.n}</div></div></div>
+      <div><button class="g-btn" style="height:40px;font-size:.9em;padding:0 14px">Show all 95 steps</button></div>`;
+  } else {
+    det = `<h4>${esc(it.title)}</h4>
+      <dl class="g-kv"><dt>Date</dt><dd>${esc(it.date)}</dd><dt>Repaired by</dt><dd>${esc(it.who)}</dd>
+        <dt>After</dt><dd>Run 1, which failed ${it.failed.map(esc).join(" and ")}</dd>
+        <dt>Fault found</dt><dd>${esc(it.fault)}</dd><dt>What was done</dt><dd>${esc(it.action)}</dd><dt>Parts replaced</dt><dd>${esc(it.parts)}</dd></dl>
+      <div><div class="g-sh">Close-up photos</div><div class="g-phs"><div class="g-ph close">U43 before</div><div class="g-ph close">U43 after</div></div></div>`;
+  }
+  return `<div class="g-pane">
+    <div class="g-hhead"><span class="ser">${HIST.serial}</span>${badge("PASS")}<span style="color:var(--g-dim)">Latest: run 2, after repair 1</span>
+      <span style="margin-left:auto;display:flex;gap:10px"><button class="g-btn" data-act="repairform" style="height:44px">Record a repair</button><button class="g-btn pri" data-act="retestq" style="height:44px">Retest this board</button><button class="g-btn" data-act="lookup" style="height:44px">Back to search</button></span></div>
+    <div class="g-facts"><div>HWDB part ID<b>${HIST.part}</b></div><div>SoM serial<b>${HIST.som}</b></div><div>EEPROM ID<b>${HIST.eeprom}</b></div><div>Runs<b>2</b></div><div>Repairs<b>1</b></div></div>
+    <div class="g-hcols"><div class="g-tl">${tl}</div><div class="g-det">${det}</div></div></div>`;
+}
+function testedBeforeHTML() {
+  return `<div class="g-pane">
+    <h3><span class="mono">PTC-0051</span> has been tested before</h3>
+    <div style="display:flex;gap:12px;align-items:center"><span>Run 1, first test, 2026-10-20 14:31, Mike Reilly</span>${badge("FAIL")}</div>
+    <div style="max-width:760px"><div class="g-sh">Failed in run 1</div>${failedTable(R1_FAILED)}</div>
+    <div class="g-hint">This will be run 2. Run 1 stays in the HWDB unchanged.</div>
+    <div class="g-choices">
+      <button class="g-choice pri" data-act="choose" data-v="repair"><b>Record a repair, then retest</b><span>Fill in what was fixed. The retest becomes run 2, after repair 1.</span></button>
+      <button class="g-choice" data-act="choose" data-v="retest"><b>Retest without a repair</b><span>For example a loose cable or a setup mistake. You’ll be asked why.</span></button>
+      <button class="g-choice" data-act="choose" data-v="only"><b>Record a repair only</b><span>Retest the board later.</span></button>
+      <button class="g-choice" data-act="choose" data-v="cancel"><b>Cancel</b><span>Back to the start screen. Nothing is saved.</span></button>
+    </div></div>`;
+}
+function repairHTML() {
+  const failed = R1_FAILED.map(r => r[0]);
+  const chips = failed.map((f, i) => `<button class="g-chip ${run.chips[i] !== false ? "on" : ""}" data-act="chip" data-v="${i}">${run.chips[i] !== false ? "✓ " : ""}${esc(f)}</button>`).join("");
+  const shots = Array.from({ length: run.closeups }, (_, i) => `<div class="g-ph close">Close-up ${i + 1}</div>`).join("");
+  return `<div class="g-pane">
+    <div class="g-hhead"><h3>Record repair 1 for <span class="mono">PTC-0051</span></h3><span style="color:var(--g-dim)">After run 1, 2026-10-20</span></div>
+    <div><div class="g-sh">What the repair was for</div><div class="g-chips">${chips}</div></div>
+    <div class="g-grid2">
+      <label><span class="g-lbl">Repaired by</span><input class="g-in" value="${esc(run.tester)}"></label>
+      <label><span class="g-lbl">Parts replaced (reference designators)</span><input class="g-in" placeholder="For example U43, C112. Leave empty if none."></label>
+      <label><span class="g-lbl">Fault found</span><textarea class="g-ta" placeholder="What was wrong, and where on the board"></textarea></label>
+      <label><span class="g-lbl">What was done</span><textarea class="g-ta" placeholder="Reworked, replaced, cleaned, reseated…"></textarea></label>
+    </div>
+    <div><div class="g-sh">Close-up photos of the defect and repair</div><div class="g-phs">${shots}<button class="g-btn" data-act="closeup" style="height:44px">Add photo…</button></div></div>
+    <div class="g-entry" style="margin-top:4px"><button class="g-btn pri" data-act="saverep" data-v="retest">Save repair and retest</button><button class="g-btn" data-act="saverep" data-v="only">Save repair only</button><button class="g-btn" data-act="home">Cancel</button></div>
+  </div>`;
+}
+function duplicateHTML() {
+  return `<div class="g-start"><div class="g-form" style="width:640px">
+    <h3><span class="mono">PTC-0042</span> has 2 entries in the HWDB</h3>
+    <table class="g-mini"><thead><tr><th>HWDB part ID</th><th>Created</th><th>Holds</th></tr></thead><tbody>
+      <tr><td class="mono">D08104300001-00042</td><td>2026-10-14</td><td>2 runs, 1 repair</td></tr>
+      <tr><td class="mono">D08104300001-00061</td><td>2026-10-19</td><td>1 run</td></tr></tbody></table>
+    <p class="g-prompt" style="font-size:1em">A serial must have one HWDB entry, or its history ends up split. The test can’t go on until someone with HWDB admin rights removes or merges the extra entry. Then scan the serial again.</p>
+    <div><button class="g-btn pri" data-act="home">Back to start</button></div></div></div>`;
+}
+
+function reviewHTML() {
+  if (run.review === "l1") return lookupHTML();
+  if (run.review === "l2") return historyHTML();
+  if (run.review === "r1") return testedBeforeHTML();
+  if (run.review === "r2") return repairHTML();
+  if (run.review === "r3") return duplicateHTML();
+  if (run.review === "t1a") {
+    return `<div class="g-start2"><div class="g-form">${startFields(false)}</div>
+      <div class="g-how"><h4>How to prepare the board before scanning</h4><ol>
+        <li>With the power off, check every cable is plugged in and the strain relief holds the cables from the supply hutch.</li>
+        <li>Slide the PTC into the black guardrails on the QC board. Press it down firmly and evenly until the Samtec connectors sit flush.</li>
+        <li>Turn on the 24 V supply. The QC board should draw about <b>400 mA</b>, and after a few seconds the amber LED on its Enclustra board blinks a few times a second. If it stays solid or doesn’t light, call a Penn electronics engineer.</li>
+        <li>Turn on the 12 V fan supply (CH2).</li>
+        <li>Push the PTC’s SD card in until it clicks. Don’t force it; it may be upside down.</li>
+        <li>Fit the blue jumpers <b>JT9, JT10 and JT11 at 2–3</b>. No other jumpers.</li>
+        <li>Peel the amber film off DIP switches SWT1 and SWT2.</li>
+        <li>Scan the barcode on the PTC. The scanner types the serial and presses Enter for you.</li>
+      </ol></div></div>`;
+  }
+  // t1b
+  const done = PREP.filter((p, i) => p.auto || run.ticks[i]).length + 0;
+  const rows = PREP.map((p, i) => {
+    if (p.auto) return `<div class="g-ci auto"><span class="box">✓</span><span><span class="t">${esc(p.t)}</span><span class="d">${esc(p.d)}</span>${keyLine(p)}</span><span class="g-tag2">Checked automatically</span></div>`;
+    const on = !!run.ticks[i];
+    const extra = p.input ? `<span style="display:flex;gap:6px;align-items:center"><input class="g-field mono" data-f="qcvolt" inputmode="decimal" placeholder="24.0" value="${esc(run.qcvolt)}" aria-label="QC board supply voltage" style="width:76px"><span class="g-unit">V</span><input class="g-field mono" data-f="qccur" inputmode="decimal" placeholder="400" value="${esc(run.qccur)}" aria-label="QC board current" style="width:76px"><span class="g-unit">mA</span></span>` : "";
+    return `<div class="g-ci ${on ? "on" : ""}" data-act="tick" data-v="${i}" role="checkbox" aria-checked="${on}" tabindex="0"><span class="box">${on ? "✓" : ""}</span><span><span class="t">${esc(p.t)}</span><span class="d">${esc(p.d)}</span>${keyLine(p)}</span>${extra}</div>`;
+  }).join("");
+  return `<div class="g-start2"><div class="g-form">${startFields(!prepDone())}</div>
+    <div><div class="g-clh"><h4>Prepare the board</h4><span>${done} of ${PREP.length} done</span></div><div class="g-cl">${rows}</div></div></div>`;
+}
+
 function render() {
   applyStyle();
-  gui.innerHTML = topBar() + (run.screen === "start" ? startHTML() : run.screen === "run" ? runHTML() : resultsHTML());
+  gui.innerHTML = topBar() + (run.screen === "start" ? startHTML() : run.screen === "review" ? reviewHTML() : run.screen === "run" ? runHTML() : resultsHTML());
+  const mn = document.getElementById("mockNote"), m = MOCKS.find(x => x.id === run.review);
+  mn.hidden = run.screen !== "review"; if (m) mn.textContent = m.note;
+  document.getElementById("mock").value = run.screen === "review" ? run.review : "";
   document.querySelectorAll("#screens button").forEach(b => b.classList.toggle("on", b.dataset.screen === run.screen));
+  updateNext();
 }
 const say = (msg, kind) => { run.msg = msg; run.msgKind = kind || ""; };
 
 function record(ok, v) {
   const s = steps()[run.idx];
   run.results[s.key] = { v, ok }; run.idx = Math.min(run.idx + 1, steps().length - 1);
+  run.choice = null; run.autoDone = false; run.photoReview = false;
   run.scanWarned = false; say(""); render();
   const f = gui.querySelector("[data-in]"); if (f && frameFocus) f.focus({ preventScroll:true });
 }
@@ -395,9 +818,54 @@ function act(a, el) {
   const val = n => { const f = gui.querySelector(`[data-in="${n}"]`); return f ? f.value.trim() : ""; };
   frameFocus = true;
   switch (a) {
-    case "mode": run.mode = el.dataset.v; say(""); render(); break;
+    case "mode": if (run.screen === "review") break; run.mode = el.dataset.v; say(""); render(); break;
+    case "pick":
+      run.choice = el.dataset.v === "1";
+      gui.querySelectorAll('[data-act="pick"]').forEach(b => { const on = (b.dataset.v === "1") === run.choice; b.classList.toggle("on", on); b.textContent = (on ? "✓ " : "") + b.dataset.label; });
+      updateNext(); break;
+    case "nextstep": {
+      if (!stepReady(s).ok) break;
+      if (s.type === "yn") record(s.ask === "yesno" ? run.choice === s.expect : run.choice, run.choice ? "Yes" : "No");
+      else if (s.type === "value") { const n = Number(val("v")); record(s.judge ? run.choice : n >= s.lo && n <= s.hi, `${n} ${s.unit}`); }
+      else if (s.type === "scan") record(null, val("v"));
+      else if (s.type === "po") { const a1 = +val("a"), b1 = +val("b"); record(a1 === b1, `${b1} of ${a1}`); }
+      else if (s.type === "auto") record(s.ok, s.demo);
+      else if (s.type === "photo") act("usephoto");
+      else if (s.type === "checklist") { const V = +run.qcvolt, I = +run.qccur; record(V >= 23.5 && V <= 24.5 && I >= 350 && I <= 450, `${run.qcvolt} V, ${run.qccur} mA`); }
+      else if (s.type === "notes") act("finish");
+      break; }
+    case "howtoggle": run.howOpen = !run.howOpen; render(); break;
+    case "take": run.photoReview = true; run.photoSrc = "camera"; render(); break;
+    case "pfile": run.photoReview = true; run.photoSrc = "file"; render(); break;
+    case "retake": run.photoReview = false; render(); break;
+    case "usephoto": {
+      const cb = gui.querySelector("#asghost"), side = s.side;
+      if (cb && cb.checked) run.hasGhost[side] = true;
+      run.photoReview = false; run.off = { x:-7, y:5, r:-1.1 };
+      record(null, `PTC-0042-${side}-20261021-1432.jpg`); break; }
+    case "home": run.screen = "start"; run.review = null; run.runLabel = null; say(""); render(); break;
+    case "lookup": run.screen = "review"; run.review = "l1"; render(); break;
+    case "open": run.screen = "review"; run.review = "l2"; run.sel = 0; render(); break;
+    case "tl": run.sel = +el.dataset.v; render(); break;
+    case "retestq": run.screen = "review"; run.review = "r1"; render(); break;
+    case "repairform": run.screen = "review"; run.review = "r2"; run.chips = {}; run.closeups = 0; render(); break;
+    case "chip": run.chips[el.dataset.v] = run.chips[el.dataset.v] === false; render(); break;
+    case "closeup": run.closeups++; render(); break;
+    case "choose":
+      if (el.dataset.v === "repair" || el.dataset.v === "only") { run.screen = "review"; run.review = "r2"; run.chips = {}; run.closeups = 0; render(); }
+      else if (el.dataset.v === "retest") { startRetest("PTC-0051", "Run 2, retest"); }
+      else act("home");
+      break;
+    case "saverep":
+      if (el.dataset.v === "retest") startRetest("PTC-0051", "Run 2, after repair 1");
+      else { run.screen = "start"; run.review = null; say("Repair 1 saved for PTC-0051. It’s on the Waiting for a retest list.", ""); render(); }
+      break;
+    case "somkeep": run.mockSom = false; record(null, "2503804780, moved from PTC-0031"); break;
+    case "somagain": run.mockSom = false; say("Scan the SoM again.", ""); render(); break;
+    case "tick": run.ticks[el.dataset.v] = !run.ticks[el.dataset.v]; render(); { const r = gui.querySelector(`[data-act="tick"][data-v="${el.dataset.v}"]`); if (r) r.focus({ preventScroll:true }); } break;
     case "begin":
       if (!run.tester.trim()) { say("Enter the tester name first.", "err"); render(); break; }
+      if (run.review === "t1b" && run.screen === "review" && !prepDone()) { say("Finish the preparation list first.", "err"); render(); break; }
       if (run.mode === "board" && !run.serial.trim()) { say("Scan the PTC serial first.", "err"); render(); break; }
       if (run.mode === "ship" && !run.po.trim()) { say("Enter the purchase order number first.", "err"); render(); break; }
       run.idx = 0; run.results = {}; run.notes = ""; say(""); run.screen = "run"; render(); break;
@@ -422,21 +890,45 @@ function act(a, el) {
       } break;
     case "auto":
       run.running = true; say("Running on the PTC…", "run"); render();
-      setTimeout(() => { run.running = false; record(s.ok, s.demo); }, 700); break;
+      setTimeout(() => { run.running = false; run.autoDone = true; say(""); render(); }, 700); break;
     case "back": if (run.idx > 0) { run.idx--; delete run.results[st[run.idx].key]; say(""); render(); } break;
     case "finish":
       run.notes = val("notes"); run.results[s.key] = { v: run.notes || "No notes", ok: null };
       run.screen = "results"; say(""); render(); break;
     case "upload": say(run.mode === "board" ? "Uploaded to HWDB dev." : "Saved to HWDB dev as SHIPMENT-" + (run.po || "PO-2026-118") + ".", ""); render(); break;
-    case "next": run.screen = "start"; run.serial = ""; run.po = ""; run.batch = ""; say(""); render(); break;
+    case "next": run.screen = "start"; run.serial = ""; run.po = ""; run.batch = ""; run.runLabel = null; say(""); render(); break;
   }
 }
-gui.addEventListener("click", e => { const b = e.target.closest("[data-act]"); if (b && !b.disabled) act(b.dataset.act, b); });
-gui.addEventListener("input", e => { const f = e.target.dataset.f; if (f) { run[f] = e.target.value; if (run.msgKind === "err") { run.msg = ""; const m = gui.querySelector(".g-msg"); if (m) m.textContent = ""; } } });
+gui.addEventListener("click", e => { if (e.target.closest("input, textarea")) return; const b = e.target.closest("[data-act]"); if (b && !b.disabled) act(b.dataset.act, b); });
+gui.addEventListener("input", e => {
+  if ("op" in e.target.dataset) { run.ghostOp = +e.target.value; const g = gui.querySelector("svg.ghost"); if (g) g.style.opacity = run.ghostOp / 100; gui.querySelector("[data-opout]").textContent = run.ghostOp + " %"; return; }
+  if ("in" in e.target.dataset) { updateNext(); return; }
+  const f = e.target.dataset.f; if ((f === "qccur" || f === "qcvolt") && run.screen === "run") { run[f] = e.target.value; updateNext(); return; }
+  if (f === "qccur" || f === "qcvolt") { run[f] = e.target.value; const was = gui.querySelector('[data-f="serial"]').disabled; if (was === prepDone()) { render(); const q = gui.querySelector(`[data-f="${f}"]`); q.focus(); q.setSelectionRange(q.value.length, q.value.length); } return; }
+  if (f) { run[f] = e.target.value; if (run.msgKind === "err") { run.msg = ""; const m = gui.querySelector(".g-msg"); if (m) m.textContent = ""; } } });
+document.addEventListener("keydown", e => {
+  if (run.screen !== "run" || steps()[run.idx].type !== "photo") return;
+  if (e.target instanceof Element && e.target.closest("input, textarea, select")) return;
+  const mv = { ArrowLeft:[-2, 0], ArrowRight:[2, 0], ArrowUp:[0, -2], ArrowDown:[0, 2] }[e.key];
+  if (mv && !run.photoReview) { e.preventDefault(); run.off.x += mv[0]; run.off.y += mv[1]; if (Math.abs(run.off.x) + Math.abs(run.off.y) < 3) run.off.r = 0; render(); return; }
+  if (e.key === " " && !run.photoReview && !(e.target instanceof Element && e.target.closest("button"))) { e.preventDefault(); act("take"); }
+  else if (e.key === "Enter" && run.photoReview && !(e.target instanceof Element && e.target.closest("button"))) { e.preventDefault(); act("nextstep"); }
+});
 gui.addEventListener("keydown", e => {
+  if ((e.key === " " || e.key === "Enter") && e.target.dataset && e.target.dataset.act === "tick") { e.preventDefault(); act("tick", e.target); return; }
   if (e.key !== "Enter" || e.target.tagName === "TEXTAREA") return;
   if (run.screen === "start") { e.preventDefault(); act("begin"); }
-  else if (run.screen === "run" && ["value", "scan", "po"].includes(steps()[run.idx].type) && !steps()[run.idx].judge) { e.preventDefault(); act("record"); }
+  else if (run.screen === "run") { e.preventDefault(); act("nextstep"); }
+});
+
+// P/F and Y/N pick Pass or Fail on yes/no steps; Enter goes to the next test
+document.addEventListener("keydown", e => {
+  if (run.screen !== "run" || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target instanceof Element && e.target.closest("input, textarea, select, button, .g-ci")) return;
+  const s = steps()[run.idx]; if (!s) return;
+  const k = e.key.toLowerCase();
+  if (s.type === "yn" && (s.ask === "yesno" ? k === "y" || k === "n" : k === "p" || k === "y" || k === "f" || k === "n")) { e.preventDefault(); act("pick", { dataset:{ v: k === "p" || k === "y" ? "1" : "0" } }); }
+  else if (e.key === "Enter" && s.type !== "photo" && e.target === document.body) { e.preventDefault(); act("nextstep"); }
 });
 
 // jump buttons
@@ -449,10 +941,55 @@ function fillDemo(n) {
     else if (s.type === "po") run.results[s.key] = { v:`${s.demo[1]} of ${s.demo[0]}`, ok:true };
     else if (s.type === "auto") run.results[s.key] = { v:s.demo, ok:s.ok };
     else if (s.type === "notes") run.results[s.key] = { v:"No notes", ok:null };
+    else if (s.type === "photo") run.results[s.key] = { v:`PTC-0042-${s.side}.jpg`, ok:null };
+    else if (s.type === "checklist") run.results[s.key] = { v:"24.1 V, 410 mA", ok:true };
   });
 }
+document.getElementById("fillex").addEventListener("click", () => {
+  if (run.screen !== "run") return;
+  const s = steps()[run.idx], set = (n, v) => { const f = gui.querySelector(`[data-in="${n}"]`); if (f) f.value = v; };
+  if (s.type === "value") { set("v", s.demo); if (s.judge) act("pick", { dataset:{ v:"1" } }); }
+  else if (s.type === "yn") act("pick", { dataset:{ v:"1" } });
+  else if (s.type === "scan") set("v", s.demo);
+  else if (s.type === "po") { set("a", s.demo[0]); set("b", s.demo[1]); }
+  else if (s.type === "checklist") { PREP.forEach((p, i) => { if (!p.auto) run.ticks[i] = true; }); run.qcvolt = "24.1"; run.qccur = "410"; render(); }
+  else if (s.type === "photo") { act("take"); return; }
+  else if (s.type === "auto") { act("auto"); return; }
+  updateNext();
+});
+const mockSel = document.getElementById("mock");
+MOCKS.forEach(m => { const o = document.createElement("option"); o.value = m.id; o.textContent = m.label; mockSel.appendChild(o); });
+mockSel.addEventListener("change", () => {
+  if (!mockSel.value) return;
+  frameFocus = false; run.running = false; say(""); run.mode = "board";
+  run.ticks = {}; run.qccur = ""; run.qcvolt = ""; run.runLabel = null; run.mockSom = false; run.sel = 0; run.chips = {}; run.closeups = 0;
+  if (!run.serial) run.serial = "PTC-0042";
+  if (mockSel.value === "t1" || mockSel.value === "t4") {
+    const v = mockSel.value;
+    run.review = null; run.choice = null; run.autoDone = false; run.photoReview = false; run.howOpen = true;
+    if (v === "t1") { run.screen = "start"; run.serial = ""; }
+    else { run.screen = "run"; run.idx = BOARD_STEPS.findIndex(s => s.key === "prep"); fillDemo(run.idx); }
+    render(); const mn = document.getElementById("mockNote"); mn.hidden = false; mn.textContent = MOCKS.find(m => m.id === v).note;
+    mockSel.value = v; return;
+  }
+  if (mockSel.value === "t2" || mockSel.value === "t2n") {
+    const v = mockSel.value;
+    run.screen = "run"; run.review = null; run.mode = "board"; run.idx = 0; fillDemo(0); run.howOpen = true; run.photoReview = false;
+    run.hasGhost = v === "t2" ? { front:true, back:true } : { front:false, back:false }; run.off = { x:9, y:-6, r:1.4 };
+    render(); const mn = document.getElementById("mockNote"); mn.hidden = false; mn.textContent = MOCKS.find(m => m.id === v).note;
+    mockSel.value = v; return;
+  }
+  if (mockSel.value === "r4") {
+    run.screen = "run"; run.review = null; run.idx = BOARD_STEPS.findIndex(s => s.key === "som_serial"); fillDemo(run.idx); run.mockSom = true;
+    render(); document.getElementById("mockNote").hidden = false; document.getElementById("mockNote").textContent = MOCKS.find(m => m.id === "r4").note;
+    mockSel.value = "r4"; return;
+  }
+  run.screen = "review"; run.review = mockSel.value;
+  render();
+});
 document.getElementById("screens").addEventListener("click", e => {
   const b = e.target.closest("[data-screen]"); if (!b) return;
+  run.review = null; run.runLabel = null; run.mockSom = false;
   frameFocus = false; run.running = false; say("");
   if (!run.serial) run.serial = "PTC-0042";
   if (b.dataset.screen === "start") run.screen = "start";

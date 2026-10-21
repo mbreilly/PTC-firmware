@@ -175,13 +175,14 @@ to run against the production HWDB.
 
 ## The UI designer
 
-`ui-designer/ptc-gui-designer.html` is a working preview of the GUI for trying out colors,
+[`ptctestsuite/ui/designer/ptc-gui-designer.html`](ptctestsuite/ui/designer/ptc-gui-designer.html) is a working preview of the GUI for trying out colors,
 text and layout, and for reviewing each test before it's built. Open it in any browser; it
-needs nothing else. The **Test mockups** list shows specific tests and screens (start, photos,
+needs nothing else (it loads its fonts from Google Fonts, so it only looks exactly right online). The **Test mockups** list shows specific tests and screens (start, photos,
 test stand checklist, lookup, history, retest, repair, duplicate serial, SoM warning), and
 **Fill this step with an example** fills in the current step so Next test can be pressed.
 **Copy summary** gives the colors and layout as text; the colors map to the variables at the top
-of `ptctestsuite/ui/static/index.html`.
+of `ptctestsuite/ui/static/index.html`, so to change the real GUI, copy each value from the
+summary into the matching `--g-…` variable there.
 
 ## The HWDB
 
@@ -220,19 +221,6 @@ In another:
 - Window title and station label are `gui_title` and `gui_station` in `config/parameters.py`.
   Colors and layout are the variables at the top of `ui/static/index.html`, with the same
   names as the PTC QC GUI designer summary.
-
-## Changing the look: the GUI designer
-
-[`ptctestsuite/ui/designer/ptc-gui-designer.html`](ptctestsuite/ui/designer/ptc-gui-designer.html)
-is a standalone page for trying out the GUI's look. Open it in any browser by double-clicking it;
-it doesn't need the test station running. It shows a working preview of the board and shipment
-steps, with presets, color pickers and layout options. Your changes are remembered in that
-browser.
-
-When it looks right, press **Copy summary**. Then copy each color and option from the summary
-into the matching `--g-…` variable at the top of `ui/static/index.html`. The "Lab dark" preset
-matches the GUI as it is now. The preview doesn't include the board photo step, and it loads
-its own fonts from Google Fonts, so it needs internet to look exactly right.
 
 ## Still to confirm
 

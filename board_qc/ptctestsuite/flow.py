@@ -649,9 +649,10 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
             await run_remote_test(ui, plan, ws, q, "timing")
             ui.running(plan["qc_timing_lock"])
             locked, status = await qc.timing_lock()
-            q.add_result("qc_timing_lock",
-                         qc_result.ERROR if locked is None else qc_result.PASS if locked else qc_result.FAIL,
-                         {"status": hex(status)} if status is not None else None)
+            r = qc_result.ERROR if locked is None else qc_result.PASS if locked else qc_result.FAIL
+            values = {"status": hex(status)} if status is not None else None
+            q.add_result("qc_timing_lock", r, values)
+            await ui.after_auto(plan["qc_timing_lock"], r, format_value(values) if values else "The QC board didn’t answer")
             await run_manual_tests(ui, q, timing_tests)
 
         # 4.5.5 Ethernet, from the host
