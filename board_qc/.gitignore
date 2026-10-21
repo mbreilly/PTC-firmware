@@ -5,3 +5,4 @@
 !*.woff2
 !*.txt
 !reference_photos/*.jpg
+!ptctestsuite/config/*.json

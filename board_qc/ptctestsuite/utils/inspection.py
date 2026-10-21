@@ -128,6 +128,164 @@ def suggest_tantalums(img: np.ndarray) -> list[dict]:
     return out
 
 
+# ---- placing the parts from the board design ---------------------------------------
+
+def load_design() -> dict | None:
+    p = Path(__file__).parents[1] / "config" / parameters.board_design_file
+    try:
+        return json.loads(p.read_text())
+    except (OSError, ValueError):
+        return None
+
+
+def board_to_photo(board_pts, photo_pts):
+    """A mapping from board inches to photo pixels through the anchor points: a homography, with the
+    error left at each anchor spread smoothly between anchors to follow the camera lens's bending."""
+    b, p = np.float32(board_pts), np.float32(photo_pts)
+    H, _ = cv2.findHomography(b, p, 0)
+    res = p - cv2.perspectiveTransform(b[None], H)[0]
+
+    def apply(pts):
+        pts = np.float32(pts).reshape(-1, 2)
+        base = cv2.perspectiveTransform(pts[None], H)[0]
+        w = 1 / (np.linalg.norm(pts[:, None] - b[None], axis=2) ** 2 + 1e-9)
+        return base + (w @ res) / w.sum(1, keepdims=True)
+    return apply
+
+
+def _gold_dots(img) -> np.ndarray:
+    """Small round gold pads the size of a fiducial."""
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    m = cv2.inRange(hsv, (12, 70, 120), (38, 255, 255))
+    n, _, st, cen = cv2.connectedComponentsWithStats(m)
+    s = img.shape[1] / 2576
+    dots = [cen[i] for i in range(1, n) if 60 * s ** 2 < st[i][4] < 280 * s ** 2 and 8 * s < st[i][2] < 20 * s
+            and 0.7 < st[i][2] / st[i][3] < 1.4 and st[i][4] / (np.pi * (st[i][2] / 2) ** 2) > 0.6]
+    return np.array(dots).reshape(-1, 2)
+
+
+def fiducial_order(side: str) -> list[dict]:
+    """The side's fiducials with the corner of the photo each should be in, for asking the tester to click them."""
+    design = load_design()
+    layer, sx, sy = parameters.inspection_orientation[side]
+    fids = {r: f for r, f in (design or {}).get("fiducials", {}).items() if f["side"] == layer}
+    out = []
+    for r, f in fids.items():
+        px, py = sx * f["x"], sy * f["y"]
+        others = [(sx * g["x"], sy * g["y"]) for g in fids.values()]
+        left = px <= np.median([o[0] for o in others]); top = py <= np.median([o[1] for o in others])
+        out.append({"ref": r, "corner": f"{'top' if top else 'bottom'}-{'left' if left else 'right'}"})
+    return sorted(out, key=lambda o: ["top-left", "top-right", "bottom-right", "bottom-left"].index(o["corner"]))
+
+
+def place_from_design(side: str, img: np.ndarray, clicks: dict | None = None) -> dict:
+    """Places every visible polarised part of the design on a photo of one side.
+    Finds the four corner fiducials itself (or uses clicks {ref: [x, y]}), adds tantalum capacitors
+    near where the design puts them as extra anchors, and returns {"ok", "parts", "message", ...}.
+    If the fiducials can't be found it returns ok False and need_fiducials."""
+    design = load_design()
+    if not design:
+        return {"ok": False, "message": "There’s no board design file. Make one with python -m ptctestsuite.design_import."}
+    layer, sx, sy = parameters.inspection_orientation[side]
+    fids = {r: f for r, f in design["fiducials"].items() if f["side"] == layer}
+    if len(fids) < 4:
+        return {"ok": False, "message": f"The design has {len(fids)} fiducials on the {side}; four are needed."}
+    dots = _gold_dots(img)
+    names = list(fids)
+    bpos = np.array([[sx * fids[r]["x"], sy * fids[r]["y"]] for r in names])   # as the board lies in the photo
+    found, how = {}, "found automatically"
+    if clicks:
+        how = "from the points you clicked"
+        for r, xy in clicks.items():
+            xy = np.float32(xy)
+            if len(dots):
+                d = np.linalg.norm(dots - xy, axis=1)   # snap to the fiducial pad near the click
+                found[r] = dots[d.argmin()] if d.min() < img.shape[1] / 80 else xy
+            else:
+                found[r] = xy
+    elif len(dots) >= 4:
+        for a, b in ((1, 1), (-1, 1), (1, -1), (-1, -1)):   # the outermost dot in each corner
+            found[names[int(np.argmin(a * bpos[:, 0] + b * bpos[:, 1]))]] = dots[int(np.argmin(a * dots[:, 0] + b * dots[:, 1]))]
+    B = [[fids[r]["x"], fids[r]["y"]] for r in found]
+    P = [list(map(float, found[r])) for r in found]
+    # check the four points have the design's shape before trusting them
+    ok = len(found) == 4
+    if ok:   # each point must be in the corner its fiducial is in, as the board lies in the photo
+        centre = np.float32(P).mean(0)
+        for f in fiducial_order(side):
+            x, y = found[f["ref"]]
+            want_top, want_left = f["corner"].startswith("top"), f["corner"].endswith("left")
+            ok = ok and (y < centre[1]) == want_top and (x < centre[0]) == want_left
+    if ok:
+        bq, pq = np.float32(B), np.float32(P)
+        span = lambda q: (np.ptp(q[:, 0]), np.ptp(q[:, 1]))
+        bw, bh = span(np.abs(bq)); pw, ph = span(pq)
+        ok = pw > img.shape[1] * 0.3 and abs((pw / ph) / (bw / bh) - 1) < 0.15
+    if not ok:
+        return {"ok": False, "need_fiducials": fiducial_order(side),
+                "message": "The fiducials couldn’t be found in this photo. Click each one in turn." if not clicks
+                else "Those points don’t match the board’s fiducials. Click them again, in the order shown."}
+    H, _ = cv2.findHomography(np.float32(B), np.float32(P), 0)
+    px_per_in = float(np.linalg.norm(np.float32(P)[0] - np.float32(P)[3]) / np.linalg.norm(np.float32(B)[0] - np.float32(B)[3]))
+    tants = [p for p in design["parts"] if p["side"] == layer and p["kind"] == "tantalum"]
+    n_tant = 0
+    if tants:
+        seen = np.array([[q["box"][0] + q["box"][2] / 2, q["box"][1] + q["box"][3] / 2] for q in suggest_tantalums(img)]).reshape(-1, 2)
+        if len(seen):
+            pred = cv2.perspectiveTransform(np.float32([[p["x"], p["y"]] for p in tants])[None], H)[0]
+            for p, pr in zip(tants, pred):
+                d = np.linalg.norm(seen - pr, axis=1)
+                if d.min() < 0.1 * px_per_in:
+                    B.append([p["x"], p["y"]]); P.append(list(map(float, seen[d.argmin()]))); n_tant += 1
+    to_px = board_to_photo(B, P)
+    parts, skipped = [], []
+    H_img, W_img = img.shape[:2]
+    for p in design["parts"]:
+        if p["side"] != layer:
+            continue
+        if p.get("hidden"):
+            skipped.append({"ref": p["ref"], "why": p["hidden"]})
+            continue
+        x0, y0, x1, y1 = p["bbox"]
+        t = np.radians(p["rot"]); c, s = np.cos(t), np.sin(t); m = -1 if p["mirror"] else 1
+        poly = to_px([(p["x"] + c * m * u - s * v, p["y"] + s * m * u + c * v) for u, v in ((x0, y0), (x1, y0), (x1, y1), (x0, y1))])
+        bx0, by0 = np.maximum(poly.min(0), 0); bx1, by1 = np.minimum(poly.max(0), (W_img - 1, H_img - 1))
+        w, h = int(bx1 - bx0), int(by1 - by0)
+        if min(w, h) < parameters.inspection_min_part_px:
+            why = f"{min(w, h)} px across, too small to check"
+            if p["kind"] == "led":
+                why += "; the LED tests catch a reversed LED, as it won’t light"
+            skipped.append({"ref": p["ref"], "why": why})
+            continue
+        parts.append({"ref": p["ref"], "kind": p["kind"], "box": [int(bx0), int(by0), w, h]})
+    # sanity checks: the parts must fit the photo, and the tantalum capacitors must say it's the right side
+    big = [q for q in design["parts"] if q["side"] == layer and not q.get("hidden") and q["kind"] != "led"]
+    if big and len([q for q in parts if q["kind"] != "led"]) < 0.5 * len(big):
+        return {"ok": False, "need_fiducials": fiducial_order(side),
+                "message": "The parts didn’t fit on the photo, so the fiducials were probably matched wrongly. "
+                           "Click each one in turn."}
+    if len(tants) >= 6 and n_tant < len(tants) / 2:
+        return {"ok": False, "message": f"Only {n_tant} of the {len(tants)} tantalum capacitors on the {side} are where the "
+                                        f"design puts them. Is this a photo of the {side}, the right way round?"}
+    if not tants and len(suggest_tantalums(img)) >= 6:
+        return {"ok": False, "message": f"This photo shows tantalum capacitors, which are only on the other side. "
+                                        f"Is it a photo of the {side}?"}
+    anchors = f"the 4 fiducials ({how})" + (f" and {n_tant} tantalum capacitors" if n_tant else "")
+    return {"ok": True, "parts": parts, "skipped": skipped, "fiducials": {r: [float(v) for v in found[r]] for r in found},
+            "message": f"Placed {len(parts)} parts from the {design['name']} design using {anchors}." + _skipped_text(skipped)}
+
+
+def _skipped_text(skipped: list) -> str:
+    if not skipped:
+        return ""
+    groups = {}
+    for q in skipped:
+        reason = q["why"] if "too small" not in q["why"] else "too small to check in this photo" + (
+            "; the LED tests catch a reversed LED, as it won’t light" if "LED" in q["why"] else "")
+        groups.setdefault(reason, []).append(q["ref"])
+    return " Left out: " + "; ".join(f"{', '.join(sorted(refs))} ({why})" for why, refs in groups.items()) + "."
+
+
 # ---- inspection --------------------------------------------------------------------
 
 def _gray(img):

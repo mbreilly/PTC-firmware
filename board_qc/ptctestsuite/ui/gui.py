@@ -243,6 +243,16 @@ class GuiUI(TesterUI):
             img = await asyncio.to_thread(cv2.imread, str(inspection.reference_path(side)))
             await send({"type": "suggestions", "parts": inspection.suggest_tantalums(img) if img is not None else []})
             return
+        if kind == "place":
+            import cv2
+            ref = inspection.reference_path(side)
+            img = await asyncio.to_thread(cv2.imread, str(ref)) if ref.is_file() else None
+            if img is None:
+                await send({"type": "error", "message": "Set the reference photo for this side first."})
+                return
+            r = await asyncio.to_thread(inspection.place_from_design, side, img, m.get("clicks"))
+            await send({"type": "placed" if r["ok"] else "need_fiducials", **r})
+            return
         if kind == "save":
             saved = inspection.save_parts(side, m.get("parts") or [])
             await send({"type": "saved", "message": f"Saved {len(saved)} parts for the {side}."})

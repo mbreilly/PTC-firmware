@@ -96,3 +96,11 @@ inspection_search_px = 8           # placement tolerance when comparing a part w
 inspection_reverse_margin = 0.10   # turned round must match this much better to flag "reversed"
 inspection_min_match = 0.60        # below this a part doesn't look like the reference: "check it"
 # Tune these on real boards photographed on the camera stand before relying on the check.
+
+# The board design for the orientation check: polarised parts, fiducials and outline, made by
+#   python -m ptctestsuite.design_import --odb <design>_odb.tgz --bom <BOM>.csv
+board_design_file = "board_design.json"   # in ptctestsuite/config/, beside this file
+# How the board lies in each photo, as signs from board axes to photo axes (photo y points down):
+# front side up with the D-sub at the top, then turned over top to bottom for the back.
+inspection_orientation = {"front": ("top", 1, -1), "back": ("bot", 1, 1)}
+inspection_min_part_px = 14        # parts smaller than this in the photo can't be checked

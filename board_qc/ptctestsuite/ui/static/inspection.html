@@ -49,6 +49,8 @@ input, select { background: var(--g-field); color: var(--g-ink); border: 1px sol
 .msg.err { color: var(--g-fail); } .msg.ok { color: var(--g-pass); } .msg.warn { color: var(--g-warn); }
 .result img { width: 100%; border: 1px solid var(--g-line); border-radius: var(--g-r); margin-top: 6px; }
 .mono { font-family: var(--g-mono); }
+.clickbar { position: sticky; top: 0; z-index: 2; margin-bottom: 10px; padding: 10px 14px; border: 1px solid var(--g-accent); border-radius: var(--g-r); background: color-mix(in srgb, var(--g-accent) 18%, var(--g-panel)); display: flex; gap: 12px; align-items: center; }
+.clickbar b { font-family: var(--g-mono); }
 </style>
 </head>
 <body>
@@ -59,7 +61,7 @@ input, select { background: var(--g-field); color: var(--g-ink); border: 1px sol
   <a href="/">Back to the test station</a>
 </div>
 <div class="body">
-  <div class="stage" id="stage"><div class="empty" id="empty">Loading…</div><canvas id="cv" hidden></canvas></div>
+  <div class="stage" id="stage"><div class="clickbar" id="clickbar" hidden role="status"><span id="clicktext"></span><button class="btn" id="clickcancel" type="button">Cancel</button></div><div class="empty" id="empty">Loading…</div><canvas id="cv" hidden></canvas></div>
   <div class="panel">
     <section>
       <h2>Reference photo</h2>
@@ -70,7 +72,8 @@ input, select { background: var(--g-field); color: var(--g-ink); border: 1px sol
     <section>
       <h2>Parts to check</h2>
       <div class="hint">Drag on the photo to draw a box around each polarised part. Drag a box to move it, its bottom-right corner to resize it. Arrow keys nudge the selected box.</div>
-      <div class="row" style="margin-top:8px"><button class="btn" id="suggest" type="button">Suggest tantalum capacitors</button></div>
+      <div class="row" style="margin-top:8px"><button class="btn pri" id="place" type="button">Place parts from the board design</button><button class="btn" id="suggest" type="button">Suggest tantalum capacitors</button></div>
+      <div class="hint" style="margin-top:6px">Placing from the design finds the four corner fiducials and puts a box on every polarised part the design lists for this side. Check the boxes, then save.</div>
       <div class="list" id="list" style="margin-top:10px"></div>
     </section>
     <section id="edit" hidden>
@@ -118,7 +121,7 @@ function handle(m) {
     $("refinfo").textContent = m.has_reference ? `${m.width} × ${m.height} px. Take it on the camera stand from a board that has been checked by hand.` : "No reference photo for this side yet.";
     if (m.has_reference) { img = new Image(); img.onload = () => { $("empty").hidden = true; cv.hidden = false; layout(); }; img.src = m.ref_url; }
     else { cv.hidden = true; $("empty").hidden = false; $("empty").textContent = `Set a reference photo for the ${side} first.`; }
-    ["suggest", "trybtn", "save"].forEach(id => $(id).disabled = !m.has_reference);
+    ["place", "suggest", "trybtn", "save"].forEach(id => $(id).disabled = !m.has_reference);
     renderList(); renderEdit();
   } else if (m.type === "suggestions") {
     const added = m.parts.filter(p => !parts.some(q => overlap(p.box, q.box) > 0.3));
@@ -126,6 +129,13 @@ function handle(m) {
     say(added.length ? `${added.length} added. Give each one its reference designator, then save.` : "No new tantalum capacitors found.", added.length ? "ok" : "warn");
     if (added.length) { setDirty(true); sel = parts.length - added.length; }
     renderList(); renderEdit(); draw();
+  } else if (m.type === "placed") {
+    clicking = null; $("clickbar").hidden = true;
+    parts = m.parts.map(p => ({ ...p, box: [...p.box] })); sel = -1; setDirty(true);
+    say(m.message + " Check the boxes, then press Save parts.", "ok"); renderList(); renderEdit(); draw();
+  } else if (m.type === "need_fiducials") {
+    if (!m.need_fiducials) { clicking = null; $("clickbar").hidden = true; say(m.message, "err"); return; }
+    clicking = { list: m.need_fiducials, i: 0, clicks: {} }; say(m.message, "warn"); showClick(); draw();
   } else if (m.type === "saved") { say(m.message, "ok"); setDirty(false); }
   else if (m.type === "tried") {
     $("result").innerHTML = m.aligned
@@ -158,6 +168,10 @@ function draw() {
     g.fillStyle = p.ref ? "#fff" : "#E0A33A"; g.fillText(label, x + 2, y - 6);
   });
   if (drag && drag.mode === "new") { g.strokeStyle = "#fff"; g.setLineDash([5, 4]); g.strokeRect(...drag.rect); g.setLineDash([]); }
+  if (clicking) Object.entries(clicking.clicks).forEach(([ref, [x, y]]) => {
+    g.strokeStyle = "#3BA7C9"; g.lineWidth = 3; g.beginPath(); g.arc(x * scale, y * scale, 9, 0, 2 * Math.PI); g.stroke();
+    g.fillStyle = "#fff"; g.fillText(ref, x * scale + 12, y * scale + 4);
+  });
 }
 
 function renderList() {
@@ -174,11 +188,32 @@ $("eref").oninput = () => { if (sel >= 0) { parts[sel].ref = $("eref").value.tri
 $("ekind").onchange = () => { if (sel >= 0) { parts[sel].kind = lastKind = $("ekind").value; setDirty(true); renderList(); draw(); } };
 $("edel").onclick = () => { if (sel >= 0) { parts.splice(sel, 1); sel = -1; setDirty(true); renderList(); renderEdit(); draw(); } };
 
+// clicking the fiducials when they can't be found automatically
+let clicking = null;
+function showClick() {
+  const f = clicking.list[clicking.i];
+  $("clickbar").hidden = false;
+  $("clicktext").innerHTML = `Click the fiducial <b>${esc(f.ref)}</b>, near the <b>${esc(f.corner.replace("-", " "))}</b> corner (${clicking.i + 1} of ${clicking.list.length}). It’s a small round gold pad with its name printed beside it.`;
+}
+$("clickcancel").onclick = () => { clicking = null; $("clickbar").hidden = true; say("Placing from the design was cancelled."); draw(); };
+$("place").onclick = () => {
+  if (parts.length && !confirm("Replace the marked parts with the ones from the board design?")) return;
+  say("Placing parts from the board design…"); send({ type: "place", side });
+};
+
 // drawing, moving and resizing boxes
 let drag = null;
 const at = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
 cv.addEventListener("pointerdown", e => {
-  const [mx, my] = at(e); cv.setPointerCapture(e.pointerId);
+  const [mx, my] = at(e);
+  if (clicking) {
+    clicking.clicks[clicking.list[clicking.i].ref] = [mx / scale, my / scale];
+    clicking.i++;
+    if (clicking.i < clicking.list.length) { showClick(); draw(); }
+    else { $("clicktext").textContent = "Placing parts…"; send({ type: "place", side, clicks: clicking.clicks }); draw(); }
+    return;
+  }
+  cv.setPointerCapture(e.pointerId);
   if (sel >= 0) {
     const [x, y, w, h] = parts[sel].box.map(v => v * scale);
     if (Math.abs(mx - (x + w)) < 9 && Math.abs(my - (y + h)) < 9) { drag = { mode: "resize", i: sel }; return; }
@@ -202,6 +237,7 @@ cv.addEventListener("pointerup", () => {
   drag = null; draw();
 });
 document.addEventListener("keydown", e => {
+  if (clicking && e.key === "Escape") { $("clickcancel").click(); return; }
   if (sel < 0 || e.target.closest("input, select")) return;
   const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
   if (d) { e.preventDefault(); parts[sel].box[0] += d[0]; parts[sel].box[1] += d[1]; setDirty(true); draw(); }

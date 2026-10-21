@@ -140,11 +140,34 @@ answered Reversed, with the parts flagged but confirmed correct. The outlined ph
 the HWDB beside the board photo ("Run n, orientation check, front").
 
 **Setting it up.** Open `http://localhost:8080/inspection` (linked from the Look up a board screen).
-For each side, set the reference photo (the last photo taken of that side on the station, or a
-file), then drag a box around every polarised part and give it its reference designator and kind.
-**Suggest tantalum capacitors** finds the yellow tantalum bodies by colour as a starting point.
-**Try it on a photo** shows what the check flags. Everything is kept in `inspection/<side>/`
-(`reference.jpg`, `parts.json`). Until a side has a reference and parts, its check is skipped.
+For each side:
+
+1. Set the reference photo: the last photo taken of that side on the station, or a file. Take it
+   on the camera stand from a board checked by hand.
+2. Press **Place parts from the board design**. The program finds the four corner fiducials
+   (FIDT1-4 on the front, FIDB1-4 on the back), adds the tantalum capacitors it can see as extra
+   anchors, and puts a box on every polarised part the design lists for that side. If it can't
+   find the fiducials (poor light, say) it asks you to click each one, naming it and its corner. It
+   checks the photo is the side it should be (the front has 18 tantalum capacitors, the back none).
+3. Check the boxes, adjust any by dragging, and **Save parts**. **Try it on a photo** shows what
+   the check flags.
+
+Boxes can also be drawn by hand, and **Suggest tantalum capacitors** finds them by colour.
+Everything is kept in `inspection/<side>/` (`reference.jpg`, `parts.json`). Until a side has a
+reference and parts, its check is skipped.
+
+**The board design.** `ptctestsuite/config/board_design.json` lists every polarised part of the
+PTC4a v1j design: position, rotation, side, outline and pin 1 from the ODB++, and the kind from
+the BOM (ICs, oscillators and crystals, tantalum and polymer capacitors, LEDs, the Schottky diode;
+the bidirectional SMCJ12CA TVS and PGB1010603 ESD diodes aren't polarised). That's 74 parts on the
+front and 18 on the back. The seven LTM8064 converters are left out because they sit under
+heatsinks, and parts too small for the camera (the 0603 LEDs, about 0.8 mm wide) are left out when
+placing; a reversed LED won't light, so the LED tests catch it. When the design changes, rebuild
+the file from the new ODB++ and BOM:
+
+    python -m ptctestsuite.design_import --odb ptc4a_v1j_odb.tgz --bom PTC_CORE_ENG_BILL_OF_MATERIALS.CSV
+
+On the preproduction photos the placement is accurate to about 0.5 mm between anchors.
 
 Take the reference on the camera stand from a board checked by hand. The thresholds
 (`inspection_*` in `config/parameters.py`) were set on the preproduction photos and should be
