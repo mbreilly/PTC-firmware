@@ -91,6 +91,28 @@ class TerminalUI(TesterUI):
         text = await input_dialog(title="Notes", text="Enter tester notes here:").run_async()
         return text or ""
 
+    async def ask_photo(self, step: Step, side: str):
+        from ptctestsuite.utils.photos import Photo, PhotoError, from_file
+        while True:
+            path = (await self.session.prompt_async(
+                f"{self._msg(step)}\nPath to a .jpg or .png file, or press Enter to use the camera "
+                f"(space takes the photo): ")).strip().strip('"\'')
+            if path:
+                try:
+                    return from_file(side, path)
+                except PhotoError as e:
+                    print(e)
+                    continue
+            from ptctestsuite.utils.image_capture import get_board_image
+            try:
+                data = await get_board_image()
+            except Exception as e:   # camera missing, or the window was closed with Esc
+                print(f"The camera didn't give a photo ({e}).")
+                data = None
+            if data:
+                return Photo(side, data, "image/png", "camera")
+            print("No photo was taken. Try again.")
+
     async def instruct(self, title: str, text: str) -> None:
         await self.session.prompt_async(f"{text} Press Enter when ready.")
 

@@ -34,6 +34,7 @@ class reception_record(qc_record):
         dd.pop('som_serial', None)
         dd.pop('eeprom_serial', None)
         dd.pop('ambient_temperature', None)
+        dd.pop('photos', None)
         return dd
 
 

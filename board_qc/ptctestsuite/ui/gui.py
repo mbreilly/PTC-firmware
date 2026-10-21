@@ -17,7 +17,9 @@ from websockets.asyncio.server import serve, broadcast
 from websockets.datastructures import Headers
 from websockets.http11 import Response
 
+from ptctestsuite.config import parameters
 from ptctestsuite.ui.base import TesterUI, Step, TestAborted, format_value
+from ptctestsuite.utils import photos
 
 PAGE = Path(__file__).with_name("static") / "index.html"
 FONTS = PAGE.with_name("fonts")
@@ -39,12 +41,17 @@ class GuiUI(TesterUI):
         self._ask_id = 0
         self._pending = None          # (id, future, validator)
         self._abort = False
+        self._photos: dict[str, photos.Photo] = {}   # this run's photos, served at /photo/<side>
         self.state = {
             "title": title, "station": station,
             "hwdb": {"on": hwdb_on, "label": hwdb_label},
             "screen": "start", "mode": None, "ident": "", "tester": "",
             "plan": [], "results": {}, "last": None,
             "ask": None, "running": None, "status": None, "final": None,
+            "camera": {"width": parameters.camera_width, "height": parameters.camera_height,
+                       "max_mb": parameters.photo_max_mb},
+            "ghosts": {side: photos.ghost_version(side) for side in photos.SIDES},
+            "photos": {},
         }
 
     # ---- server ---------------------------------------------------------------
@@ -54,7 +61,7 @@ class GuiUI(TesterUI):
 
     async def serve(self):
         self.server = await serve(self._handler, self.host, self.port, process_request=self._http,
-                                  max_size=2 ** 20)
+                                  max_size=(parameters.photo_max_mb * 4 // 3 + 2) * 2 ** 20)
         lg.info(f"GUI running at {self.url}")
         print(f"PTC QC GUI running at {self.url}  (Ctrl+C to quit)")
         if self.open_browser:
@@ -76,7 +83,20 @@ class GuiUI(TesterUI):
                 return Response(200, "OK", Headers([("Content-Type", "font/woff2"),
                                                     ("Content-Length", str(len(body))),
                                                     ("Cache-Control", "max-age=86400")]), body)
+        if path in ("/ghost/front", "/ghost/back"):
+            g = photos.ghost_path(path.rsplit("/", 1)[1])
+            if g:
+                return self._file_response(g.read_bytes(), photos.EXT_MIME[g.suffix])
+        if path in ("/photo/front", "/photo/back"):
+            p = self._photos.get(path.rsplit("/", 1)[1])
+            if p:
+                return self._file_response(p.data, p.mime)
         return connection.respond(404, "Not found\n")
+
+    @staticmethod
+    def _file_response(body: bytes, mime: str):
+        return Response(200, "OK", Headers([("Content-Type", mime), ("Content-Length", str(len(body))),
+                                            ("Cache-Control", "no-store")]), body)
 
     async def _handler(self, ws):
         self.clients.add(ws)
@@ -97,6 +117,9 @@ class GuiUI(TesterUI):
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
+            return
+        if data.get("type") == "ghost":
+            self._ghost_message(data)
             return
         if data.get("type") == "abort" and self.state["screen"] == "run":
             lg.warning("Tester stopped the test from the GUI")
@@ -153,7 +176,28 @@ class GuiUI(TesterUI):
         return {"mode": v["mode"], "tester": self.state["tester"], "serial": str(v.get("serial", "")),
                 "po": str(v.get("po", "")), "batch": str(v.get("batch", "")).strip()}
 
+    def _ghost_message(self, data: dict):
+        """The tester replaced or removed a ghost image from the photo step."""
+        side = data.get("side")
+        if side not in photos.SIDES:
+            return
+        try:
+            if data.get("action") == "clear":
+                photos.clear_ghost(side)
+            elif data.get("action") == "set":
+                photos.save_ghost(photos.from_data_url(side, data.get("image"), "file"))
+            else:
+                return
+            self.state["ghost_error"] = None
+        except (photos.PhotoError, OSError) as e:
+            lg.error(f"Ghost image change failed: {e}")
+            self.state["ghost_error"] = str(e)
+        self.state["ghosts"][side] = photos.ghost_version(side)
+        self._push()
+
     def begin(self, mode, ident, tester, plan):
+        self._photos = {}
+        self.state["photos"] = {}
         self.state.update(screen="run", mode=mode, ident=ident, tester=tester,
                           plan=[s.to_dict() for s in plan], results={}, last=None, final=None)
         self._push()
@@ -201,6 +245,30 @@ class GuiUI(TesterUI):
             return None
         v = await self._ask("counts", step, check)
         return float(v["ordered"]), float(v["received"])
+
+    async def ask_photo(self, step, side):
+        got = {}
+
+        def check(v):
+            if not isinstance(v, dict):
+                return "Take the photo or choose a file first."
+            try:
+                got["photo"] = photos.from_data_url(side, v.get("image"), v.get("source", "camera"))
+            except photos.PhotoError as e:
+                return str(e)
+            return None
+
+        v = await self._ask("photo", step, check, side=side)
+        photo = got["photo"]
+        if v.get("ghost"):
+            try:
+                photos.save_ghost(photo)
+            except OSError as e:
+                lg.error(f"Couldn't save the {side} ghost image: {e}")
+            self.state["ghosts"][side] = photos.ghost_version(side)
+        self._photos[side] = photo
+        self.state["photos"][side] = self._ask_id
+        return photo
 
     async def ask_notes(self):
         notes = str(await self._ask("notes", Step("notes", "Notes and finish", "End",

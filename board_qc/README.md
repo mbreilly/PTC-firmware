@@ -47,6 +47,7 @@ steps follow the procedure in order. Section numbers in brackets refer to the pr
 
 | Section | Steps | How the result is decided |
 | --- | --- | --- |
+| 4.1.3 | Photos of the front and back of the board | Saved, no pass/fail; see Board photos below |
 | 4.3 | With the SoM not installed: 48V current, VP12_LOCAL, RIPPLE_0..5 voltage and switching period, LEDs | Tester enters the reading; checked against the procedure's limits |
 | 4.3.2 | SoM serial (scanned from the Enclustra Data Matrix, 10 digits), insertion, boot current, LEDs, serial console, 5 repeat boots | Mixed: readings with limits, yes/no for LEDs |
 | 4.5 | EEPROM ID, memory (`fillmem`), PTC and QC board IV sensors, temperature sensors | Automatic, run by the on-board client |
@@ -64,7 +65,30 @@ minutes.
 
 Every reading is saved with its value and unit, not only PASS or FAIL. The record also holds
 the SoM serial, EEPROM ID, room temperature, tester notes and an overall result, and it is
-uploaded to the HWDB as a "QC Test" on the board's entry, with a photo of the board.
+uploaded to the HWDB as a "QC Test" on the board's entry, with the front and back photos.
+
+### Board photos
+
+Every board test starts with a photo of the front and then the back, taken from the USB
+camera in the GUI or chosen as image files (JPEG or PNG, up to `photo_max_mb`). Both are
+uploaded to the board's HWDB entry as images with the comments "Board photo, front" and
+"Board photo, back", and their file names are stored in the QC record. A copy of every photo
+is kept in `board_photos/` on the station whatever happens to the upload.
+
+To photograph every board in the same position, the GUI lays a ghost image of each side over
+the live camera view, with an opacity slider. There is no ghost the first time: the first
+good photo of each side is offered as the ghost (the "Save as the ghost" box is ticked).
+After that the box offers to replace it. The tester can also set a ghost from a file or remove
+it from the photo step at any time. Ghosts are kept in `ghost_images/` as `front.jpg` and
+`back.jpg` (or `.png`).
+
+The camera works when the page is opened at `http://localhost` on the station itself, which
+is what `python -m ptctestsuite` does. The browser asks once for permission to use it. If the
+PC has more than one camera, pick the right one in the Camera list; the choice is
+remembered. Keys: Space takes the photo, Enter uses it.
+
+In `--terminal` mode the tester types the path of an image file, or presses Enter to use the
+older OpenCV camera window (Space takes the photo). There is no ghost image there.
 
 ### Production shipment entry
 

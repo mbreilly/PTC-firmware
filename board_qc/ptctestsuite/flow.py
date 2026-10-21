@@ -15,6 +15,7 @@ from ptctestsuite.config.test_names import (pre_som_tests, som_boot_tests, alert
 from ptctestsuite.ui.base import TesterUI, Step, TestAborted, step_title
 from ptctestsuite.utils import qc_result, qc_record, init_ptc, start_client, manual_test
 from ptctestsuite.utils.qc_board import qc_board_handler
+from ptctestsuite.utils.photos import save_board_photo
 from ptctestsuite.utils.reception import reception_record, shipment_types, already_recorded, save_locally
 
 renewal_needed = asyncio.Event()
@@ -62,6 +63,12 @@ STEP_AMBIENT = Step("ambient_temperature", "Room temperature", "4.5.1",
                     "SoM and boot", kind="number", unit="°C")
 STEP_BATCH = Step("batch_number", "Batch number", "4.1", "Enter the production batch number, if there is one.",
                   "Shipment", kind="scan")
+STEP_PHOTO_FRONT = Step("photo_front", "Front photo", "4.1.3",
+                        "Put the board front side up under the camera, line it up with the ghost image and "
+                        "take the photo. You can choose an image file instead.", "Board photos", kind="photo")
+STEP_PHOTO_BACK = Step("photo_back", "Back photo", "4.1.3",
+                       "Turn the board over, line it up with the ghost image and take the photo.",
+                       "Board photos", kind="photo")
 STEP_NOTES = Step("notes", "Notes and finish", "End", "Add any notes, then finish.", "Finish", kind="notes")
 
 def _load_pct(amps: float) -> int:
@@ -69,7 +76,8 @@ def _load_pct(amps: float) -> int:
 
 def board_plan() -> list[Step]:
     g = "Power checks, no SoM"
-    plan = [Step.from_man_test(t, g) for t in pre_som_tests]
+    plan = [STEP_PHOTO_FRONT, STEP_PHOTO_BACK]
+    plan += [Step.from_man_test(t, g) for t in pre_som_tests]
     g = "SoM and boot"
     plan += [STEP_SOM_SERIAL] + [Step.from_man_test(t, g) for t in som_boot_tests] + [STEP_AMBIENT]
     g = "Automatic tests"
@@ -202,6 +210,15 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
     if not disable_hwdb:
         await check_hwdb(ui)
 
+    # 4.1.3 photos of the front and back, kept here and uploaded to the HWDB with the results
+    photos = {}
+    for side, step in (("front", STEP_PHOTO_FRONT), ("back", STEP_PHOTO_BACK)):
+        photo = await ui.ask_photo(step, side)
+        path = save_board_photo(q.serial_number, photo)
+        photos[side] = photo
+        q.photos[side] = path.name
+        ui.saved(step.key, path.name)
+
     # 4.3 manual tests, done before the SoM is installed
     if await ui.confirm("Power checks without the SoM",
                         "Run the manual checks without the SoM (4.3)? The SoM must not be installed for these. Skip them if it already is.",
@@ -323,25 +340,37 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
         q.tester_notes = notes
 
     if disable_hwdb:
-        await ui.finish(q, "HWDB upload is off (--disable-hwdb), so nothing was uploaded.", None)
+        await ui.finish(q, f"HWDB upload is off (--disable-hwdb), so nothing was uploaded. The photos are in "
+                           f"{parameters.photo_dir}.", None)
         return
+    part_id, results_uploaded, photos_uploaded = None, False, []
     try:
         from ptctestsuite.utils.hwdb import upload_ptc_image, upload_test_result, create_hwdb_item
-        from ptctestsuite.utils.image_capture import get_board_image
         await renew_token_if_needed()
         ui.status("Uploading the results to the HWDB…")
         r = await create_hwdb_item(q)
-        await upload_test_result(q, r['part_id'])
-        ui.status("Taking the board photo…")
-        board_img = await get_board_image()
-        await upload_ptc_image(r['part_id'], board_img)
+        part_id = r['part_id']
+        await upload_test_result(q, part_id)
+        results_uploaded = True
+        for side, photo in photos.items():
+            ui.status(f"Uploading the {side} photo to the HWDB…")
+            await upload_ptc_image(part_id, photo.data, filename=q.photos[side],
+                                   comments=f"Board photo, {side}", mime=photo.mime)
+            photos_uploaded.append(side)
     except Exception as e:
         lg.exception(e)
-        _save_unuploaded(q)
-        await ui.finish(q, f"The HWDB upload failed. {e} The results were saved to "
-                           f"{parameters.unuploaded_results_file} so they can be uploaded later.", False)
+        if not results_uploaded:
+            _save_unuploaded(q)
+            message = (f"The HWDB upload failed. {e} The results were saved to {parameters.unuploaded_results_file} "
+                       f"and the photos are in {parameters.photo_dir}, so they can be uploaded later.")
+        else:
+            missing = " and ".join(s for s in photos if s not in photos_uploaded)
+            message = (f"The results were uploaded (part {part_id}), but the {missing} photo upload failed. {e} "
+                       f"The photos are in {parameters.photo_dir}. Add the missing photo to part {part_id} "
+                       f"rather than running the test again.")
+        await ui.finish(q, message, False)
         return
-    await ui.finish(q, "Uploaded to the HWDB with the board photo.", True)
+    await ui.finish(q, "Uploaded the results and the front and back photos to the HWDB.", True)
 
 
 # ---- shipment entry -----------------------------------------------------------

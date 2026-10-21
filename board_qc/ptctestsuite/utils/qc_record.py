@@ -21,6 +21,8 @@ class qc_record:
     eeprom_serial: str | None = None
     # room temperature entered by the tester, reference for the temperature sensors
     ambient_temperature: float | None = None
+    # file names of the front and back photos (procedure 4.1.3), as uploaded to the HWDB
+    photos: dict = field(default_factory=dict)
 
     def add_result(self, test_name: str, result: qc_result, value=None, unit: str | None = None, limits=None):
         self.test_status[test_name] = {"result": result, "value": value, "unit": unit,

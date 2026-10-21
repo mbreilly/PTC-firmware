@@ -59,3 +59,13 @@ unuploaded_results_file = "unuploaded_results.jsonl"
 gui_port = 8080
 gui_title = "PTC QC Test Station"
 gui_station = "Penn, bench 1"
+
+# Board photos (procedure 4.1.3): the front and back of every board, uploaded to the HWDB.
+# A copy of every photo is also kept in photo_dir on this computer.
+photo_dir = "board_photos"
+# Alignment guides shown over the camera view, one per side. Set from the GUI.
+ghost_image_dir = "ghost_images"
+photo_max_mb = 20
+# The browser asks the camera for this resolution and gets the closest it supports
+camera_width = 3840
+camera_height = 2160

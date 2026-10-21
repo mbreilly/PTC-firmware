@@ -23,7 +23,7 @@ class Step:
     section: str = ""             # procedure section, e.g. "4.3.1"
     prompt: str = ""              # instruction shown to the tester
     group: str = ""               # heading in the step list
-    kind: str = "manual"          # manual, auto, scan, counts, number, notes
+    kind: str = "manual"          # manual, auto, scan, counts, number, notes, photo
     limits: tuple | None = None   # (lo, hi); hi may be None for "more than lo"
     unit: str | None = None
 
@@ -120,6 +120,8 @@ _TITLES = {
     "assembled_pcb_certificate_review": "Assembled PCB vendor certificate",
     "batch_number": "Batch number",
     "notes": "Notes and finish",
+    "photo_front": "Front photo",
+    "photo_back": "Back photo",
 }
 _PATTERNS = [
     (re.compile(r"^ripple(\d)$"), lambda m: f"DC-DC {m[1]} output"),
@@ -202,6 +204,10 @@ class TesterUI:
         raise NotImplementedError
 
     async def ask_notes(self) -> str:
+        raise NotImplementedError
+
+    async def ask_photo(self, step: Step, side: str):
+        """A photo of one side of the board ("front" or "back"). Returns utils.photos.Photo."""
         raise NotImplementedError
 
     async def instruct(self, title: str, text: str) -> None:

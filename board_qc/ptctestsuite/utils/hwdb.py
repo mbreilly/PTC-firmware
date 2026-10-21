@@ -185,13 +185,14 @@ async def upload_test_result(item: qc_record, part_id: str) -> dict:
     return rj
 
 
-async def upload_ptc_image(part_id: str, image: Buffer) -> dict:
+async def upload_ptc_image(part_id: str, image: Buffer, filename: str | None = None,
+                           comments: str = "Board Image", mime: str = "image/png") -> dict:
     p = f"{dune_hwdb_api_path}/components/{part_id}/images"
-    data = {'image': (f'boardimage-{part_id}.png', image, 'application/png')}
-    json_payload = {"comments": "Board Image"}
+    data = {'image': (filename or f'boardimage-{part_id}.png', image, mime)}
+    json_payload = {"comments": comments}
 
     rj = await _request("POST", p, f"upload the image for part {part_id}", data=json_payload, files=data)
-    lg.info(f"Successfully uploaded image for part {part_id}")
+    lg.info(f"Successfully uploaded {filename or 'image'} for part {part_id}")
     return rj
 
 

@@ -140,6 +140,25 @@ tr.grp-row td { color: var(--g-dim); font-size: .85em; font-weight: 600; padding
 .upload.ok { border-color: color-mix(in srgb, var(--g-pass) 60%, transparent); }
 .upload.bad { border-color: var(--g-fail); color: var(--g-ink); }
 .actions { display: flex; gap: 12px; }
+[hidden] { display: none !important; }
+
+/* board photo step */
+.cam { display: flex; flex-direction: column; gap: 12px; }
+.cam-box { position: relative; width: min(100%, calc(50vh * var(--ar, 1.7778))); aspect-ratio: var(--ar, 1.7778); background: #000; border: 1px solid var(--g-line); border-radius: var(--g-r); overflow: hidden; }
+.cam-box video, .cam-box img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.cam-box .ghost { pointer-events: none; }
+.cam-badge { position: absolute; left: 10px; top: 10px; font-size: .78em; padding: 2px 8px; border-radius: var(--g-r); background: rgba(0,0,0,.6); color: #fff; }
+.cam-empty { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: center; padding: 24px; text-align: center; color: var(--g-dim); background: var(--g-field); }
+.cam-tools { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; font-size: .9em; color: var(--g-dim); }
+.cam-tools label { display: flex; gap: 8px; align-items: center; }
+.cam-tools select { background: var(--g-field); color: var(--g-ink); border: 1px solid var(--g-line); border-radius: var(--g-r); height: 40px; padding: 0 8px; font: .95em var(--g-font); max-width: 260px; }
+.cam-tools input[type=range] { width: 170px; accent-color: var(--g-accent); }
+.btn.small { height: 40px; padding: 0 14px; font-size: .9em; }
+.check { display: flex; gap: 10px; align-items: center; font-size: .95em; cursor: pointer; }
+.check input { width: 22px; height: 22px; accent-color: var(--g-accent); }
+.thumbs { display: flex; gap: 14px; align-items: flex-end; }
+.thumbs figure { margin: 0; font-size: .8em; color: var(--g-dim); }
+.thumbs img { display: block; height: 110px; border: 1px solid var(--g-line); border-radius: var(--g-r); margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -204,7 +223,7 @@ function renderSide() {
 
 // ---- main panel ----
 function stepHead(st, kindLabel) {
-  const kind = kindLabel === "auto" ? '<span class="kind auto">Automatic</span>' : kindLabel === "manual" ? '<span class="kind manual">Manual check</span>' : "";
+  const kind = kindLabel === "auto" ? '<span class="kind auto">Automatic</span>' : kindLabel === "manual" ? '<span class="kind manual">Manual check</span>' : kindLabel === "photo" ? '<span class="kind manual">Photo</span>' : "";
   const acc = accText(st);
   return `<div class="sec">${st.section ? `<span>Section ${esc(st.section)}</span>` : ""}${kind}</div>
     <h1 class="name">${esc(st.title)}</h1><p class="prompt">${esc(st.prompt)}</p>
@@ -220,6 +239,7 @@ function askHTML(a) {
     case "judged": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" inputmode="decimal" autocomplete="off">${unit}<button class="btn pass" data-a="jyes">Pass</button><button class="btn fail" data-a="jno">Fail</button></div>`;
     case "text": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" autocomplete="off" style="width:360px" value="${esc(a.default)}"><button class="btn pri" data-a="text">Record</button></div>`;
     case "counts": return stepHead(st, "manual") + `<div class="entry"><label class="fl">Ordered<input class="field" id="a" inputmode="numeric" autocomplete="off" style="width:160px"></label><label class="fl">Received<input class="field" id="b" inputmode="numeric" autocomplete="off" style="width:160px"></label><button class="btn pri" data-a="counts">Record</button></div>`;
+    case "photo": return stepHead(st, "photo") + photoHTML(a.side);
     case "notes": return stepHead(st, "") + `<div class="entry" style="flex-direction:column;align-items:stretch"><textarea class="field" id="v" placeholder="Anything unusual about this run"></textarea><div><button class="btn pri" data-a="notes">Finish and save</button></div></div>`;
     case "instruct": return `<div class="sec"><span class="kind manual">Do this now</span></div><h1 class="name">${esc(a.title)}</h1><p class="prompt">${esc(a.text)}</p><div class="entry"><button class="btn pri" data-a="ok">Done, continue</button></div>`;
     case "confirm": return `<div class="sec"></div><h1 class="name">${esc(a.title)}</h1><p class="prompt">${esc(a.text)}</p><div class="entry"><button class="btn pri" data-a="yes">${esc(a.yes)}</button><button class="btn" data-a="no">${esc(a.no)}</button></div>`;
@@ -245,8 +265,11 @@ function renderRun() {
     viewKey = key; pendingWarn = null;
     screen.innerHTML = `<div class="body"><aside class="side" id="side"></aside><main class="main"><div id="mainc" style="display:flex;flex-direction:column;gap:16px"></div><div class="msg" id="msg" role="status"></div><div id="lastc" style="margin-top:auto"></div></main></div>
       <div class="foot"><span id="cnt"></span><div class="bar"><i id="barfill"></i></div><span>${S.mode === "ship" ? "Shipment entry" : "Production board"}</span></div>`;
+    // keep the camera running from the front photo to the back photo, stop it otherwise
+    if ((S.ask && S.ask.kind !== "photo") || S.running || S.status) stopCamera();
     document.getElementById("mainc").innerHTML = mainHTML();
     bindMain();
+    if (S.ask && S.ask.kind === "photo") bindPhoto(S.ask.side);
     const f = screen.querySelector("#v, #a"); if (f) f.focus();
   }
   document.getElementById("side").innerHTML = renderSide();
@@ -254,6 +277,7 @@ function renderRun() {
   document.getElementById("cnt").textContent = `${done} of ${plan.length} recorded`;
   document.getElementById("barfill").style.width = `${Math.round(done / Math.max(1, plan.length) * 100)}%`;
   showError();
+  if (S.ask && S.ask.kind === "photo") updateGhost(S.ask.side);
   const cur = document.getElementById("cur"); if (cur) cur.scrollIntoView({ block: "nearest" });
 }
 function say(text, kind) { const m = document.getElementById("msg"); if (m) { m.textContent = text; m.className = "msg " + (kind || ""); } }
@@ -370,6 +394,7 @@ function renderResults() {
     ${F.message ? `<div class="upload ${up}">${esc(F.message)}</div>` : ""}
     <div class="tbl"><table><thead><tr><th>Step</th>${SHOW_KEYS ? "<th>Database key</th>" : ""}<th>Value</th>${SHOW_LIMITS ? "<th>Accept</th>" : ""}<th>Result</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${F.notes ? `<div><span class="lbl">Notes</span>${esc(F.notes)}</div>` : ""}
+    ${Object.keys(S.photos || {}).length ? `<div class="thumbs">${["front", "back"].filter(sd => S.photos[sd]).map(sd => `<figure><a href="/photo/${sd}?v=${S.photos[sd]}" target="_blank" rel="noopener">${sd === "front" ? "Front" : "Back"}<img src="/photo/${sd}?v=${S.photos[sd]}" alt="${sd} of the board"></a></figure>`).join("")}</div>` : ""}
     <div class="actions"><button class="btn pri" id="next" type="button">${S.mode === "ship" ? "New entry" : "Test next board"}</button></div></div>`;
   document.getElementById("next").onclick = () => answer(true);
   document.getElementById("next").focus();
@@ -383,10 +408,191 @@ function renderStopped() {
   document.getElementById("next").focus();
 }
 
+// ---- board photo step ----
+const cam = { stream: null, deviceId: null, shot: null, source: null };
+const $ = id => document.getElementById(id);
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+function photoHTML(side) {
+  return `<div class="cam">
+    <div class="cam-box" id="camBox">
+      <video id="video" autoplay playsinline muted></video>
+      <img id="shot" alt="The photo just taken" hidden>
+      <img id="ghost" class="ghost" alt="" hidden>
+      <span class="cam-badge" id="camBadge">Live</span>
+      <div class="cam-empty" id="camEmpty"><span id="camEmptyText">Starting the camera…</span><button class="btn small" data-p="retry" type="button" hidden>Retry</button></div>
+    </div>
+    <div class="cam-tools">
+      <label>Camera <select id="camSel" aria-label="Camera"></select></label>
+      <label>Ghost <input type="range" id="ghostOp" min="0" max="100" step="5" aria-label="Ghost image opacity"><span id="ghostOpOut" class="mono"></span></label>
+      <span id="ghostInfo"></span>
+      <button class="btn small" data-p="ghostset" type="button" id="ghostSetBtn"></button>
+      <button class="btn small" data-p="ghostclear" type="button" id="ghostClearBtn">Remove ghost</button>
+    </div>
+    <div class="entry" id="liveBtns"><button class="btn pri" data-p="take" type="button" id="takeBtn" disabled>Take photo</button><button class="btn" data-p="file" type="button">Choose file…</button></div>
+    <div class="entry" id="reviewBtns" hidden><button class="btn pri" data-p="use" type="button">Use this photo</button><button class="btn" data-p="retake" type="button">Retake</button>
+      <label class="check"><input type="checkbox" id="asGhost"><span id="asGhostLbl"></span></label></div>
+    <div class="keys" id="photoKeys">Space takes the photo.</div>
+    <input type="file" id="fileIn" accept="image/jpeg,image/png" hidden>
+    <input type="file" id="ghostIn" accept="image/jpeg,image/png" hidden>
+  </div>`;
+}
+
+function stopCamera() {
+  if (cam.stream) { cam.stream.getTracks().forEach(t => t.stop()); cam.stream = null; }
+}
+function setAspect(w, h) { const box = $("camBox"); if (box && w && h) box.style.setProperty("--ar", (w / h).toFixed(4)); }
+function camMessage(text, retry) {
+  $("camEmpty").hidden = false; $("camEmptyText").textContent = text;
+  $("camEmpty").querySelector('[data-p="retry"]').hidden = !retry;
+  $("takeBtn").disabled = true;
+}
+
+async function startCamera(deviceId) {
+  const askId = S.ask && S.ask.id;
+  const stillHere = () => S.ask && S.ask.id === askId && S.ask.kind === "photo" && $("video");
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    camMessage("The camera only works when this page is opened at http://localhost on the test station. You can still choose a photo file.", false);
+    return;
+  }
+  if (cam.stream && deviceId && deviceId !== cam.deviceId) stopCamera();
+  try {
+    if (!cam.stream) {
+      const want = deviceId || store.get("ptc-camera", null);
+      const size = { width: { ideal: S.camera.width }, height: { ideal: S.camera.height } };
+      try {
+        cam.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: want ? { ...size, deviceId: { exact: want } } : size });
+      } catch (e) {
+        if (!want || !["NotFoundError", "OverconstrainedError"].includes(e.name)) throw e;
+        cam.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: size });  // saved camera is gone
+      }
+      cam.deviceId = cam.stream.getVideoTracks()[0].getSettings().deviceId || want;
+      if (cam.deviceId) store.set("ptc-camera", cam.deviceId);
+    }
+    if (!stillHere()) { if (!(S.ask && S.ask.kind === "photo")) stopCamera(); return; }
+    const v = $("video");
+    v.onloadedmetadata = () => setAspect(v.videoWidth, v.videoHeight);
+    v.srcObject = cam.stream;
+    await v.play().catch(() => {});
+    if (!stillHere()) return;
+    if (v.videoWidth) setAspect(v.videoWidth, v.videoHeight);
+    $("camEmpty").hidden = true; $("takeBtn").disabled = !!cam.shot;
+    const sel = $("camSel"), cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
+    sel.innerHTML = cams.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || "Camera " + (i + 1))}</option>`).join("");
+    sel.value = cam.deviceId || "";
+    sel.disabled = cams.length < 2;
+  } catch (e) {
+    stopCamera();
+    if (!stillHere()) return;
+    const why = e.name === "NotAllowedError" ? "The browser isn’t allowed to use the camera. Allow it from the camera icon in the address bar and press Retry, or choose a photo file."
+      : e.name === "NotFoundError" || e.name === "OverconstrainedError" ? "No camera was found. Plug in the USB camera and press Retry, or choose a photo file."
+      : e.name === "NotReadableError" ? "The camera is busy. Close any other program using it and press Retry, or choose a photo file."
+      : `The camera couldn’t start (${e.name || e}). Press Retry, or choose a photo file.`;
+    camMessage(why, true);
+  }
+}
+
+function updateGhost(side) {
+  const g = $("ghost"); if (!g) return;
+  const ver = S.ghosts[side], name = side === "front" ? "front" : "back";
+  if (ver) {
+    const src = `/ghost/${side}?v=${ver}`;
+    if (g.dataset.src !== src) {
+      g.dataset.src = src; g.src = src;
+      g.onload = () => { if (!cam.stream && !cam.shot) setAspect(g.naturalWidth, g.naturalHeight); };
+    }
+    g.hidden = false;
+  } else { g.hidden = true; g.removeAttribute("src"); delete g.dataset.src; }
+  g.style.opacity = $("ghostOp").value / 100;
+  $("ghostInfo").textContent = ver ? "" : `No ${name} ghost yet`;
+  $("ghostSetBtn").textContent = ver ? "Change ghost…" : "Set ghost from file…";
+  $("ghostClearBtn").hidden = !ver;
+  $("ghostOp").disabled = !ver;
+  if (S.ghost_error) say(S.ghost_error, "err");
+}
+
+function showReview(dataUrl, source, side) {
+  cam.shot = dataUrl; cam.source = source;
+  const shot = $("shot");
+  shot.onload = () => setAspect(shot.naturalWidth, shot.naturalHeight);
+  shot.src = dataUrl; shot.hidden = false; $("video").hidden = true; $("camEmpty").hidden = true;
+  $("camBadge").textContent = source === "file" ? "Chosen file" : "Photo";
+  $("liveBtns").hidden = true; $("reviewBtns").hidden = false;
+  const hasGhost = !!S.ghosts[side];
+  $("asGhost").checked = !hasGhost;
+  $("asGhostLbl").textContent = hasGhost ? "Replace the ghost with this photo" : "Save as the ghost for the next boards";
+  $("photoKeys").textContent = "Enter uses the photo. The ghost isn’t part of the photo.";
+  say("");
+}
+function showLive() {
+  cam.shot = null; cam.source = null;
+  $("shot").hidden = true; $("shot").removeAttribute("src"); $("video").hidden = false;
+  $("camBadge").textContent = "Live";
+  $("liveBtns").hidden = false; $("reviewBtns").hidden = true;
+  $("takeBtn").disabled = !cam.stream;
+  if (!cam.stream) startCamera();
+  $("photoKeys").textContent = "Space takes the photo.";
+}
+
+function readImageFile(file, done) {
+  if (!file) return;
+  if (!/^image\/(jpeg|png)$/.test(file.type)) { say("Choose a JPEG or PNG image.", "err"); return; }
+  if (file.size > S.camera.max_mb * 1024 * 1024) { say(`That image is larger than ${S.camera.max_mb} MB.`, "err"); return; }
+  const r = new FileReader();
+  r.onload = () => done(r.result);
+  r.onerror = () => say("That file couldn’t be read.", "err");
+  r.readAsDataURL(file);
+}
+
+function bindPhoto(side) {
+  cam.shot = null;
+  const op = $("ghostOp");
+  op.value = store.get("ptc-ghost-opacity", "40");
+  $("ghostOpOut").textContent = op.value + " %";
+  op.oninput = () => { $("ghostOpOut").textContent = op.value + " %"; $("ghost").style.opacity = op.value / 100; store.set("ptc-ghost-opacity", op.value); };
+  updateGhost(side);
+  $("camSel").onchange = e => { stopCamera(); startCamera(e.target.value); };
+  $("fileIn").onchange = e => { readImageFile(e.target.files[0], url => showReview(url, "file", side)); e.target.value = ""; };
+  $("ghostIn").onchange = e => {
+    readImageFile(e.target.files[0], url => { ws.send(JSON.stringify({ type: "ghost", side, action: "set", image: url })); say("Ghost image updated.", ""); });
+    e.target.value = "";
+  };
+  const act = {
+    take() {
+      const v = $("video");
+      if (!cam.stream || !v.videoWidth) { say("The camera isn’t ready yet.", "err"); return; }
+      const c = document.createElement("canvas");
+      c.width = v.videoWidth; c.height = v.videoHeight;
+      c.getContext("2d").drawImage(v, 0, 0);
+      showReview(c.toDataURL("image/jpeg", 0.92), "camera", side);
+    },
+    file() { $("fileIn").click(); },
+    retake() { showLive(); },
+    retry() { stopCamera(); $("camEmptyText").textContent = "Starting the camera…"; startCamera($("camSel").value || undefined); },
+    use() { if (cam.shot) answer({ image: cam.shot, source: cam.source, ghost: $("asGhost").checked }); },
+    ghostset() { $("ghostIn").click(); },
+    ghostclear() {
+      if (confirm(`Remove the ${side} ghost image? The next good photo can set a new one.`))
+        ws.send(JSON.stringify({ type: "ghost", side, action: "clear" }));
+    },
+  };
+  screen.querySelectorAll("[data-p]").forEach(b => b.onclick = () => act[b.dataset.p]());
+  photoKeys = e => {
+    if (e.target instanceof Element && e.target.closest("input, textarea, select, button")) return;
+    if (e.key === " " && !cam.shot) { e.preventDefault(); act.take(); }
+    else if (e.key === "Enter" && cam.shot) { e.preventDefault(); act.use(); }
+  };
+  startCamera();
+}
+let photoKeys = null;
+document.addEventListener("keydown", e => { if (S && S.ask && S.ask.kind === "photo" && photoKeys && !e.ctrlKey && !e.metaKey && !e.altKey) photoKeys(e); });
+
 function render() {
   document.title = S.title;
   if (!S.ask || S.ask.id !== sentId) sentId = null;
   renderTop();
+  if (S.screen !== "run") stopCamera();
   if (S.screen === "start") renderStart();
   else if (S.screen === "run") renderRun();
   else if (S.screen === "results") renderResults();
