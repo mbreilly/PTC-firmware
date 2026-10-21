@@ -141,6 +141,19 @@ In another:
   Colors and layout are the variables at the top of `ui/static/index.html`, with the same
   names as the PTC QC GUI designer summary.
 
+## Changing the look: the GUI designer
+
+[`ptctestsuite/ui/designer/ptc-gui-designer.html`](ptctestsuite/ui/designer/ptc-gui-designer.html)
+is a standalone page for trying out the GUI's look. Open it in any browser by double-clicking it;
+it doesn't need the test station running. It shows a working preview of the board and shipment
+steps, with presets, color pickers and layout options. Your changes are remembered in that
+browser.
+
+When it looks right, press **Copy summary**. Then copy each color and option from the summary
+into the matching `--g-…` variable at the top of `ui/static/index.html`. The "Lab dark" preset
+matches the GUI as it is now. The preview doesn't include the board photo step, and it loads
+its own fonts from Google Fonts, so it needs internet to look exactly right.
+
 ## Still to confirm
 
 - Which QC board mux (0x70–0x75) belongs to which converter. The code assumes 0x70 is converter 0. Procedures v1.4 reversed the PWM register order, so the mux order may be reversed too.
