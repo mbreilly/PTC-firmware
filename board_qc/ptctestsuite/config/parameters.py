@@ -69,3 +69,12 @@ photo_max_mb = 20
 # The browser asks the camera for this resolution and gets the closest it supports
 camera_width = 3840
 camera_height = 2160
+
+# This station's record of every board it tested, one JSON file per serial. Used for the
+# lookup lists, as a fallback when the HWDB can't be reached, and to spot a SoM or EEPROM
+# seen on two boards. The HWDB stays the master copy.
+board_records_dir = "board_records"
+# HWDB test type for repair records. It must exist on the PTC component type in the HWDB.
+repair_test_type = "Repair"
+qc_test_type = "QC Test"
+max_repair_photos = 6

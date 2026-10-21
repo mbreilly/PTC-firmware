@@ -23,6 +23,15 @@ class qc_record:
     ambient_temperature: float | None = None
     # file names of the front and back photos (procedure 4.1.3), as uploaded to the HWDB
     photos: dict = field(default_factory=dict)
+    # retests: every run of a board is kept; this one's number and why it was run
+    run_number: int = 1
+    run_type: str = "First test"            # First test, Retest, Retest after repair
+    follows_run: int | None = None          # the run this one retests
+    after_repair: int | None = None         # the repair made since that run
+    retest_reason: str | None = None
+    # serials that should only be on one board but were seen on another
+    som_moved_from: str | None = None
+    eeprom_also_on: list | None = None
 
     def add_result(self, test_name: str, result: qc_result, value=None, unit: str | None = None, limits=None):
         self.test_status[test_name] = {"result": result, "value": value, "unit": unit,

@@ -8,6 +8,7 @@ which the test suite already uses.
 """
 
 import asyncio
+import re
 import json
 import webbrowser
 from pathlib import Path
@@ -52,6 +53,7 @@ class GuiUI(TesterUI):
                        "max_mb": parameters.photo_max_mb},
             "ghosts": {side: photos.ghost_version(side) for side in photos.SIDES},
             "photos": {},
+            "run_label": None,
         }
 
     # ---- server ---------------------------------------------------------------
@@ -87,6 +89,11 @@ class GuiUI(TesterUI):
             g = photos.ghost_path(path.rsplit("/", 1)[1])
             if g:
                 return self._file_response(g.read_bytes(), photos.EXT_MIME[g.suffix])
+        if path.startswith("/stored/"):
+            name = path[len("/stored/"):]
+            stored = Path(parameters.photo_dir) / name
+            if re.fullmatch(r"[A-Za-z0-9._-]+", name) and stored.suffix in photos.EXT_MIME and stored.is_file():
+                return self._file_response(stored.read_bytes(), photos.EXT_MIME[stored.suffix])
         if path in ("/photo/front", "/photo/back"):
             p = self._photos.get(path.rsplit("/", 1)[1])
             if p:
@@ -158,11 +165,20 @@ class GuiUI(TesterUI):
     # ---- screens --------------------------------------------------------------
     async def start(self) -> dict:
         self._abort = False
-        self.state.update(screen="start", mode=None, ident="", plan=[], results={}, last=None, final=None)
+        self.state.update(screen="start", mode=None, ident="", plan=[], results={}, last=None, final=None,
+                          run_label=None)
+        from ptctestsuite.utils import board_records
+        try:
+            boards = {"waiting": board_records.waiting_for_retest()[:12], "recent": board_records.recent(10)}
+        except OSError as e:
+            lg.error(f"Can't read the board records: {e}")
+            boards = {"waiting": [], "recent": []}
 
         def check(v):
-            if not isinstance(v, dict) or v.get("mode") not in ("board", "ship"):
-                return "Choose production board or production shipment."
+            if not isinstance(v, dict) or v.get("mode") not in ("board", "ship", "lookup"):
+                return "Choose what you’re entering first."
+            if v["mode"] == "lookup":
+                return None if str(v.get("query", "")).strip() else "Scan or type a serial to look up."
             if not str(v.get("tester", "")).strip():
                 return "Enter the tester name first."
             if v["mode"] == "board" and not str(v.get("serial", "")).strip():
@@ -171,7 +187,10 @@ class GuiUI(TesterUI):
                 return "Enter the purchase order number first."
             return None
 
-        v = await self._ask("start", validate=check, tester=self.state["tester"])
+        v = await self._ask("start", validate=check, tester=self.state["tester"], boards=boards)
+        if v["mode"] == "lookup":
+            return {"mode": "lookup", "tester": self.state["tester"] or str(v.get("tester", "")).strip(),
+                    "query": str(v["query"]).strip()}
         self.state["tester"] = v["tester"].strip()
         return {"mode": v["mode"], "tester": self.state["tester"], "serial": str(v.get("serial", "")),
                 "po": str(v.get("po", "")), "batch": str(v.get("batch", "")).strip()}
@@ -211,9 +230,47 @@ class GuiUI(TesterUI):
                                  "ok": upload_ok, "notes": record.tester_notes})
         await self._ask("next")
 
-    async def stopped(self, message):
-        self.state.update(screen="stopped", running=None, status=None, final={"message": message})
+    async def stopped(self, message, title=None):
+        self.state.update(screen="stopped", running=None, status=None,
+                          final={"message": message, "title": title or "The test stopped"})
         await self._ask("next")
+
+    # ---- boards tested before -------------------------------------------------
+    def set_run(self, label):
+        self.state["run_label"] = label
+        self._push()
+
+    async def ask_retest_choice(self, board):
+        return await self._ask("retest", board=board,
+                               validate=lambda v: None if v in ("repair", "retest", "repair_only", "cancel")
+                               else "Choose one of the options.")
+
+    async def ask_repair(self, form):
+        def check(v):
+            if not isinstance(v, dict):
+                return "Fill in the repair first."
+            if not str(v.get("repaired_by", "")).strip():
+                return "Enter who repaired the board."
+            if not str(v.get("fault_found", "")).strip() and not str(v.get("action_taken", "")).strip():
+                return "Describe the fault found or what was done."
+            return None
+        v = await self._ask("repair", form=form, validate=check)
+        keys = {f["key"] for f in form["failed"]}
+        return {"repaired_by": str(v.get("repaired_by", "")), "for_steps": [k for k in v.get("for_steps", []) if k in keys],
+                "fault_found": str(v.get("fault_found", "")), "action_taken": str(v.get("action_taken", "")),
+                "parts_replaced": str(v.get("parts_replaced", "")), "notes": str(v.get("notes", ""))}
+
+    async def show_board(self, board):
+        self.state.update(screen="board", mode=None, ident=board["serial"], plan=[], results={})
+        return await self._ask("board", board=board,
+                               validate=lambda v: None if v in ("retest", "repair", "back") else "Choose an action.")
+
+    async def pick_board(self, query, rows):
+        self.state.update(screen="board", mode=None, ident="")
+        serials = {r["serial"] for r in rows}
+        v = await self._ask("pick", query=query, rows=rows[:50],
+                            validate=lambda v: None if v in serials or v == "" else "Choose a board from the list.")
+        return v or None
 
     # ---- questions ------------------------------------------------------------
     async def ask_number(self, step):
@@ -246,10 +303,13 @@ class GuiUI(TesterUI):
         v = await self._ask("counts", step, check)
         return float(v["ordered"]), float(v["received"])
 
-    async def ask_photo(self, step, side):
+    async def ask_photo(self, step, side, optional=False):
         got = {}
 
         def check(v):
+            if optional and isinstance(v, dict) and v.get("done"):
+                got["photo"] = None
+                return None
             if not isinstance(v, dict):
                 return "Take the photo or choose a file first."
             try:
@@ -258,16 +318,19 @@ class GuiUI(TesterUI):
                 return str(e)
             return None
 
-        v = await self._ask("photo", step, check, side=side)
+        v = await self._ask("photo", step, check, side=side, optional=optional)
         photo = got["photo"]
-        if v.get("ghost"):
+        if photo is None:
+            return None
+        if v.get("ghost") and side in photos.SIDES:
             try:
                 photos.save_ghost(photo)
             except OSError as e:
                 lg.error(f"Couldn't save the {side} ghost image: {e}")
             self.state["ghosts"][side] = photos.ghost_version(side)
-        self._photos[side] = photo
-        self.state["photos"][side] = self._ask_id
+        if side in photos.SIDES:
+            self._photos[side] = photo
+            self.state["photos"][side] = self._ask_id
         return photo
 
     async def ask_notes(self):

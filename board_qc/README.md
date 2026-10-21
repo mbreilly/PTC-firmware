@@ -38,7 +38,8 @@ client over ssh with `python3 -m ptctestclient`, so the QC image on the PTC must
 
 ## The two kinds of entry
 
-Each run starts by asking which kind of entry this is.
+Each run starts by asking which kind of entry this is: a production board, a production
+shipment, or **Look up a board** (see Board history, retests and repairs below).
 
 ### Production board entry
 
@@ -103,6 +104,49 @@ The shipment goes to the same HWDB as the boards, as its own entry with serial `
 and a "Reception Check" test. It is also saved in `reception_records.jsonl`, and a second entry
 for the same PO is refused.
 
+## Board history, retests and repairs
+
+The PTC serial number is how every board is found, and each serial has exactly one HWDB entry.
+Every run and every repair of a board is added to that entry; nothing is ever overwritten.
+
+**Scanning a serial that was tested before.** Before testing, the program searches the HWDB
+for the serial (and this station's records):
+
+- Not found: a new board. Its HWDB entry is created when the results are uploaded.
+- Found once: the tester sees the earlier runs and what failed, and chooses **Record a repair,
+  then retest**, **Retest without a repair** (they are asked why), **Record a repair only**, or
+  **Cancel**. The run is uploaded to the same HWDB entry as the next run number, with its run
+  type, the run it follows and the repair it follows. A retest is always the full test. Photos
+  are retaken after a repair (the board changed) and skipped on a retest without one.
+- Found more than once: the program stops. Someone with HWDB admin rights has to remove or merge
+  the extra entry first. The program never creates a second entry for a serial, and checks again
+  just before uploading.
+
+**Repairs** are their own HWDB record (test type `Repair`, set by `repair_test_type`) on the
+board's entry: who repaired it, after which run, which failed steps it was for, the fault found,
+what was done, the parts replaced, notes, and up to `max_repair_photos` close-up photos. **The
+`Repair` test type has to be added to the PTC component type by an HWDB admin.** Until it is,
+repairs are kept on the station only and the screen says why.
+
+**Look up a board** shows a board's whole history, newest first: each run with its result,
+failed steps (or all steps), photos and notes, and each repair. From there the tester can retest
+the board or record a repair. The start screen lists boards **waiting for a retest** (the latest
+run failed, or the board was repaired since) and boards **recently tested** on this station.
+Search with `*` to match part of a serial.
+
+**One SoM, one EEPROM per board.** If a scanned SoM serial was already recorded on another PTC,
+the tester is warned and can keep it (the move is noted as `SoM Moved From`) or scan again. A
+repeated EEPROM ID is noted (`EEPROM Also On`) and the tester is asked to tell an engineer.
+
+This station keeps its own record of every board in `board_records/` (one JSON file per serial).
+It feeds the lookup lists and the SoM and EEPROM checks, and shows a board's history when the
+HWDB can't be reached. The HWDB stays the master copy.
+
+**Checking the dev HWDB.** `python -m ptctestsuite.hwdb_check` creates one throwaway board on
+the dev HWDB and checks that the serial search works, that a second QC Test record is kept
+alongside the first, whether the `Repair` test type exists, and that photos attach. It refuses
+to run against the production HWDB.
+
 ## The HWDB
 
 The HWDB address (`dune_hwdb_api_path`, the development database by default), the PTC part type
@@ -163,3 +207,5 @@ its own fonts from Google Fonts, so it needs internet to look exactly right.
 - The AUX LED register, so that step is a manual prompt for now.
 - The QC board timing lock for channels 1–5. Procedures v1.4 only gives the steps for channel 0.
 - Whether shipments should get their own part type in the HWDB instead of the PTC one.
+- That the HWDB keeps every QC Test record of a board (`python -m ptctestsuite.hwdb_check`), and
+  that an HWDB admin has added the `Repair` test type to the PTC component type.

@@ -122,6 +122,7 @@ _TITLES = {
     "notes": "Notes and finish",
     "photo_front": "Front photo",
     "photo_back": "Back photo",
+    "retest_reason": "Reason for the retest",
 }
 _PATTERNS = [
     (re.compile(r"^ripple(\d)$"), lambda m: f"DC-DC {m[1]} output"),
@@ -167,8 +168,8 @@ class TesterUI:
 
     # --- screens -------------------------------------------------------------
     async def start(self) -> dict:
-        """Returns {"mode": "board" | "ship" | "quit", "tester": str,
-        "serial": str, "po": str, "batch": str | None}."""
+        """Returns {"mode": "board" | "ship" | "lookup" | "quit", "tester": str,
+        "serial": str, "po": str, "batch": str | None, "query": str}."""
         raise NotImplementedError
 
     def begin(self, mode: str, ident: str, tester: str, plan: list[Step]) -> None:
@@ -181,7 +182,7 @@ class TesterUI:
         """Show the final result and wait until the tester is ready for the next one."""
         raise NotImplementedError
 
-    async def stopped(self, message: str) -> None:
+    async def stopped(self, message: str, title: str | None = None) -> None:
         """The run could not continue. Show why and wait to go back to the start."""
         raise NotImplementedError
 
@@ -206,9 +207,33 @@ class TesterUI:
     async def ask_notes(self) -> str:
         raise NotImplementedError
 
-    async def ask_photo(self, step: Step, side: str):
-        """A photo of one side of the board ("front" or "back"). Returns utils.photos.Photo."""
+    async def ask_photo(self, step: Step, side: str, optional: bool = False):
+        """A photo: "front" or "back" of the board (with a ghost image), or a "closeup" of a defect or
+        repair. Returns utils.photos.Photo, or None if optional and the tester has no more photos."""
         raise NotImplementedError
+
+    # --- boards tested before ------------------------------------------------------
+    async def ask_retest_choice(self, board: dict) -> str:
+        """The scanned serial has runs already (board is BoardHistory.view()). Returns "repair"
+        (record a repair, then retest), "retest" (no repair), "repair_only" or "cancel"."""
+        raise NotImplementedError
+
+    async def ask_repair(self, form: dict) -> dict:
+        """The repair record. form has serial, n, after_run, after_date, repaired_by and failed
+        ([{key, title}]). Returns {repaired_by, for_steps: [keys], fault_found, action_taken,
+        parts_replaced, notes}."""
+        raise NotImplementedError
+
+    async def show_board(self, board: dict) -> str:
+        """A board's history for the lookup. Returns "retest", "repair" or "back"."""
+        raise NotImplementedError
+
+    async def pick_board(self, query: str, rows: list[dict]) -> str | None:
+        """Several boards match a search. Returns the chosen serial, or None to go back."""
+        raise NotImplementedError
+
+    def set_run(self, label: str) -> None:
+        """This run is a retest, e.g. "Run 2, after repair 1"."""
 
     async def instruct(self, title: str, text: str) -> None:
         """Tell the tester to do something and wait until they say it's done."""

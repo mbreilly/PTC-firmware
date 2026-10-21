@@ -35,6 +35,9 @@ class reception_record(qc_record):
         dd.pop('eeprom_serial', None)
         dd.pop('ambient_temperature', None)
         dd.pop('photos', None)
+        for k in ('run_number', 'run_type', 'follows_run', 'after_repair', 'retest_reason',
+                  'som_moved_from', 'eeprom_also_on'):
+            dd.pop(k, None)
         return dd
 
 

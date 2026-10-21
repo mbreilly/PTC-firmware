@@ -142,6 +142,57 @@ tr.grp-row td { color: var(--g-dim); font-size: .85em; font-weight: 600; padding
 .actions { display: flex; gap: 12px; }
 [hidden] { display: none !important; }
 
+/* lookup, history, retest and repair */
+.start2 { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 36px; padding: 28px 40px; background: var(--g-panel); overflow: auto; align-items: start; }
+.start2 .form { width: auto; }
+.sh { font-size: .78em; font-weight: 600; color: var(--g-dim); letter-spacing: .05em; text-transform: uppercase; margin: 0 0 8px; }
+.rows { display: flex; flex-direction: column; border: 1px solid var(--g-line); border-radius: var(--g-r); overflow: hidden; }
+.row { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 9px 14px; background: var(--g-field); border: 0; border-top: 1px solid var(--g-line); cursor: pointer; text-align: left; color: var(--g-ink); font: inherit; width: 100%; }
+.row:first-child { border-top: 0; }
+.row:hover { background: color-mix(in srgb, var(--g-accent) 8%, var(--g-field)); }
+.row:focus-visible { outline: 2px solid var(--g-accent); outline-offset: -2px; }
+.row .s { font-family: var(--g-mono); font-weight: 500; }
+.row .d { color: var(--g-dim); font-size: .85em; }
+.empty { color: var(--g-dim); font-size: .9em; padding: 10px 0; }
+.pane { flex: 1; min-height: 0; overflow: auto; padding: 22px 36px; background: var(--g-panel); display: flex; flex-direction: column; gap: 14px; }
+.pane h1 { margin: 0; font-size: 1.6em; font-weight: 600; }
+.hhead { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.hhead .ser { font: 600 1.6em var(--g-mono); }
+.hhead .acts { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+.hhead .acts .btn { height: 46px; }
+.facts { display: flex; gap: 26px; color: var(--g-dim); font-size: .8em; flex-wrap: wrap; }
+.facts b { display: block; color: var(--g-ink); font: 500 1.15em var(--g-mono); }
+.hcols { flex: 1; min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; }
+.tl { display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.tli { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 12px; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); cursor: pointer; text-align: left; color: var(--g-ink); font: inherit; }
+.tli.sel { border-color: var(--g-accent); box-shadow: inset 3px 0 var(--g-accent); }
+.tli .k { font-weight: 600; } .tli .d { display: block; font-size: .82em; color: var(--g-dim); }
+.tli .ic { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 600 .76em var(--g-mono); background: var(--g-side); border: 1px solid var(--g-line); color: var(--g-dim); }
+.tli .ic.rep { color: var(--g-warn); border-color: color-mix(in srgb, var(--g-warn) 60%, transparent); }
+.det { min-height: 0; overflow: auto; border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; background: var(--g-side); }
+.det h2 { margin: 0; font-size: 1.25em; font-weight: 600; display: flex; gap: 10px; align-items: center; }
+.kv { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 6px 16px; font-size: .92em; margin: 0; }
+.kv dt { color: var(--g-dim); } .kv dd { margin: 0; white-space: pre-wrap; }
+table.mini { width: 100%; border-collapse: collapse; font-size: .9em; }
+.mini th { position: static; background: none; text-align: left; color: var(--g-dim); font-weight: 500; padding: 5px 10px 5px 0; border-bottom: 1px solid var(--g-line); }
+.mini td { padding: 6px 10px 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--g-line) 60%, transparent); }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 820px; }
+.choice { min-height: var(--g-bh); padding: 12px 18px; text-align: left; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); color: var(--g-ink); font: inherit; cursor: pointer; }
+.choice b { display: block; font-size: 1.05em; font-weight: 600; } .choice span { color: var(--g-dim); font-size: .86em; }
+.choice.pri { border-color: var(--g-accent); background: color-mix(in srgb, var(--g-accent) 14%, var(--g-field)); }
+.choice:focus-visible { outline: 2px solid var(--g-ink); outline-offset: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 6px 12px; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); font: inherit; font-size: .9em; color: var(--g-dim); cursor: pointer; }
+.chip.on { border-color: var(--g-fail); color: var(--g-ink); background: color-mix(in srgb, var(--g-fail) 14%, var(--g-field)); }
+.ta, .in { background: var(--g-field); border: 1px solid var(--g-line); border-radius: var(--g-r); color: var(--g-ink); font: 1em var(--g-font); width: 100%; }
+.ta { padding: 8px 12px; resize: vertical; min-height: 76px; }
+.in { padding: 0 12px; height: 44px; }
+.ta:focus, .in:focus { outline: 2px solid var(--g-accent); outline-offset: 1px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; max-width: 980px; }
+.grid2 .wide { grid-column: 1 / -1; }
+.warnbox { border: 1px solid var(--g-warn); border-radius: var(--g-r); padding: 10px 14px; background: color-mix(in srgb, var(--g-warn) 10%, var(--g-panel)); font-size: .92em; }
+.thumbs a:focus-visible { outline: 2px solid var(--g-accent); }
+
 /* board photo step */
 .cam { display: flex; flex-direction: column; gap: 12px; }
 .cam-box { position: relative; width: min(100%, calc(50vh * var(--ar, 1.7778))); aspect-ratio: var(--ar, 1.7778); background: #000; border: 1px solid var(--g-line); border-radius: var(--g-r); overflow: hidden; }
@@ -196,7 +247,7 @@ function renderTop() {
   const isRun = S.screen === "run";
   const meta = S.screen === "start" ? "" : `<div class="meta"><div>Tester<b>${esc(S.tester)}</b></div>
     <div>${S.mode === "ship" ? "Purchase order" : "PTC serial"}<b>${esc(S.ident)}</b></div>
-    ${isRun ? `<div>Step<b>${Math.min(done + 1, plan.length)} of ${plan.length}</b></div>` : ""}</div>`;
+    ${isRun && S.run_label ? `<div>Run<b>${esc(S.run_label)}</b></div>` : ""}${isRun ? `<div>Step<b>${Math.min(done + 1, plan.length)} of ${plan.length}</b></div>` : ""}</div>`;
   top.className = "top" + (isRun ? " run" : "");
   top.innerHTML = `<div><div class="title">${esc(S.title)}</div><div class="sub">${esc(S.station)}</div></div>${meta}
     <div class="pill ${S.hwdb.on ? "on" : ""} ${meta ? "" : "first"}"><i></i>${esc(S.hwdb.label)}</div>
@@ -239,12 +290,50 @@ function askHTML(a) {
     case "judged": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" inputmode="decimal" autocomplete="off">${unit}<button class="btn pass" data-a="jyes">Pass</button><button class="btn fail" data-a="jno">Fail</button></div>`;
     case "text": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" autocomplete="off" style="width:360px" value="${esc(a.default)}"><button class="btn pri" data-a="text">Record</button></div>`;
     case "counts": return stepHead(st, "manual") + `<div class="entry"><label class="fl">Ordered<input class="field" id="a" inputmode="numeric" autocomplete="off" style="width:160px"></label><label class="fl">Received<input class="field" id="b" inputmode="numeric" autocomplete="off" style="width:160px"></label><button class="btn pri" data-a="counts">Record</button></div>`;
-    case "photo": return stepHead(st, "photo") + photoHTML(a.side);
+    case "photo": return stepHead(st, "photo") + photoHTML(a.side, a.optional);
+    case "retest": return retestHTML(a.board);
+    case "repair": return repairHTML(a.form);
     case "notes": return stepHead(st, "") + `<div class="entry" style="flex-direction:column;align-items:stretch"><textarea class="field" id="v" placeholder="Anything unusual about this run"></textarea><div><button class="btn pri" data-a="notes">Finish and save</button></div></div>`;
     case "instruct": return `<div class="sec"><span class="kind manual">Do this now</span></div><h1 class="name">${esc(a.title)}</h1><p class="prompt">${esc(a.text)}</p><div class="entry"><button class="btn pri" data-a="ok">Done, continue</button></div>`;
     case "confirm": return `<div class="sec"></div><h1 class="name">${esc(a.title)}</h1><p class="prompt">${esc(a.text)}</p><div class="entry"><button class="btn pri" data-a="yes">${esc(a.yes)}</button><button class="btn" data-a="no">${esc(a.no)}</button></div>`;
   }
   return "";
+}
+const badge = r => `<span class="badge ${esc(r)}">${esc(r === "PENDING" ? "NOT RUN" : r)}</span>`;
+function failedTable(rows) {
+  return `<table class="mini"><thead><tr><th>Step</th><th>Value</th><th>Accept</th><th>Result</th></tr></thead><tbody>${rows.map(r =>
+    `<tr><td>${esc(r.title)}</td><td class="mono">${esc(r.value)}</td><td>${esc(r.accept || "")}</td><td>${badge(r.result)}</td></tr>`).join("")}</tbody></table>`;
+}
+function retestHTML(b) {
+  const last = b.items.find(i => i.kind === "run" && b.latest && i.n === b.latest.n);
+  const lines = b.items.slice(0, 4).map(i => `<div>${esc(i.date)}  <b>${esc(i.title)}</b>  ${esc(i.who)} ${i.result ? badge(i.result) : ""}</div>`).join("");
+  return `<div class="sec"><span class="kind manual">Tested before</span></div>
+    <h1 class="name"><span class="mono">${esc(b.serial)}</span> has been tested before</h1>
+    ${b.warning ? `<div class="warnbox">${esc(b.warning)}</div>` : ""}
+    <div style="display:flex;flex-direction:column;gap:4px;font-size:.95em">${lines}</div>
+    ${last && last.failed.length ? `<div style="max-width:820px"><div class="sh">Failed in run ${last.n}</div>${failedTable(last.failed)}</div>` : ""}
+    <div class="keys">This will be run ${b.next_run}. Earlier runs stay in the HWDB unchanged.</div>
+    <div class="choices">
+      <button class="choice pri" data-a="choose" data-v="repair" type="button"><b>Record a repair, then retest</b><span>Fill in what was fixed. The retest becomes run ${b.next_run}.</span></button>
+      <button class="choice" data-a="choose" data-v="retest" type="button"><b>Retest without a repair</b><span>For example a loose cable or a setup mistake. You’ll be asked why.</span></button>
+      <button class="choice" data-a="choose" data-v="repair_only" type="button"><b>Record a repair only</b><span>Retest the board later.</span></button>
+      <button class="choice" data-a="choose" data-v="cancel" type="button"><b>Cancel</b><span>Back to the start screen. Nothing is saved.</span></button>
+    </div>`;
+}
+function repairHTML(f) {
+  return `<div class="sec"><span class="kind manual">Repair</span></div>
+    <h1 class="name">Repair ${f.n} for <span class="mono">${esc(f.serial)}</span></h1>
+    <p class="prompt">${f.after_run ? `After run ${f.after_run}, ${esc(f.after_date)}.` : ""} Close-up photos come next.</p>
+    ${f.failed.length ? `<div><div class="sh">What the repair was for</div><div class="chips">${f.failed.map(x =>
+      `<button class="chip on" type="button" data-a="chip" data-v="${esc(x.key)}" aria-pressed="true">${esc(x.title)}</button>`).join("")}</div></div>` : ""}
+    <div class="grid2">
+      <label><span class="lbl">Repaired by</span><input class="in" id="r-by" value="${esc(f.repaired_by)}" autocomplete="off"></label>
+      <label><span class="lbl">Parts replaced (reference designators)</span><input class="in" id="r-parts" placeholder="For example U43, C112. Empty if none." autocomplete="off"></label>
+      <label><span class="lbl">Fault found</span><textarea class="ta" id="r-fault" placeholder="What was wrong, and where on the board"></textarea></label>
+      <label><span class="lbl">What was done</span><textarea class="ta" id="r-action" placeholder="Reworked, replaced, cleaned, reseated…"></textarea></label>
+      <label class="wide"><span class="lbl">Notes</span><input class="in" id="r-notes" autocomplete="off"></label>
+    </div>
+    <div class="entry"><button class="btn pri" data-a="saverep" type="button">Next: close-up photos</button></div>`;
 }
 function lastHTML() {
   const k = S.last, r = k && S.results[k]; if (!r) return "";
@@ -264,7 +353,7 @@ function renderRun() {
   if (key !== viewKey || !screen.querySelector(".body")) {
     viewKey = key; pendingWarn = null;
     screen.innerHTML = `<div class="body"><aside class="side" id="side"></aside><main class="main"><div id="mainc" style="display:flex;flex-direction:column;gap:16px"></div><div class="msg" id="msg" role="status"></div><div id="lastc" style="margin-top:auto"></div></main></div>
-      <div class="foot"><span id="cnt"></span><div class="bar"><i id="barfill"></i></div><span>${S.mode === "ship" ? "Shipment entry" : "Production board"}</span></div>`;
+      <div class="foot"><span id="cnt"></span><div class="bar"><i id="barfill"></i></div><span id="footmode"></span></div>`;
     // keep the camera running from the front photo to the back photo, stop it otherwise
     if ((S.ask && S.ask.kind !== "photo") || S.running || S.status) stopCamera();
     document.getElementById("mainc").innerHTML = mainHTML();
@@ -274,6 +363,7 @@ function renderRun() {
   }
   document.getElementById("side").innerHTML = renderSide();
   document.getElementById("lastc").innerHTML = lastHTML();
+  document.getElementById("footmode").textContent = S.run_label || (S.mode === "ship" ? "Shipment entry" : "Production board");
   document.getElementById("cnt").textContent = `${done} of ${plan.length} recorded`;
   document.getElementById("barfill").style.width = `${Math.round(done / Math.max(1, plan.length) * 100)}%`;
   showError();
@@ -288,7 +378,7 @@ function showError() {
 function bindMain() {
   const a = S.ask; if (!a) return;
   const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
-  const act = name => {
+  const act = (name, el) => {
     const st = a.step;
     switch (name) {
       case "record": {
@@ -314,9 +404,18 @@ function bindMain() {
         if (x === "" || y === "" || !isFinite(+x) || !isFinite(+y)) { say("Enter both quantities as numbers.", "err"); return; }
         answer({ ordered: +x, received: +y }); return; }
       case "notes": answer(val("v")); return;
+      case "choose": answer(el.dataset.v); return;
+      case "chip": { const on = !el.classList.contains("on"); el.classList.toggle("on", on); el.setAttribute("aria-pressed", on); return; }
+      case "saverep": {
+        const r = { repaired_by: val("r-by"), parts_replaced: val("r-parts"), fault_found: val("r-fault"),
+                    action_taken: val("r-action"), notes: val("r-notes"),
+                    for_steps: [...screen.querySelectorAll(".chip.on")].map(c => c.dataset.v) };
+        if (!r.repaired_by) { say("Enter who repaired the board.", "err"); return; }
+        if (!r.fault_found && !r.action_taken) { say("Describe the fault found or what was done.", "err"); return; }
+        answer(r); return; }
     }
   };
-  screen.querySelectorAll("[data-a]").forEach(b => b.onclick = () => act(b.dataset.a));
+  screen.querySelectorAll("[data-a]").forEach(b => b.onclick = () => act(b.dataset.a, b));
   screen.querySelectorAll("input.field").forEach(f => {
     f.oninput = () => { if (document.getElementById("msg").className.includes("err")) say(""); };
     f.onkeydown = e => {
@@ -341,13 +440,36 @@ function renderStart() {
   if (key === viewKey && screen.querySelector(".form")) { showStartError(); return; }
   viewKey = key;
   const draw = () => {
-    const b = startMode === "board";
+    const b = startMode === "board", look = startMode === "lookup";
     const keep = id => { const el = document.getElementById(id); return el ? el.value : ""; };
     const tester = keep("f-tester") || (S.ask && S.ask.tester) || "";
+    const boards = (S.ask && S.ask.boards) || { waiting: [], recent: [] };
+    const list = (rows, none) => rows.length ? `<div class="rows">${rows.map(r => `<button class="row" type="button" data-q="${esc(r.serial)}"><span class="s">${esc(r.serial)}</span><span class="d">${esc(r.failed.length ? "Run " + r.run + ": " + r.failed.slice(0, 3).join(", ") + (r.failed.length > 3 ? "…" : "") : "Run " + r.run)}${r.repaired_since ? ", repaired" : ""}<br>${esc(r.date)}</span>${badge(r.result)}</button>`).join("")}</div>` : `<div class="empty">${none}</div>`;
+    const seg = `<div><span class="lbl">What are you doing?</span>
+        <div class="seg"><button type="button" data-m="board" class="${b ? "on" : ""}">Production board</button><button type="button" data-m="ship" class="${startMode === "ship" ? "on" : ""}">Production shipment</button><button type="button" data-m="lookup" class="${look ? "on" : ""}">Look up a board</button></div></div>`;
+    if (look) {
+      screen.innerHTML = `<div class="start2"><div class="form">
+        <h1>Look up a board</h1>${seg}
+        <label><span class="lbl">PTC serial number</span><input class="field" id="f-query" autocomplete="off" placeholder="Scan or type, * matches any part"></label>
+        <input type="hidden" id="f-tester" value="${esc(tester)}">
+        <div class="msg" id="msg" role="status"></div>
+        <button class="btn pri" id="go" type="button">Show history</button>
+        <div class="keys">Read-only. Board history comes from the HWDB, and from this station’s records if the HWDB can’t be reached.</div>
+      </div><div style="display:flex;flex-direction:column;gap:18px">
+        <div><div class="sh">Waiting for a retest</div>${list(boards.waiting, "No boards are waiting for a retest.")}</div>
+        <div><div class="sh">Recently tested on this station</div>${list(boards.recent, "No boards tested on this station yet.")}</div>
+      </div></div>`;
+      screen.querySelectorAll("[data-m]").forEach(x => x.onclick = () => { startMode = x.dataset.m; draw(); });
+      const goL = q => { if (!q) return say("Scan or type a serial to look up.", "err"); answer({ mode: "lookup", query: q, tester }); };
+      document.getElementById("go").onclick = () => goL(document.getElementById("f-query").value.trim());
+      document.getElementById("f-query").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); goL(e.target.value.trim()); } };
+      screen.querySelectorAll("[data-q]").forEach(r => r.onclick = () => goL(r.dataset.q));
+      document.getElementById("f-query").focus();
+      return;
+    }
     screen.innerHTML = `<div class="center"><div class="form">
       <h1>Start a test</h1>
-      <div><span class="lbl">What are you entering?</span>
-        <div class="seg"><button type="button" data-m="board" class="${b ? "on" : ""}">Production board</button><button type="button" data-m="ship" class="${b ? "" : "on"}">Production shipment</button></div></div>
+      ${seg}
       <label><span class="lbl">Tester name</span><input class="field" id="f-tester" autocomplete="off" value="${esc(tester)}"></label>
       ${b ? `<label><span class="lbl">PTC serial number</span><input class="field" id="f-serial" autocomplete="off" placeholder="Scan the PTC barcode"></label>`
           : `<div class="two"><label><span class="lbl">Purchase order</span><input class="field" id="f-po" autocomplete="off"></label><label><span class="lbl">Batch number, if any</span><input class="field" id="f-batch" autocomplete="off"></label></div>`}
@@ -390,7 +512,7 @@ function renderResults() {
   });
   const up = F.ok === true ? "ok" : F.ok === false ? "bad" : "";
   screen.innerHTML = `<div class="res">
-    <div class="verdict"><span class="word ${ov}">${ov}</span><div><div style="font-size:1.4em;font-weight:600">${esc(S.mode === "ship" ? "Shipment " + S.ident : S.ident)}</div><div style="color:var(--g-dim)">${esc(words[ov] || "")}</div></div></div>
+    <div class="verdict"><span class="word ${ov}">${ov}</span><div><div style="font-size:1.4em;font-weight:600">${esc(S.mode === "ship" ? "Shipment " + S.ident : S.ident)}${S.run_label ? `<span style="font-weight:400;color:var(--g-dim);font-size:.7em">  ${esc(S.run_label)}</span>` : ""}</div><div style="color:var(--g-dim)">${esc(words[ov] || "")}</div></div></div>
     ${F.message ? `<div class="upload ${up}">${esc(F.message)}</div>` : ""}
     <div class="tbl"><table><thead><tr><th>Step</th>${SHOW_KEYS ? "<th>Database key</th>" : ""}<th>Value</th>${SHOW_LIMITS ? "<th>Accept</th>" : ""}<th>Result</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${F.notes ? `<div><span class="lbl">Notes</span>${esc(F.notes)}</div>` : ""}
@@ -402,7 +524,7 @@ function renderResults() {
 function renderStopped() {
   const key = JSON.stringify(["stopped", S.ask && S.ask.id, S.final]);
   if (key === viewKey) return; viewKey = key;
-  screen.innerHTML = `<div class="center"><div class="form"><h1>The test stopped</h1><p class="prompt">${esc(S.final.message)}</p>
+  screen.innerHTML = `<div class="center"><div class="form"><h1>${esc(S.final.title || "The test stopped")}</h1><p class="prompt">${esc(S.final.message)}</p>
     <div><button class="btn pri" id="next" type="button">Back to start</button></div></div></div>`;
   document.getElementById("next").onclick = () => answer(true);
   document.getElementById("next").focus();
@@ -414,7 +536,8 @@ const $ = id => document.getElementById(id);
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
                 set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 
-function photoHTML(side) {
+function photoHTML(side, optional) {
+  const ghosted = side !== "closeup";
   return `<div class="cam">
     <div class="cam-box" id="camBox">
       <video id="video" autoplay playsinline muted></video>
@@ -425,14 +548,14 @@ function photoHTML(side) {
     </div>
     <div class="cam-tools">
       <label>Camera <select id="camSel" aria-label="Camera"></select></label>
-      <label>Ghost <input type="range" id="ghostOp" min="0" max="100" step="5" aria-label="Ghost image opacity"><span id="ghostOpOut" class="mono"></span></label>
+      ${ghosted ? `<label>Ghost <input type="range" id="ghostOp" min="0" max="100" step="5" aria-label="Ghost image opacity"><span id="ghostOpOut" class="mono"></span></label>
       <span id="ghostInfo"></span>
       <button class="btn small" data-p="ghostset" type="button" id="ghostSetBtn"></button>
-      <button class="btn small" data-p="ghostclear" type="button" id="ghostClearBtn">Remove ghost</button>
+      <button class="btn small" data-p="ghostclear" type="button" id="ghostClearBtn">Remove ghost</button>` : ""}
     </div>
-    <div class="entry" id="liveBtns"><button class="btn pri" data-p="take" type="button" id="takeBtn" disabled>Take photo</button><button class="btn" data-p="file" type="button">Choose file…</button></div>
+    <div class="entry" id="liveBtns"><button class="btn pri" data-p="take" type="button" id="takeBtn" disabled>Take photo</button><button class="btn" data-p="file" type="button">Choose file…</button>${optional ? '<button class="btn" data-p="done" type="button">Done, no more photos</button>' : ""}</div>
     <div class="entry" id="reviewBtns" hidden><button class="btn pri" data-p="use" type="button">Use this photo</button><button class="btn" data-p="retake" type="button">Retake</button>
-      <label class="check"><input type="checkbox" id="asGhost"><span id="asGhostLbl"></span></label></div>
+      ${ghosted ? '<label class="check"><input type="checkbox" id="asGhost"><span id="asGhostLbl"></span></label>' : ""}</div>
     <div class="keys" id="photoKeys">Space takes the photo.</div>
     <input type="file" id="fileIn" accept="image/jpeg,image/png" hidden>
     <input type="file" id="ghostIn" accept="image/jpeg,image/png" hidden>
@@ -495,6 +618,7 @@ async function startCamera(deviceId) {
 
 function updateGhost(side) {
   const g = $("ghost"); if (!g) return;
+  if (!$("ghostOp")) { g.hidden = true; return; }   // close-ups have no ghost
   const ver = S.ghosts[side], name = side === "front" ? "front" : "back";
   if (ver) {
     const src = `/ghost/${side}?v=${ver}`;
@@ -520,8 +644,10 @@ function showReview(dataUrl, source, side) {
   $("camBadge").textContent = source === "file" ? "Chosen file" : "Photo";
   $("liveBtns").hidden = true; $("reviewBtns").hidden = false;
   const hasGhost = !!S.ghosts[side];
-  $("asGhost").checked = !hasGhost;
-  $("asGhostLbl").textContent = hasGhost ? "Replace the ghost with this photo" : "Save as the ghost for the next boards";
+  if ($("asGhost")) {
+    $("asGhost").checked = !hasGhost;
+    $("asGhostLbl").textContent = hasGhost ? "Replace the ghost with this photo" : "Save as the ghost for the next boards";
+  }
   $("photoKeys").textContent = "Enter uses the photo. The ghost isn’t part of the photo.";
   say("");
 }
@@ -547,9 +673,9 @@ function readImageFile(file, done) {
 
 function bindPhoto(side) {
   cam.shot = null;
-  const op = $("ghostOp");
+  const op = $("ghostOp") || { value: "40" };
   op.value = store.get("ptc-ghost-opacity", "40");
-  $("ghostOpOut").textContent = op.value + " %";
+  if ($("ghostOpOut")) $("ghostOpOut").textContent = op.value + " %";
   op.oninput = () => { $("ghostOpOut").textContent = op.value + " %"; $("ghost").style.opacity = op.value / 100; store.set("ptc-ghost-opacity", op.value); };
   updateGhost(side);
   $("camSel").onchange = e => { stopCamera(); startCamera(e.target.value); };
@@ -570,7 +696,8 @@ function bindPhoto(side) {
     file() { $("fileIn").click(); },
     retake() { showLive(); },
     retry() { stopCamera(); $("camEmptyText").textContent = "Starting the camera…"; startCamera($("camSel").value || undefined); },
-    use() { if (cam.shot) answer({ image: cam.shot, source: cam.source, ghost: $("asGhost").checked }); },
+    use() { if (cam.shot) answer({ image: cam.shot, source: cam.source, ghost: !!($("asGhost") && $("asGhost").checked) }); },
+    done() { answer({ done: true }); },
     ghostset() { $("ghostIn").click(); },
     ghostclear() {
       if (confirm(`Remove the ${side} ghost image? The next good photo can set a new one.`))
@@ -588,6 +715,66 @@ function bindPhoto(side) {
 let photoKeys = null;
 document.addEventListener("keydown", e => { if (S && S.ask && S.ask.kind === "photo" && photoKeys && !e.ctrlKey && !e.metaKey && !e.altKey) photoKeys(e); });
 
+let boardSel = 0, boardAll = false;
+function boardDetail(it) {
+  if (!it) return "";
+  const photos = names => names.length ? `<div><div class="sh">Photos</div><div class="thumbs">${names.map(n =>
+      `<figure><a href="/stored/${encodeURIComponent(n)}" target="_blank" rel="noopener">${esc(n.replace(/\.(jpg|png)$/, ""))}<img src="/stored/${encodeURIComponent(n)}" alt="" loading="lazy"></a></figure>`).join("")}</div></div>` : "";
+  const local = it.uploaded === false ? `<div class="warnbox">Saved on this station only. It wasn’t uploaded to the HWDB.</div>` : "";
+  if (it.kind === "run") {
+    const rows = boardAll ? it.all : it.failed;
+    return `<h2>${esc(it.title)} ${badge(it.result)}</h2>${local}
+      <dl class="kv"><dt>Date</dt><dd>${esc(it.date)}</dd><dt>Tester</dt><dd>${esc(it.who)}</dd>
+        ${it.reason ? `<dt>Why retested</dt><dd>${esc(it.reason)}</dd>` : ""}
+        <dt>Steps</dt><dd>${it.steps ? (it.failed.length ? `${it.steps - it.failed.length} of ${it.steps} passed` : `All ${it.steps} passed`) : "Details not available"}</dd>
+        ${it.notes ? `<dt>Notes</dt><dd>${esc(it.notes)}</dd>` : ""}</dl>
+      ${rows.length ? `<div><div class="sh">${boardAll ? "All steps" : "Failed steps"}</div>${failedTable(rows)}</div>` : ""}
+      ${it.steps ? `<div><button class="btn small" type="button" id="allsteps">${boardAll ? "Show failed steps only" : `Show all ${it.steps} steps`}</button></div>` : ""}
+      ${photos(Object.values(it.photos || {}))}`;
+  }
+  return `<h2>${esc(it.title)}</h2>${local}
+    <dl class="kv"><dt>Date</dt><dd>${esc(it.date)}</dd><dt>Repaired by</dt><dd>${esc(it.who)}</dd>
+      ${it.after_run ? `<dt>After</dt><dd>Run ${it.after_run}</dd>` : ""}
+      ${it.for_steps.length ? `<dt>For</dt><dd>${esc(it.for_steps.join(", "))}</dd>` : ""}
+      <dt>Fault found</dt><dd>${esc(it.fault || "-")}</dd><dt>What was done</dt><dd>${esc(it.action || "-")}</dd>
+      <dt>Parts replaced</dt><dd>${esc(it.parts || "None")}</dd>${it.notes ? `<dt>Notes</dt><dd>${esc(it.notes)}</dd>` : ""}</dl>
+    ${photos(it.photos || [])}`;
+}
+function renderBoard() {
+  const a = S.ask; if (!a) return;
+  const key = JSON.stringify(["board", a.id]);
+  if (key === viewKey) { showError(); return; }
+  viewKey = key;
+  if (a.kind === "pick") {
+    screen.innerHTML = `<div class="pane"><h1>Boards matching <span class="mono">${esc(a.query)}</span></h1>
+      ${a.rows.length ? `<div class="rows" style="max-width:860px">${a.rows.map(r => `<button class="row" type="button" data-q="${esc(r.serial)}"><span class="s">${esc(r.serial)}</span><span class="d">${esc(r.run ? "Run " + r.run + (r.failed.length ? ": " + r.failed.slice(0, 3).join(", ") : "") : "No runs")}<br>${esc(r.date)}</span>${badge(r.result)}</button>`).join("")}</div>`
+        : `<div class="empty">No boards on this station match. Exact serials are also checked in the HWDB.</div>`}
+      <div class="msg" id="msg" role="status"></div>
+      <div><button class="btn" type="button" id="back">Back to start</button></div></div>`;
+    screen.querySelectorAll("[data-q]").forEach(r => r.onclick = () => answer(r.dataset.q));
+    document.getElementById("back").onclick = () => answer("");
+    return;
+  }
+  const b = a.board; boardSel = 0; boardAll = false;
+  const draw = () => {
+    const tl = b.items.map((x, i) => `<button class="tli ${i === boardSel ? "sel" : ""}" type="button" data-i="${i}">
+        <span class="ic ${x.kind === "repair" ? "rep" : ""}">${x.kind === "repair" ? "R" : ""}${x.n}</span>
+        <span><span class="k">${esc(x.title)}</span><span class="d">${esc(x.date)}, ${esc(x.who)}</span></span>${x.result ? badge(x.result) : ""}</button>`).join("");
+    screen.innerHTML = `<div class="pane">
+      <div class="hhead"><span class="ser">${esc(b.serial)}</span>${b.latest ? badge(b.latest.result) + `<span style="color:var(--g-dim)">Latest: run ${b.latest.n}</span>` : ""}
+        <span class="acts"><button class="btn" type="button" data-b="repair">Record a repair</button><button class="btn pri" type="button" data-b="retest">Retest this board</button><button class="btn" type="button" data-b="back">Back to start</button></span></div>
+      <div class="facts"><div>HWDB part ID<b>${esc(b.part_ids.length > 1 ? b.part_ids.join(", ") : b.part_id || "None yet")}</b></div><div>SoM serial<b>${esc(b.som || "-")}</b></div><div>EEPROM ID<b>${esc(b.eeprom || "-")}</b></div><div>Runs<b>${b.runs}</b></div><div>Repairs<b>${b.repairs}</b></div><div>From<b style="font-family:var(--g-font)">${esc(b.source)}</b></div></div>
+      ${b.part_ids.length > 1 ? `<div class="warnbox">This serial has ${b.part_ids.length} HWDB entries. It can’t be retested until the extra entry is removed.</div>` : ""}
+      ${b.warning ? `<div class="warnbox">${esc(b.warning)}</div>` : ""}
+      <div class="msg" id="msg" role="status"></div>
+      <div class="hcols"><div class="tl">${tl || '<div class="empty">No runs or repairs recorded.</div>'}</div><div class="det">${boardDetail(b.items[boardSel])}</div></div></div>`;
+    screen.querySelectorAll("[data-i]").forEach(x => x.onclick = () => { boardSel = +x.dataset.i; boardAll = false; draw(); screen.querySelector(`[data-i="${boardSel}"]`).focus(); });
+    screen.querySelectorAll("[data-b]").forEach(x => x.onclick = () => answer(x.dataset.b));
+    const all = document.getElementById("allsteps"); if (all) all.onclick = () => { boardAll = !boardAll; draw(); };
+  };
+  draw();
+}
+
 function render() {
   document.title = S.title;
   if (!S.ask || S.ask.id !== sentId) sentId = null;
@@ -596,6 +783,7 @@ function render() {
   if (S.screen === "start") renderStart();
   else if (S.screen === "run") renderRun();
   else if (S.screen === "results") renderResults();
+  else if (S.screen === "board") renderBoard();
   else renderStopped();
 }
 connect();

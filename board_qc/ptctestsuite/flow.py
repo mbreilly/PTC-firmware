@@ -12,10 +12,11 @@ from ptctestsuite.config.test_names import test_sequence
 from ptctestsuite.config.test_names import (pre_som_tests, som_boot_tests, alert_led_tests, crate_address_tests,
                                             timing_tests, ethernet_tests, mcu_tests, ripple_full_load,
                                             load_steps, load_tolerance, reception_checks)
-from ptctestsuite.ui.base import TesterUI, Step, TestAborted, step_title
+from ptctestsuite.ui.base import TesterUI, Step, TestAborted, step_title, format_value
 from ptctestsuite.utils import qc_result, qc_record, init_ptc, start_client, manual_test
 from ptctestsuite.utils.qc_board import qc_board_handler
 from ptctestsuite.utils.photos import save_board_photo
+from ptctestsuite.utils import board_records
 from ptctestsuite.utils.reception import reception_record, shipment_types, already_recorded, save_locally
 
 renewal_needed = asyncio.Event()
@@ -32,7 +33,7 @@ async def renew_token_if_needed():
         renewal_needed.clear()
 
 
-async def check_hwdb(ui: TesterUI) -> None:
+async def check_hwdb(ui: TesterUI) -> bool:
     """Tells the tester before the run starts if the HWDB can't be reached, so they
     know the results won't upload. They can carry on and upload the saved results later."""
     from ptctestsuite.utils.hwdb import check_connection, HwdbError
@@ -46,8 +47,9 @@ async def check_hwdb(ui: TesterUI) -> None:
                                 "but they won't be uploaded.",
                                 yes="Continue without the HWDB", no="Stop"):
             raise TestAborted()
-        return
+        return False
     ui.status("Connected to the HWDB.")
+    return True
 
 
 # ---- the plan: every step in order, for the GUI step list ---------------------
@@ -69,6 +71,9 @@ STEP_PHOTO_FRONT = Step("photo_front", "Front photo", "4.1.3",
 STEP_PHOTO_BACK = Step("photo_back", "Back photo", "4.1.3",
                        "Turn the board over, line it up with the ghost image and take the photo.",
                        "Board photos", kind="photo")
+STEP_RETEST_REASON = Step("retest_reason", "Reason for the retest", "Retest",
+                          "Why is this board being retested without a repair? For example: loose cable on the "
+                          "QC board, wrong jumper, scope set up wrong.", "Retest", kind="scan")
 STEP_NOTES = Step("notes", "Notes and finish", "End", "Add any notes, then finish.", "Finish", kind="notes")
 
 def _load_pct(amps: float) -> int:
@@ -194,25 +199,267 @@ def _save_unuploaded(record) -> None:
         f.write(json.dumps(record.gen_hwdb_datasheet(), default=str) + "\n")
 
 
+# ---- board history: every run and repair of one serial ------------------------
+
+class BoardHistory:
+    """What is known about one serial, from the HWDB and this station's records.
+    Runs and repairs from both are merged by number; nothing is ever dropped."""
+
+    def __init__(self, serial: str):
+        self.serial = serial
+        self.part_ids: list[str] = []      # HWDB entries with this serial: should be 0 or 1
+        self.local = board_records.load(serial)
+        self.hwdb_runs: list[dict] = []
+        self.hwdb_repairs: list[dict] = []
+        self.hwdb_checked = False
+        self.hwdb_error: str | None = None
+
+    @property
+    def duplicate(self) -> bool:
+        return len(self.part_ids) > 1
+
+    @property
+    def part_id(self) -> str | None:
+        if len(self.part_ids) == 1:
+            return self.part_ids[0]
+        if not self.part_ids and not self.hwdb_checked and self.local:
+            return self.local.get("part_id")
+        return None
+
+    def _merged(self, local: list, hwdb: list) -> list:
+        by_n = {r["n"]: r for r in hwdb if r.get("n") is not None}
+        by_n.update({r["n"]: r for r in local if r.get("n") is not None})   # this station's copy has more detail
+        return [by_n[n] for n in sorted(by_n)]
+
+    @property
+    def runs(self) -> list[dict]:
+        return self._merged((self.local or {}).get("runs", []), self.hwdb_runs)
+
+    @property
+    def repairs(self) -> list[dict]:
+        return self._merged((self.local or {}).get("repairs", []), self.hwdb_repairs)
+
+    @property
+    def found(self) -> bool:
+        return bool(self.runs or self.repairs or self.part_ids)
+
+    @property
+    def last_run(self) -> dict | None:
+        return self.runs[-1] if self.runs else None
+
+    @property
+    def next_run_number(self) -> int:
+        # an HWDB entry with no readable runs still means the board was tested once
+        return max([r["n"] for r in self.runs] + [1 if self.part_ids else 0]) + 1
+
+    @property
+    def next_repair_number(self) -> int:
+        return max([r["n"] for r in self.repairs] + [0]) + 1
+
+    def failed_steps(self) -> list[tuple[str, str]]:
+        run = self.last_run or {}
+        return [(k, v["title"]) for k, v in run.get("results", {}).items() if v["result"] in ("FAIL", "ERROR")]
+
+    def view(self) -> dict:
+        """Everything the UI needs to show this board's history, newest first."""
+        items = []
+        for r in self.runs:
+            res = r.get("results", {})
+            label = f"Run {r['n']}, " + ("first test" if r.get("type") == "First test" else
+                                         f"after repair {r['after_repair']}" if r.get("after_repair") else "retest")
+            items.append({"kind": "run", "n": r["n"], "title": label, "date": r.get("date", ""),
+                          "who": r.get("tester", ""), "result": r.get("overall", ""),
+                          "reason": r.get("retest_reason"), "steps": len(res),
+                          "failed": [v for v in res.values() if v["result"] in ("FAIL", "ERROR")],
+                          "all": list(res.values()), "photos": r.get("photos") or {},
+                          "notes": r.get("notes") or "", "uploaded": r.get("uploaded", True)})
+        for p in self.repairs:
+            items.append({"kind": "repair", "n": p["n"], "title": f"Repair {p['n']}", "date": p.get("date", ""),
+                          "who": p.get("repaired_by", ""), "after_run": p.get("after_run"),
+                          "for_steps": p.get("for_steps") or [], "fault": p.get("fault_found", ""),
+                          "action": p.get("action_taken", ""), "parts": p.get("parts_replaced", ""),
+                          "notes": p.get("notes", ""), "photos": p.get("photos") or [],
+                          "uploaded": p.get("uploaded", True)})
+        # newest first, in the order things happened: run 1, repairs after run 1, run 2, ...
+        items.sort(key=lambda i: (i["n"], 0) if i["kind"] == "run" else (i.get("after_run") or 0, 1), reverse=True)
+        last = self.last_run
+        runs = [r for r in self.runs]
+        return {"serial": self.serial, "part_id": self.part_id, "part_ids": self.part_ids,
+                "som": next((r.get("som_serial") for r in reversed(runs) if r.get("som_serial")), None),
+                "eeprom": next((r.get("eeprom_serial") for r in reversed(runs) if r.get("eeprom_serial")), None),
+                "latest": {"n": last["n"], "result": last.get("overall")} if last else None,
+                "runs": len(self.runs), "repairs": len(self.repairs), "items": items,
+                "next_run": self.next_run_number,
+                "failed": [t for _, t in self.failed_steps()],
+                "source": "HWDB and this station" if self.hwdb_checked and not self.hwdb_error else "this station only",
+                "warning": self.hwdb_error}
+
+
+def _run_from_hwdb(i: int, t: dict) -> dict:
+    d = t.get("test_data") or {}
+    results = {}
+    for key, v in (d.get("test_status") or {}).items():
+        if isinstance(v, dict):
+            results[key] = {"title": step_title(key), "result": str(v.get("result", "")),
+                            "value": format_value(v.get("value"), v.get("unit")), "accept": ""}
+    return {"n": d.get("Run Number") or i + 1, "type": d.get("Run Type") or "First test",
+            "after_repair": d.get("After Repair"), "retest_reason": d.get("Retest Reason"),
+            "date": f"{d.get('Test Date', '')} {str(d.get('Test Time', ''))[:5]}".strip(),
+            "tester": d.get("Operator Name", ""), "overall": d.get("Overall Result", ""),
+            "som_serial": d.get("SoM Serial Number"), "eeprom_serial": d.get("EEPROM Serial ID"),
+            "photos": {}, "notes": t.get("comments") or "", "results": results, "uploaded": True}
+
+def _repair_from_hwdb(i: int, t: dict) -> dict:
+    d = t.get("test_data") or {}
+    return {"n": d.get("Repair Number") or i + 1, "date": d.get("Repair Date", ""),
+            "repaired_by": d.get("Repaired By", ""), "after_run": d.get("After Run"),
+            "for_steps": d.get("For Steps") or [], "fault_found": d.get("Fault Found", ""),
+            "action_taken": d.get("Action Taken", ""), "parts_replaced": d.get("Parts Replaced", ""),
+            "photos": d.get("Photos") or [], "notes": t.get("comments") or "", "uploaded": True}
+
+
+async def load_history(serial: str, use_hwdb: bool) -> BoardHistory:
+    h = BoardHistory(serial)
+    if not use_hwdb:
+        return h
+    from ptctestsuite.utils.hwdb import find_parts, get_test_records, HwdbError
+    try:
+        h.part_ids = [p["part_id"] for p in await find_parts(serial)]
+        h.hwdb_checked = True
+    except HwdbError as e:
+        lg.error(f"Couldn't look up {serial} in the HWDB: {e}")
+        h.hwdb_error = f"The HWDB couldn’t be searched for {serial}, so only this station’s records are shown. {e}"
+        return h
+    if len(h.part_ids) == 1:
+        pid = h.part_ids[0]
+        board_records.set_part_id(serial, pid) if h.local else None
+        try:
+            h.hwdb_runs = [_run_from_hwdb(i, t) for i, t in enumerate(await get_test_records(pid, parameters.qc_test_type))]
+        except HwdbError as e:
+            lg.warning(f"Couldn't read the QC test history of {pid}: {e}")
+            h.hwdb_error = f"The HWDB found {serial} ({pid}) but its earlier runs couldn’t be read. {e}"
+        try:
+            h.hwdb_repairs = [_repair_from_hwdb(i, t) for i, t in
+                              enumerate(await get_test_records(pid, parameters.repair_test_type))]
+        except HwdbError as e:
+            lg.info(f"No repair records read for {pid}: {e}")
+    return h
+
+
+def duplicate_message(h: BoardHistory) -> str:
+    return (f"{h.serial} has {len(h.part_ids)} entries in the HWDB ({', '.join(h.part_ids)}). A serial must have "
+            "exactly one, or its history ends up split between them. The test can’t go on until someone with HWDB "
+            "admin rights removes or merges the extra entry. Then scan the serial again.")
+
+
+async def record_repair(ui: TesterUI, h: BoardHistory, tester: str, use_hwdb: bool) -> tuple[dict, str]:
+    """Asks for a repair record and its close-up photos, saves it here and adds it to the board's HWDB
+    entry as its own record. Returns the repair and a sentence saying where it was saved."""
+    last = h.last_run
+    n = h.next_repair_number
+    form = await ui.ask_repair({"serial": h.serial, "n": n, "after_run": last["n"] if last else None,
+                                "after_date": last.get("date") if last else "", "repaired_by": tester,
+                                "failed": [{"key": k, "title": t} for k, t in h.failed_steps()]})
+    titles = dict(h.failed_steps())
+    photos = []
+    for i in range(parameters.max_repair_photos):
+        step = Step(f"repair{n}_photo{i + 1}", f"Repair photo {i + 1}", "Repair",
+                    "Take a close-up of the defect or the repair. Press Done when you have no more photos.",
+                    "Repair", kind="photo")
+        photo = await ui.ask_photo(step, "closeup", optional=True)
+        if photo is None:
+            break
+        path = save_board_photo(f"{h.serial}-repair{n}", photo)
+        photos.append((path.name, photo))
+    repair = {"n": n, "date": board_records.now().strftime("%Y-%m-%d %H:%M"),
+              "repaired_by": form["repaired_by"].strip(), "after_run": last["n"] if last else None,
+              "for_steps": [titles.get(k, k) for k in form.get("for_steps", [])],
+              "fault_found": form.get("fault_found", "").strip(), "action_taken": form.get("action_taken", "").strip(),
+              "parts_replaced": form.get("parts_replaced", "").strip(), "notes": form.get("notes", "").strip(),
+              "photos": [name for name, _ in photos]}
+    uploaded, where = False, "on this station only (HWDB upload is off)"
+    if use_hwdb and h.part_id:
+        from ptctestsuite.utils.hwdb import upload_repair_record, upload_ptc_image, HwdbError
+        try:
+            ui.status(f"Adding repair {n} to {h.serial} in the HWDB…")
+            await upload_repair_record(h.part_id, repair)
+            for i, (name, p) in enumerate(photos, 1):
+                await upload_ptc_image(h.part_id, p.data, filename=name, comments=f"Repair {n}, close-up {i}",
+                                       mime=p.mime)
+            uploaded, where = True, f"in the HWDB on {h.part_id} and on this station"
+        except HwdbError as e:
+            lg.exception(e)
+            where = (f"on this station only, because the HWDB upload failed: {e} If the HWDB says the "
+                     f"{parameters.repair_test_type} test type doesn’t exist, it has to be added to the PTC component "
+                     "type by an HWDB admin")
+    elif use_hwdb:
+        where = "on this station only, because this board has no HWDB entry yet"
+    board_records.save_repair(h.serial, repair, h.part_id, uploaded)
+    return repair, where
+
+
 # ---- board test ---------------------------------------------------------------
 
-async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_hwdb: bool = False):
+async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_hwdb: bool = False,
+                       preset: str | None = None):
+    """One run of the board test. If the serial was tested before, the run is added to that board as
+    the next run number (after an optional repair record); nothing from earlier runs is changed.
+    preset skips the "tested before" question: "retest", "repair" (repair, then retest) or "repair_only"."""
+    serial = entry["serial"].strip()
     if not disable_hwdb:
         ui.status("Renewing the HWDB token…")
         await renew_token_if_needed()
 
-    q = qc_record(entry["serial"].strip(), entry["tester"])
+    q = qc_record(serial, entry["tester"])
     watch(q, ui)
     plan_list = board_plan()
     plan = {s.key: s for s in plan_list}
     ui.begin("board", q.serial_number, q.tester_name, plan_list)
     lg.info(f"Starting new PTC Test Session for {q.serial_number}")
-    if not disable_hwdb:
-        await check_hwdb(ui)
+    use_hwdb = await check_hwdb(ui) if not disable_hwdb else False
+
+    # one serial, one board: find every earlier run and repair before testing
+    ui.status(f"Looking up {serial}…")
+    hist = await load_history(serial, use_hwdb)
+    if hist.duplicate:
+        await ui.stopped(duplicate_message(hist), title=f"{serial} has {len(hist.part_ids)} entries in the HWDB")
+        return
+    if hist.hwdb_error and not await ui.confirm(
+            "Earlier runs couldn’t be checked", f"{hist.hwdb_error} Carry on with the test?",
+            yes="Carry on", no="Stop"):
+        raise TestAborted()
+    retake_photos = True
+    if hist.found:
+        choice = preset or await ui.ask_retest_choice(hist.view())
+        if choice == "cancel":
+            return
+        last = hist.last_run
+        q.run_number = hist.next_run_number
+        q.follows_run = last["n"] if last else None
+        if choice in ("repair", "repair_only"):
+            repair, where = await record_repair(ui, hist, q.tester_name, use_hwdb)
+            if choice == "repair_only":
+                await ui.stopped(f"Repair {repair['n']} for {serial} was saved {where}. The board is on the "
+                                 "Waiting for a retest list until it’s retested.", title=f"Repair {repair['n']} saved")
+                return
+            ui.status(f"Repair {repair['n']} saved {where}.")
+            q.run_type, q.after_repair = "Retest after repair", repair["n"]
+            ui.set_run(f"Run {q.run_number}, after repair {repair['n']}")
+        else:
+            q.run_type = "Retest"
+            q.retest_reason = (await ui.ask_text(STEP_RETEST_REASON)).strip()
+            ui.saved("retest_reason", q.retest_reason)
+            ui.set_run(f"Run {q.run_number}, retest")
+            retake_photos = False   # the board hasn't changed, so the first photos still stand
+    elif preset == "repair_only":
+        await ui.stopped(f"{serial} hasn’t been tested yet, so there’s nothing to repair against.", title="No runs yet")
+        return
 
     # 4.1.3 photos of the front and back, kept here and uploaded to the HWDB with the results
     photos = {}
-    for side, step in (("front", STEP_PHOTO_FRONT), ("back", STEP_PHOTO_BACK)):
+    if not retake_photos:
+        ui.skipped([STEP_PHOTO_FRONT.key, STEP_PHOTO_BACK.key])
+    for side, step in (("front", STEP_PHOTO_FRONT), ("back", STEP_PHOTO_BACK)) if retake_photos else ():
         photo = await ui.ask_photo(step, side)
         path = save_board_photo(q.serial_number, photo)
         photos[side] = photo
@@ -233,13 +480,25 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
     # the Enclustra label is a Data Matrix code holding only the 10 digit serial printed beside it
     while True:
         q.som_serial = (await ui.ask_text(STEP_SOM_SERIAL)).strip()
-        if q.som_serial.isdigit() and len(q.som_serial) == 10:
-            break
-        if await ui.confirm("Check the SoM serial",
-                            f"{q.som_serial or 'That'} doesn’t look like a 10 digit Enclustra serial. Keep it anyway?",
-                            yes="Keep it", no="Scan again"):
-            break
-    ui.saved("som_serial", q.som_serial)
+        if not (q.som_serial.isdigit() and len(q.som_serial) == 10) and not await ui.confirm(
+                "Check the SoM serial",
+                f"{q.som_serial or 'That'} doesn’t look like a 10 digit Enclustra serial. Keep it anyway?",
+                yes="Keep it", no="Scan again"):
+            continue
+        # a SoM should only ever be on one PTC: warn (don't block) if it was recorded on another
+        others = board_records.boards_with_som(q.som_serial, serial)
+        if others:
+            o = others[0]
+            if not await ui.confirm(
+                    "This SoM is already recorded on another board",
+                    f"SoM {q.som_serial} was recorded on {o['serial']} in run {o['run']} on {o['date']}. A SoM should "
+                    "only be on one PTC. If it was moved to this board on purpose, keep it and the move is noted with "
+                    "the results. Otherwise scan the SoM again.",
+                    yes="Keep it, the SoM was moved", no="Scan again"):
+                continue
+            q.som_moved_from = o["serial"]
+        break
+    ui.saved("som_serial", q.som_serial + (f", moved from {q.som_moved_from}" if q.som_moved_from else ""))
     await run_manual_tests(ui, q, som_boot_tests)
     q.ambient_temperature = await ui.ask_number(STEP_AMBIENT)
     ui.saved("ambient_temperature", f"{q.ambient_temperature:g} °C")
@@ -281,6 +540,14 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
                 _, values = await run_remote_test(ui, plan, ws, q, t['test_type'], t['test_params'], t.get('test_name'))
                 if t['test_type'] == 'eeprom' and values:
                     q.eeprom_serial = values.get('eeprom_serial')
+                    others = board_records.boards_with_eeprom(q.eeprom_serial, serial)
+                    if others:
+                        q.eeprom_also_on = [o["serial"] for o in others]
+                        await ui.instruct(
+                            "This EEPROM ID is already recorded on another board",
+                            f"EEPROM ID {q.eeprom_serial} was also recorded on {', '.join(q.eeprom_also_on)}. Each PTC "
+                            "should have its own. The test carries on and this is noted with the results; please tell "
+                            "a Penn electronics engineer, as the serial label may be on the wrong board.")
 
             # 4.5.1 sensors: all converters on at 25% load
             ui.status("Turning on the WIB outputs and setting 25% load…")
@@ -340,25 +607,36 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
         q.tester_notes = notes
 
     if disable_hwdb:
-        await ui.finish(q, f"HWDB upload is off (--disable-hwdb), so nothing was uploaded. The photos are in "
-                           f"{parameters.photo_dir}.", None)
+        board_records.save_run(q, hist.part_id, uploaded=False)
+        await ui.finish(q, f"HWDB upload is off (--disable-hwdb), so nothing was uploaded. Run {q.run_number} and the "
+                           f"photos are saved on this station.", None)
         return
-    part_id, results_uploaded, photos_uploaded = None, False, []
+    part_id, results_uploaded, photos_uploaded = hist.part_id, False, []
     try:
-        from ptctestsuite.utils.hwdb import upload_ptc_image, upload_test_result, create_hwdb_item
+        from ptctestsuite.utils.hwdb import upload_ptc_image, upload_test_result, create_hwdb_item, find_parts, HwdbError
         await renew_token_if_needed()
         ui.status("Uploading the results to the HWDB…")
-        r = await create_hwdb_item(q)
-        part_id = r['part_id']
+        if part_id is None:
+            # check again: the HWDB may have been unreachable when the run started
+            existing = await find_parts(serial)
+            if len(existing) > 1:
+                raise HwdbError(f"{serial} now has {len(existing)} HWDB entries "
+                                f"({', '.join(e['part_id'] for e in existing)}). Nothing was added to any of them.")
+            if existing:
+                part_id = existing[0]["part_id"]
+                lg.warning(f"{serial} already had HWDB entry {part_id}; adding run {q.run_number} to it")
+            else:
+                part_id = (await create_hwdb_item(q))['part_id']
         await upload_test_result(q, part_id)
         results_uploaded = True
         for side, photo in photos.items():
             ui.status(f"Uploading the {side} photo to the HWDB…")
             await upload_ptc_image(part_id, photo.data, filename=q.photos[side],
-                                   comments=f"Board photo, {side}", mime=photo.mime)
+                                   comments=f"Run {q.run_number}, board photo, {side}", mime=photo.mime)
             photos_uploaded.append(side)
     except Exception as e:
         lg.exception(e)
+        board_records.save_run(q, part_id, uploaded=results_uploaded)
         if not results_uploaded:
             _save_unuploaded(q)
             message = (f"The HWDB upload failed. {e} The results were saved to {parameters.unuploaded_results_file} "
@@ -370,7 +648,9 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
                        f"rather than running the test again.")
         await ui.finish(q, message, False)
         return
-    await ui.finish(q, "Uploaded the results and the front and back photos to the HWDB.", True)
+    board_records.save_run(q, part_id, uploaded=True)
+    what = "the results and the front and back photos" if photos else "the results"
+    await ui.finish(q, f"Uploaded {what} to the HWDB as run {q.run_number} of {serial} ({part_id}).", True)
 
 
 # ---- shipment entry -----------------------------------------------------------
@@ -422,6 +702,51 @@ async def run_reception_check(ui: TesterUI, entry: dict, disable_hwdb: bool = Fa
 
 # ---- main loop ----------------------------------------------------------------
 
+async def run_lookup(ui: TesterUI, entry: dict, debug: bool = False, disable_hwdb: bool = False):
+    """Look up a board by serial (read-only). From its history the tester can start a retest
+    or record a repair, which run through the normal board test."""
+    query = entry["query"].strip()
+    use_hwdb = False
+    if not disable_hwdb:
+        from ptctestsuite.utils.hwdb import check_connection, HwdbError
+        try:
+            await renew_token_if_needed()
+            await check_connection()
+            use_hwdb = True
+        except Exception as e:
+            lg.warning(f"Lookup without the HWDB: {e}")
+    while True:
+        if "*" in query or "?" in query:
+            rows = board_records.search(query)
+            query = await ui.pick_board(query, rows)
+            if not query:
+                return
+            continue
+        h = await load_history(query, use_hwdb)
+        if not h.found:
+            near = board_records.search(query)
+            if near:
+                query = await ui.pick_board(query, near)
+                if not query:
+                    return
+                continue
+            where = ("this station’s records or the HWDB" if use_hwdb else
+                     "this station’s records (the HWDB is switched off)" if disable_hwdb else
+                     "this station’s records (the HWDB couldn’t be reached)")
+            await ui.stopped(f"No board with serial {query} was found in {where}.", title="Board not found")
+            return
+        if not use_hwdb and h.hwdb_error is None:
+            h.hwdb_error = ("HWDB lookup is switched off (--disable-hwdb), so only this station’s records are shown."
+                            if disable_hwdb else "The HWDB couldn’t be reached, so only this station’s records are shown.")
+        action = await ui.show_board(h.view())
+        if action == "retest":
+            await run_ptc_test(ui, {"mode": "board", "tester": entry["tester"], "serial": query}, debug, disable_hwdb)
+        elif action in ("repair", "repair_only"):
+            await run_ptc_test(ui, {"mode": "board", "tester": entry["tester"], "serial": query}, debug, disable_hwdb,
+                               preset="repair_only")
+        return
+
+
 async def main_loop(ui: TesterUI, debug: bool = False, disable_hwdb: bool = False):
     renewal_needed.set()  # always renew the token on launch
     renewal_task = asyncio.create_task(token_renew_signal())
@@ -433,6 +758,8 @@ async def main_loop(ui: TesterUI, debug: bool = False, disable_hwdb: bool = Fals
             try:
                 if entry["mode"] == "board":
                     await run_ptc_test(ui, entry, debug=debug, disable_hwdb=disable_hwdb)
+                elif entry["mode"] == "lookup":
+                    await run_lookup(ui, entry, debug=debug, disable_hwdb=disable_hwdb)
                 else:
                     await run_reception_check(ui, entry, disable_hwdb=disable_hwdb)
             except TestAborted:

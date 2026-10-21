@@ -16,7 +16,8 @@ from loguru import logger as lg
 
 from ptctestsuite.config import parameters
 
-SIDES = ("front", "back")
+SIDES = ("front", "back")                 # sides with a ghost image
+PHOTO_SIDES = SIDES + ("closeup",)        # close-ups of a defect or repair have no ghost
 MIME_EXT = {"image/jpeg": ".jpg", "image/png": ".png"}
 EXT_MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
 
@@ -55,8 +56,8 @@ _DATA_URL = re.compile(r"^data:([\w/+.-]+);base64,(.*)$", re.S)
 
 def from_data_url(side: str, url: str, source: str = "camera") -> Photo:
     """Decodes an image sent by the GUI as a data: URL."""
-    if side not in SIDES:
-        raise PhotoError("Unknown board side.")
+    if side not in PHOTO_SIDES:
+        raise PhotoError("Unknown kind of photo.")
     m = _DATA_URL.match(url or "")
     if not m:
         raise PhotoError("No image was received. Take the photo again.")
@@ -93,6 +94,10 @@ def save_board_photo(serial: str, photo: Photo) -> Path:
     folder.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     path = folder / f"{_safe(serial)}-{photo.side}-{stamp}{photo.ext}"
+    n = 2
+    while path.exists():   # several close-ups can be taken in the same second
+        path = folder / f"{_safe(serial)}-{photo.side}-{stamp}-{n}{photo.ext}"
+        n += 1
     path.write_bytes(photo.data)
     lg.info(f"Saved {photo.side} photo of {serial} to {path}")
     return path
