@@ -137,3 +137,24 @@ reception_checks = {
 
 # kept for backwards compatibility with older imports
 manual_tests = pre_som_tests
+
+
+# 4.2.3 Preparing the test stand: done after the board photos and before the power checks.
+# Each row is saved to the HWDB under its key. kind "power" also asks for the QC board's supply
+# voltage and current; kind "network" is checked by the program (SSH to parameters.qc_ip).
+prep_checklist = [
+    {"key": "prep_cables_connected", "title": "Cables plugged in, power off",
+     "detail": "The strain relief holds the cables coming down from the supply hutch."},
+    {"key": "prep_ptc_seated", "title": "PTC seated on the QC board",
+     "detail": "In the black guardrails, pressed down evenly until the Samtec connectors are flush."},
+    {"key": "prep_qc_board_power", "title": "QC board powered", "kind": "power",
+     "detail": "Read the 24 V supply’s display. After a few seconds the amber LED on the QC board’s Enclustra blinks."},
+    {"key": "prep_qc_board_network", "title": "QC board on the network", "kind": "network",
+     "detail": "The program checks the QC board answers."},
+    {"key": "prep_fans_on", "title": "Fans on", "detail": "12 V fan supply, CH2 on the lab supply."},
+    {"key": "prep_sd_card", "title": "SD card inserted in the PTC",
+     "detail": "Pushed in until it clicks. If it won’t go in, it may be upside down. Don’t force it."},
+    {"key": "prep_jumpers", "title": "Jumpers fitted", "detail": "JT9, JT10 and JT11 at position 2–3. No other jumpers."},
+    {"key": "prep_dip_film_removed", "title": "Film removed from SWT1 and SWT2",
+     "detail": "Peel the amber film off both DIP switches."},
+]

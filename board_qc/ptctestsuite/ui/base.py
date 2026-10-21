@@ -26,10 +26,14 @@ class Step:
     kind: str = "manual"          # manual, auto, scan, counts, number, notes, photo
     limits: tuple | None = None   # (lo, hi); hi may be None for "more than lo"
     unit: str | None = None
+    how: list | None = None       # "How to run this test": short instructions, one per line
+    hidden: bool = False          # recorded and shown in the results, but not listed on its own in the step list
 
     @property
     def acceptance(self) -> str | None:
         unit = f" {'µs' if self.unit == 'us' else self.unit}" if self.unit else ""
+        if self.kind == "yesno":
+            return "Yes"   # every yes/no question is worded so that Yes is the good answer
         if self.limits is None:
             return None
         lo, hi = self.limits
@@ -206,6 +210,15 @@ class TesterUI:
 
     async def ask_notes(self) -> str:
         raise NotImplementedError
+
+    async def ask_checklist(self, step: Step, items: list[dict], network: dict, previous: dict | None = None) -> dict:
+        """The test stand checklist. items are config.test_names.prep_checklist; network is the
+        program's check of the QC board ({"ok": bool, "detail": str}). Returns {"ticks": {key: True},
+        "voltage": float, "current": float}, or {"recheck": True} to run the network check again."""
+        raise NotImplementedError
+
+    async def after_auto(self, step: Step, result: qc_result, value_text: str) -> None:
+        """An automatic test has finished. The GUI shows its result and waits for Next test."""
 
     async def ask_photo(self, step: Step, side: str, optional: bool = False):
         """A photo: "front" or "back" of the board (with a ghost image), or a "closeup" of a defect or

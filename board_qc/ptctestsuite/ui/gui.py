@@ -303,6 +303,34 @@ class GuiUI(TesterUI):
         v = await self._ask("counts", step, check)
         return float(v["ordered"]), float(v["received"])
 
+    async def ask_checklist(self, step, items, network, previous=None):
+        manual = [i["key"] for i in items if i.get("kind") != "network"]
+
+        def check(v):
+            if not isinstance(v, dict):
+                return "Fill in the checklist first."
+            if v.get("recheck"):
+                return None
+            ticks = v.get("ticks") or {}
+            left = [k for k in manual if not ticks.get(k)]
+            if left:
+                return f"{len(left)} {'row' if len(left) == 1 else 'rows'} left to tick."
+            if not (_is_number(v.get("voltage")) and _is_number(v.get("current"))):
+                return "Enter the QC board voltage and current."
+            return None
+
+        prev = previous if previous and not previous.get("recheck") else (previous or {}).get("keep")
+        v = await self._ask("checklist", step, check, items=items, network=network, previous=prev,
+                            limits={"voltage": parameters.qc_board_supply_v_limits,
+                                    "current": parameters.qc_board_current_ma_limits})
+        if v.get("recheck"):
+            return {"recheck": True, "keep": v.get("keep")}
+        return {"ticks": {k: True for k in manual if v["ticks"].get(k)},
+                "voltage": float(v["voltage"]), "current": float(v["current"])}
+
+    async def after_auto(self, step, result, value_text):
+        await self._ask("autodone", step, result=result.name, value=value_text)
+
     async def ask_photo(self, step, side, optional=False):
         got = {}
 

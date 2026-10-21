@@ -9,6 +9,7 @@ from websockets.asyncio.client import connect
 
 from ptctestsuite.config import parameters
 from ptctestsuite.config.test_names import test_sequence
+from ptctestsuite.config.test_names import prep_checklist
 from ptctestsuite.config.test_names import (pre_som_tests, som_boot_tests, alert_led_tests, crate_address_tests,
                                             timing_tests, ethernet_tests, mcu_tests, ripple_full_load,
                                             load_steps, load_tolerance, reception_checks)
@@ -67,10 +68,33 @@ STEP_BATCH = Step("batch_number", "Batch number", "4.1", "Enter the production b
                   "Shipment", kind="scan")
 STEP_PHOTO_FRONT = Step("photo_front", "Front photo", "4.1.3",
                         "Put the board front side up under the camera, line it up with the ghost image and "
-                        "take the photo. You can choose an image file instead.", "Board photos", kind="photo")
+                        "take the photo. You can choose an image file instead.", "Board photos", kind="photo", how=[
+    "Take the PTC out of the test stand, if it’s in. Wear your ESD strap.",
+    "Lay it on the mat under the camera, front side (components and front panel) up. The SoM isn’t fitted yet.",
+    "Move the board until its edges, connectors and mounting holes sit under the ghost outline. Use the Ghost "
+    "slider to fade it in and out.",
+    "Check there’s no glare on the chips and the serial label is readable.",
+    "Press Take photo, or Space. Look at it and press Retake if it’s blurry or out of line.",
+    "No ghost yet? This is the first board. If the photo is well lined up, leave “Save as the ghost” ticked so the "
+    "next boards line up to it.",
+    "Took the photo with another camera? Use Choose file instead."])
 STEP_PHOTO_BACK = Step("photo_back", "Back photo", "4.1.3",
                        "Turn the board over, line it up with the ghost image and take the photo.",
-                       "Board photos", kind="photo")
+                       "Board photos", kind="photo", how=[
+    "Turn the board over without moving the camera or lights.",
+    "Line it up with the back ghost the same way.",
+    "Press Take photo, check it, and retake if needed.",
+    "No back ghost yet? Leave “Save as the ghost” ticked on a good photo."])
+STEP_PREP = Step("prep", "Prepare the test stand", "4.2.3",
+                 "Seat the PTC on the QC board and power the QC board up. Tick each row as you do it.",
+                 "Test stand preparation", kind="checklist", how=[
+    "Work down the list. Each row says what to check.",
+    "Read the voltage and current on the 24 V supply’s display once the amber LED on the QC board starts blinking.",
+    "If the amber LED stays solid or doesn’t light, stop and call a Penn electronics engineer.",
+    "The network check runs by itself. If it fails, check the Ethernet cable and give the QC board time to boot, "
+    "then press Check again.",
+    "Every row and both readings go to the HWDB with the results."])
+
 STEP_RETEST_REASON = Step("retest_reason", "Reason for the retest", "Retest",
                           "Why is this board being retested without a repair? For example: loose cable on the "
                           "QC board, wrong jumper, scope set up wrong.", "Retest", kind="scan")
@@ -81,7 +105,9 @@ def _load_pct(amps: float) -> int:
 
 def board_plan() -> list[Step]:
     g = "Power checks, no SoM"
-    plan = [STEP_PHOTO_FRONT, STEP_PHOTO_BACK]
+    plan = [STEP_PHOTO_FRONT, STEP_PHOTO_BACK, STEP_PREP]
+    plan += [Step(t["key"], t["title"], "4.2.3", t["detail"], "Test stand preparation", kind="check", hidden=True)
+             for t in prep_checklist]
     plan += [Step.from_man_test(t, g) for t in pre_som_tests]
     g = "SoM and boot"
     plan += [STEP_SOM_SERIAL] + [Step.from_man_test(t, g) for t in som_boot_tests] + [STEP_AMBIENT]
@@ -155,8 +181,8 @@ async def run_manual_tests(ui: TesterUI, q: qc_record, tests: list):
                 ok, value = await ui.ask_judged(step)
                 q.add_result(test.test_name, qc_result(int(ok)), _number_or_text(value), test.unit)
             else:
-                ok = await ui.ask_yesno(step)
-                q.add_result(test.test_name, qc_result(int(ok)), None, test.unit)
+                ok = await ui.ask_yesno(step)   # worded so that Yes is the good answer
+                q.add_result(test.test_name, qc_result(int(ok)), "Yes" if ok else "No", test.unit)
 
 async def run_remote_test(ui: TesterUI, plan: dict, ws, q: qc_record | None, test_type: str,
                           test_params: dict | None = None, test_name: str | None = None, limits=None,
@@ -174,6 +200,8 @@ async def run_remote_test(ui: TesterUI, plan: dict, ws, q: qc_record | None, tes
     lg.info(f"{t['test_name']} -> {result.name}")
     if q is not None:
         q.add_result(msg['test_name'], result, values, unit, limits)
+        step = plan.get(msg['test_name']) or _auto(msg['test_name'], "", "", "")
+        await ui.after_auto(step, result, format_value(values, unit))
     return result, values
 
 async def run_load_tests(ui, plan, ws, q: qc_record, qc: qc_board_handler):
@@ -184,7 +212,8 @@ async def run_load_tests(ui, plan, ws, q: qc_record, qc: qc_board_handler):
             name = f"load{n}_{_load_pct(amps)}pct"
             ui.running(plan[name])
             if not await qc.set_load(n, value):
-                q.add_result(name, qc_result.ERROR)
+                q.add_result(name, qc_result.ERROR, "The QC board load couldn’t be set")
+                await ui.after_auto(plan[name], qc_result.ERROR, "The QC board load couldn’t be set")
                 continue
             await run_remote_test(ui, plan, ws, q, "qc_iv_sensors",
                                   {"converters": [n], "i_min": amps - load_tolerance, "i_max": amps + load_tolerance},
@@ -398,6 +427,51 @@ async def record_repair(ui: TesterUI, h: BoardHistory, tester: str, use_hwdb: bo
     return repair, where
 
 
+# ---- test stand checklist ------------------------------------------------------
+
+async def check_qc_board_network(debug: bool) -> dict:
+    """Whether the QC board answers on its SSH port, which is how the program talks to it."""
+    if debug:
+        return {"ok": True, "detail": "Not checked in debug mode."}
+    try:
+        _, writer = await asyncio.wait_for(asyncio.open_connection(parameters.qc_ip, 22),
+                                           parameters.qc_board_network_timeout)
+        writer.close()
+        return {"ok": True, "detail": f"Answered at {parameters.qc_ip}."}
+    except (OSError, asyncio.TimeoutError):
+        return {"ok": False, "detail": f"No answer from {parameters.qc_ip}. Check the Ethernet cable and give the QC "
+                                       "board time to finish booting, then press Check again."}
+
+
+async def run_prep_checklist(ui: TesterUI, q: qc_record, debug: bool) -> None:
+    """Procedure 4.2.3. Every row is saved under its own key; the QC board supply voltage and
+    current are checked against qc_board_supply_v_limits and qc_board_current_ma_limits."""
+    network = await check_qc_board_network(debug)
+    answer = None
+    while True:
+        answer = await ui.ask_checklist(STEP_PREP, prep_checklist, network, answer)
+        if not answer.get("recheck"):
+            break
+        network = await check_qc_board_network(debug)
+    v_lo, v_hi = parameters.qc_board_supply_v_limits
+    i_lo, i_hi = parameters.qc_board_current_ma_limits
+    all_ok = True
+    for item in prep_checklist:
+        key, kind = item["key"], item.get("kind")
+        if kind == "network":
+            ok = network["ok"]
+            q.add_result(key, qc_result(int(ok)), network["detail"])
+        elif kind == "power":
+            volts, milliamps = float(answer["voltage"]), float(answer["current"])
+            ok = v_lo <= volts <= v_hi and i_lo <= milliamps <= i_hi
+            q.add_result(key, qc_result(int(ok)), {"voltage_v": volts, "current_ma": milliamps})
+        else:
+            ok = bool(answer["ticks"].get(key))
+            q.add_result(key, qc_result(int(ok)), "Yes" if ok else "No")
+        all_ok = all_ok and ok
+    ui.result(STEP_PREP.key, qc_result(int(all_ok)), f"{float(answer['voltage']):g} V, {float(answer['current']):g} mA")
+
+
 # ---- board test ---------------------------------------------------------------
 
 async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_hwdb: bool = False,
@@ -465,6 +539,9 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
         photos[side] = photo
         q.photos[side] = path.name
         ui.saved(step.key, path.name)
+
+    # 4.2.3 test stand checklist: seat the board and power the QC board up
+    await run_prep_checklist(ui, q, debug)
 
     # 4.3 manual tests, done before the SoM is installed
     if await ui.confirm("Power checks without the SoM",
@@ -587,9 +664,11 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
             with gbe_test(ptc_ip) as t:
                 r = await asyncio.to_thread(t.run_test)
                 q.add_result("gbe_ping", r, t.values)
+                await ui.after_auto(plan["gbe_ping"], r, format_value(t.values))
             ui.running(plan["gbe_throughput"])
             r, rate = await gbe_throughput_test(ptc_ip)
             q.add_result("gbe_throughput", r, rate, "MB/s", (parameters.throughput_min_mb_s, None))
+            await ui.after_auto(plan["gbe_throughput"], r, format_value(rate, "MB/s"))
         await run_manual_tests(ui, q, ethernet_tests)
 
         # 4.5.3 microcontroller and EtherCAT, from the Windows machine

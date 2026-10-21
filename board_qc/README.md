@@ -43,14 +43,16 @@ shipment, or **Look up a board** (see Board history, retests and repairs below).
 
 ### Production board entry
 
-One run per PTC board. The tester scans or types the board serial and their name, then the
-steps follow the procedure in order. Section numbers in brackets refer to the procedure.
+One run per PTC board. The tester enters their name and scans the board serial while the board
+is on the bench, takes the front and back photos, works through the test stand checklist, and
+then the steps follow the procedure in order. Section numbers refer to the procedure.
 
 | Section | Steps | How the result is decided |
 | --- | --- | --- |
 | 4.1.3 | Photos of the front and back of the board | Saved, no pass/fail; see Board photos below |
+| 4.2.3 | Test stand checklist: cables, PTC seated, QC board powered (24 V supply voltage and current read from the display), QC board on the network, fans, SD card, jumpers, DIP switch film | Each row saved as its own result (`prep_...`). The voltage and current must be inside `qc_board_supply_v_limits` and `qc_board_current_ma_limits`; the network row is checked by the program (SSH to `qc_ip`) |
 | 4.3 | With the SoM not installed: 48V current, VP12_LOCAL, RIPPLE_0..5 voltage and switching period, LEDs | Tester enters the reading; checked against the procedure's limits |
-| 4.3.2 | SoM serial (scanned from the Enclustra Data Matrix, 10 digits), insertion, boot current, LEDs, serial console, 5 repeat boots | Mixed: readings with limits, yes/no for LEDs |
+| 4.3.2 | SoM serial (scanned from the Enclustra Data Matrix, 10 digits), insertion, boot current, LEDs, serial console, 5 repeat boots | Mixed: readings with limits, Yes/No for LEDs |
 | 4.5 | EEPROM ID, memory (`fillmem`), PTC and QC board IV sensors, temperature sensors | Automatic, run by the on-board client |
 | 4.5.1 | Alerts, and the OVER TEMP LED | Automatic, then a yes/no for the LED |
 | 4.4.1 | DC-DC load test at 25/50/75/100% on each converter, plus the RMS ripple on the scope at full load | Automatic current check (1.5/3/4.5/6 A ± 100 mA); ripple entered by the tester |
@@ -67,6 +69,30 @@ minutes.
 Every reading is saved with its value and unit, not only PASS or FAIL. The record also holds
 the SoM serial, EEPROM ID, room temperature, tester notes and an overall result, and it is
 uploaded to the HWDB as a "QC Test" on the board's entry, with the front and back photos.
+
+### Answering the steps in the GUI
+
+The step list on the left shows every step, the current one and a pass/fail dot for each one
+done. Answering a step only fills in the page; **Next test** (bottom right, or Enter) moves on,
+and stays greyed out with a note saying what's missing until the page is complete:
+
+- **Yes/No questions.** Everything the tester observes (LEDs, insertion, switches, reviews) is
+  asked as Yes or No, worded so that Yes is the good answer. The answer is saved as `Yes` or
+  `No` with PASS or FAIL. Keys: Y and N.
+- **Readings** need a number. A reading outside the limits still unlocks Next test, with a
+  warning that it will be saved as FAIL, so a typo can be caught first.
+- **Pass/Fail** is only used where the tester judges a reading with no fixed limit (boot
+  current, timing round trip).
+- **Automatic tests** show their result and wait for Next test, so the tester sees every one.
+- **The test stand checklist** unlocks Next test when every row is ticked and the voltage and
+  current are entered. If the QC board isn't answering, Check again runs the network check again.
+
+Steps can carry a **How to run this test** panel on the right with short instructions. Hide
+folds it away (remembered on the station) and a button brings it back. The instructions live
+on each step (`how=` on `Step`); the photo and checklist steps have them so far.
+
+Confirmations and the retest choice have their own buttons instead of Next test. Terminal mode
+(`--terminal`) asks the same questions with prompts.
 
 ### Board photos
 
@@ -146,6 +172,16 @@ HWDB can't be reached. The HWDB stays the master copy.
 the dev HWDB and checks that the serial search works, that a second QC Test record is kept
 alongside the first, whether the `Repair` test type exists, and that photos attach. It refuses
 to run against the production HWDB.
+
+## The UI designer
+
+`ui-designer/ptc-gui-designer.html` is a working preview of the GUI for trying out colors,
+text and layout, and for reviewing each test before it's built. Open it in any browser; it
+needs nothing else. The **Test mockups** list shows specific tests and screens (start, photos,
+test stand checklist, lookup, history, retest, repair, duplicate serial, SoM warning), and
+**Fill this step with an example** fills in the current step so Next test can be pressed.
+**Copy summary** gives the colors and layout as text; the colors map to the variables at the top
+of `ptctestsuite/ui/static/index.html`.
 
 ## The HWDB
 

@@ -95,6 +95,43 @@ textarea.field { font: 1.05em var(--g-font); height: 140px; width: 100%; max-wid
 .btn:focus-visible { outline: 2px solid var(--g-ink); outline-offset: 2px; }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn.pri { background: var(--g-accent); border-color: var(--g-accent); color: var(--g-on-accent); }
+.btn.pri:disabled { background: var(--g-line); border-color: var(--g-line); color: var(--g-dim); opacity: 1; cursor: not-allowed; }
+.btn.opt { min-width: 170px; background: transparent; }
+.btn.opt.y { border-color: var(--g-accent); color: var(--g-ink); } .btn.opt.y.on { background: var(--g-accent); color: var(--g-on-accent); }
+.btn.opt.p { border-color: var(--g-pass); color: var(--g-pass); } .btn.opt.p.on { background: var(--g-pass); color: var(--g-on-pass); }
+.btn.opt.f { border-color: var(--g-fail); color: var(--g-fail); } .btn.opt.f.on { background: var(--g-fail); color: var(--g-on-fail); }
+.main.with-how { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 26px; align-items: start; }
+.stepcol { display: flex; flex-direction: column; gap: 16px; min-width: 0; min-height: 100%; }
+.howcard { background: var(--g-side); border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 14px 16px; font-size: .9em; position: sticky; top: 0; }
+.howhd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.howhd span { font-size: .84em; font-weight: 600; color: var(--g-dim); letter-spacing: .05em; text-transform: uppercase; }
+.howbtn { background: none; border: 1px solid var(--g-line); border-radius: var(--g-r); color: var(--g-dim); font: .85em var(--g-font); padding: 3px 9px; cursor: pointer; }
+.howcard ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 7px; }
+.howcard li::marker { color: var(--g-dim); font-family: var(--g-mono); }
+.nextbar { margin-top: auto; display: flex; align-items: flex-end; gap: 16px; padding-top: 8px; }
+.nextbar .last { margin-top: 0; flex: 1; min-width: 0; }
+.nextwrap { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; margin-left: auto; }
+.btn.next { min-width: 220px; }
+.nexthint { font-size: .86em; color: var(--g-dim); min-height: 1.2em; text-align: right; }
+.nexthint.warn { color: var(--g-warn); }
+.autores { display: flex; gap: 14px; align-items: center; font-size: 1.1em; flex-wrap: wrap; }
+.autores b { font-family: var(--g-mono); font-weight: 500; }
+.clh { display: flex; justify-content: space-between; align-items: baseline; }
+.clh span { font: .85em var(--g-mono); color: var(--g-dim); }
+.cl { display: flex; flex-direction: column; gap: 6px; max-width: 900px; }
+.ci { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 12px; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); cursor: pointer; }
+.ci:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 1px; }
+.ci .box { width: 26px; height: 26px; border: 2px solid var(--g-dim); border-radius: calc(var(--g-r) / 2 + 1px); display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--g-on-pass); }
+.ci.on { border-color: color-mix(in srgb, var(--g-pass) 55%, var(--g-line)); }
+.ci.on .box { background: var(--g-pass); border-color: var(--g-pass); }
+.ci.auto { cursor: default; border-style: dashed; }
+.ci.auto.ok .box { background: var(--g-auto); border-color: var(--g-auto); color: #fff; }
+.ci.auto.bad { border-color: var(--g-fail); } .ci.auto.bad .box { border-color: var(--g-fail); color: var(--g-fail); }
+.ci .t { font-weight: 500; } .ci .d { display: block; font-size: .84em; color: var(--g-dim); }
+.ci .tag2 { font-size: .78em; color: var(--g-auto); white-space: nowrap; }
+.ci .pw { display: flex; gap: 6px; align-items: center; }
+.ci .pw .field { height: 42px; width: 92px; font-size: 1.05em; padding: 0 10px; }
+.ci .pw .unit { font-size: 1em; }
 .btn.pass { background: var(--g-pass); border-color: var(--g-pass); color: var(--g-on-pass); min-width: 170px; }
 .btn.fail { background: var(--g-fail); border-color: var(--g-fail); color: var(--g-on-fail); min-width: 170px; }
 .msg { font-size: .95em; min-height: 1.4em; }
@@ -243,7 +280,7 @@ function answer(value) {
 
 // ---- top bar ----
 function renderTop() {
-  const plan = S.plan || [], done = plan.filter(p => S.results[p.key]).length;
+  const plan = (S.plan || []).filter(p => !p.hidden), done = plan.filter(p => S.results[p.key]).length;
   const isRun = S.screen === "run";
   const meta = S.screen === "start" ? "" : `<div class="meta"><div>Tester<b>${esc(S.tester)}</b></div>
     <div>${S.mode === "ship" ? "Purchase order" : "PTC serial"}<b>${esc(S.ident)}</b></div>
@@ -262,9 +299,10 @@ function renderTop() {
 function currentKey() { return S.ask && S.ask.step ? S.ask.step.key : S.running ? S.running.key : null; }
 function renderSide() {
   const cur = currentKey(); let html = "", grp = null;
-  const firstPending = (S.plan.find(p => !S.results[p.key]) || {}).key;
-  const hl = cur && S.plan.some(p => p.key === cur) ? cur : firstPending;
-  S.plan.forEach(p => {
+  const shown = S.plan.filter(p => !p.hidden);
+  const firstPending = (shown.find(p => !S.results[p.key]) || {}).key;
+  const hl = cur && shown.some(p => p.key === cur) ? cur : firstPending;
+  shown.forEach(p => {
     if (p.group !== grp) { grp = p.group; html += `<div class="grp">${esc(grp)}</div>`; }
     const r = S.results[p.key], isCur = p.key === hl;
     html += `<div class="item ${isCur ? "cur" : r ? "done" : ""}" ${isCur ? 'id="cur"' : ""}><span class="dot ${isCur ? "cur" : r ? r.result : ""}"></span><span>${esc(p.title)}</span>${p.kind === "auto" ? '<span class="tag">auto</span>' : ""}</div>`;
@@ -274,30 +312,131 @@ function renderSide() {
 
 // ---- main panel ----
 function stepHead(st, kindLabel) {
-  const kind = kindLabel === "auto" ? '<span class="kind auto">Automatic</span>' : kindLabel === "manual" ? '<span class="kind manual">Manual check</span>' : kindLabel === "photo" ? '<span class="kind manual">Photo</span>' : "";
+  const kind = kindLabel === "auto" ? '<span class="kind auto">Automatic</span>' : kindLabel === "manual" ? '<span class="kind manual">Manual check</span>' : kindLabel === "photo" ? '<span class="kind manual">Photo</span>' : kindLabel === "checklist" ? '<span class="kind manual">Checklist</span>' : "";
   const acc = accText(st);
   return `<div class="sec">${st.section ? `<span>Section ${esc(st.section)}</span>` : ""}${kind}</div>
     <h1 class="name">${esc(st.title)}</h1><p class="prompt">${esc(st.prompt)}</p>
     ${SHOW_LIMITS && acc ? `<div class="limits"><span>Accept<b>${esc(acc)}</b></span></div>` : ""}
     ${SHOW_KEYS ? `<div class="key">Database key: ${esc(st.key)}</div>` : ""}`;
 }
+let pend = { choice: null, ticks: {} };
+function optBtns(kind) {
+  const y = kind === "yesno", L1 = y ? "Yes" : "Pass", L0 = y ? "No" : "Fail", c = pend.choice;
+  return `<button class="btn opt ${y ? "y" : "p"} ${c === true ? "on" : ""}" type="button" data-pick="1" data-label="${L1}" aria-pressed="${c === true}">${c === true ? "✓ " : ""}${L1}</button>` +
+         `<button class="btn opt ${y ? "y" : "f"} ${c === false ? "on" : ""}" type="button" data-pick="0" data-label="${L0}" aria-pressed="${c === false}">${c === false ? "✓ " : ""}${L0}</button>`;
+}
+function checklistHTML(a) {
+  const prev = a.previous || {}, ticks = pend.ticks;
+  const rows = a.items.map(it => {
+    if (it.kind === "network") {
+      const n = a.network;
+      return `<div class="ci auto ${n.ok ? "ok" : "bad"}"><span class="box">${n.ok ? "✓" : "!"}</span><span><span class="t">${esc(it.title)}</span><span class="d">${esc(n.detail)}</span></span>${n.ok ? '<span class="tag2">Checked automatically</span>' : '<button class="btn small" type="button" id="recheck">Check again</button>'}</div>`;
+    }
+    const on = !!ticks[it.key];
+    const pw = it.kind === "power" ? `<span class="pw"><input class="field mono" id="ck-v" inputmode="decimal" autocomplete="off" placeholder="24.0" value="${esc(prev.voltage ?? "")}" aria-label="QC board supply voltage"><span class="unit">V</span><input class="field mono" id="ck-i" inputmode="decimal" autocomplete="off" placeholder="400" value="${esc(prev.current ?? "")}" aria-label="QC board current"><span class="unit">mA</span></span>` : "";
+    return `<div class="ci ${on ? "on" : ""}" role="checkbox" tabindex="0" aria-checked="${on}" data-tick="${esc(it.key)}"><span class="box">${on ? "✓" : ""}</span><span><span class="t">${esc(it.title)}</span><span class="d">${esc(it.detail)}</span>${SHOW_KEYS ? `<span class="d mono">Database key: ${esc(it.key)}</span>` : ""}</span>${pw}</div>`;
+  }).join("");
+  return `<div class="clh"><b>Checklist</b><span id="ckcount"></span></div><div class="cl">${rows}</div>`;
+}
 function askHTML(a) {
   const st = a.step, u = st ? unitText(st.unit) : "";
   const unit = u ? `<span class="unit">${esc(u)}</span>` : "";
   switch (a.kind) {
-    case "number": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" inputmode="decimal" autocomplete="off">${unit}<button class="btn pri" data-a="record">Record</button></div>`;
-    case "yesno": return stepHead(st, "manual") + `<div class="entry"><button class="btn pass" data-a="yes">Pass</button><button class="btn fail" data-a="no">Fail</button></div><div class="keys">Keys: P or Y for Pass, F or N for Fail</div>`;
-    case "judged": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" inputmode="decimal" autocomplete="off">${unit}<button class="btn pass" data-a="jyes">Pass</button><button class="btn fail" data-a="jno">Fail</button></div>`;
-    case "text": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" autocomplete="off" style="width:360px" value="${esc(a.default)}"><button class="btn pri" data-a="text">Record</button></div>`;
-    case "counts": return stepHead(st, "manual") + `<div class="entry"><label class="fl">Ordered<input class="field" id="a" inputmode="numeric" autocomplete="off" style="width:160px"></label><label class="fl">Received<input class="field" id="b" inputmode="numeric" autocomplete="off" style="width:160px"></label><button class="btn pri" data-a="counts">Record</button></div>`;
+    case "number": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" inputmode="decimal" autocomplete="off">${unit}</div>`;
+    case "yesno": return stepHead(st, "manual") + `<div class="entry">${optBtns("yesno")}</div><div class="keys">Keys: Y for Yes, N for No, Enter for Next test.</div>`;
+    case "judged": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" inputmode="decimal" autocomplete="off">${unit}${optBtns("judged")}</div>`;
+    case "text": return stepHead(st, "manual") + `<div class="entry"><input class="field" id="v" autocomplete="off" style="width:360px" value="${esc(a.default)}"></div>`;
+    case "counts": return stepHead(st, "manual") + `<div class="entry"><label class="fl">Ordered<input class="field" id="a" inputmode="numeric" autocomplete="off" style="width:160px"></label><label class="fl">Received<input class="field" id="b" inputmode="numeric" autocomplete="off" style="width:160px"></label></div>`;
     case "photo": return stepHead(st, "photo") + photoHTML(a.side, a.optional);
+    case "checklist": return stepHead(st, "checklist") + checklistHTML(a);
+    case "autodone": return stepHead(st, "auto") + `<div class="autores"><span>Result</span><b>${esc(a.value || "No value")}</b>${badge(a.result)}</div>`;
     case "retest": return retestHTML(a.board);
     case "repair": return repairHTML(a.form);
-    case "notes": return stepHead(st, "") + `<div class="entry" style="flex-direction:column;align-items:stretch"><textarea class="field" id="v" placeholder="Anything unusual about this run"></textarea><div><button class="btn pri" data-a="notes">Finish and save</button></div></div>`;
+    case "notes": return stepHead(st, "") + `<div class="entry" style="flex-direction:column;align-items:stretch"><textarea class="field" id="v" placeholder="Anything unusual about this run"></textarea></div>`;
     case "instruct": return `<div class="sec"><span class="kind manual">Do this now</span></div><h1 class="name">${esc(a.title)}</h1><p class="prompt">${esc(a.text)}</p><div class="entry"><button class="btn pri" data-a="ok">Done, continue</button></div>`;
     case "confirm": return `<div class="sec"></div><h1 class="name">${esc(a.title)}</h1><p class="prompt">${esc(a.text)}</p><div class="entry"><button class="btn pri" data-a="yes">${esc(a.yes)}</button><button class="btn" data-a="no">${esc(a.no)}</button></div>`;
   }
   return "";
+}
+// what the current page still needs before Next test unlocks
+const NEXT_KINDS = ["number", "yesno", "judged", "text", "counts", "photo", "checklist", "autodone", "notes"];
+function fieldVal(id) { const el = document.getElementById(id); return el ? el.value.trim() : ""; }
+function ready(a) {
+  const st = a.step || {};
+  switch (a.kind) {
+    case "number": {
+      const raw = fieldVal("v"), n = Number(raw);
+      if (raw === "") return { ok: false, hint: "Enter the reading." };
+      if (!isFinite(n)) return { ok: false, hint: "Enter a number." };
+      if (st.limits) { const [lo, hi] = st.limits; if (n < lo || (hi !== null && n > hi)) return { ok: true, warn: true, hint: `Outside ${accText(st)}, so it will be saved as FAIL. Check it first.` }; }
+      return { ok: true };
+    }
+    case "yesno": return pend.choice === null ? { ok: false, hint: "Answer Yes or No." } : { ok: true };
+    case "judged":
+      if (fieldVal("v") === "") return { ok: false, hint: "Enter the reading." };
+      return pend.choice === null ? { ok: false, hint: "Choose Pass or Fail." } : { ok: true };
+    case "text": {
+      const raw = fieldVal("v");
+      if (!raw) return st.key === "batch_number" ? { ok: true } : { ok: false, hint: "Scan or type it." };
+      if (st.key === "som_serial" && !/^\d{10}$/.test(raw)) return { ok: true, warn: true, hint: "That isn’t 10 digits. Check it before going on." };
+      return { ok: true };
+    }
+    case "counts": {
+      const x = fieldVal("a"), y = fieldVal("b");
+      if (x === "" || y === "" || !isFinite(+x) || !isFinite(+y)) return { ok: false, hint: "Enter both quantities." };
+      return +x === +y ? { ok: true } : { ok: true, warn: true, hint: "The counts differ, so it will be saved as FAIL." };
+    }
+    case "photo": return cam.shot ? { ok: true } : { ok: false, hint: a.optional ? "Take a photo, or press Done." : "Take the photo or choose a file." };
+    case "checklist": {
+      const left = a.items.filter(i => i.kind !== "network" && !pend.ticks[i.key]).length;
+      if (left) return { ok: false, hint: `${left} ${left === 1 ? "row" : "rows"} left to tick.` };
+      const V = fieldVal("ck-v"), I = fieldVal("ck-i");
+      if (V === "" || I === "" || !isFinite(+V) || !isFinite(+I)) return { ok: false, hint: "Enter the QC board voltage and current." };
+      const [vl, vh] = a.limits.voltage, [il, ih] = a.limits.current;
+      if (+V < vl || +V > vh || +I < il || +I > ih) return { ok: true, warn: true, hint: `Outside ${vl}–${vh} V or ${il}–${ih} mA, so it will be saved as FAIL.` };
+      if (!a.network.ok) return { ok: true, warn: true, hint: "The QC board isn’t answering, so that row will be saved as FAIL." };
+      return { ok: true };
+    }
+    case "autodone": case "notes": return { ok: true };
+  }
+  return { ok: false, hint: "" };
+}
+function nextValue(a) {
+  switch (a.kind) {
+    case "number": return Number(fieldVal("v"));
+    case "yesno": return pend.choice;
+    case "judged": return { ok: pend.choice, value: fieldVal("v") };
+    case "text": case "notes": return fieldVal("v");
+    case "counts": return { ordered: +fieldVal("a"), received: +fieldVal("b") };
+    case "photo": return { image: cam.shot, source: cam.source, ghost: !!($("asGhost") && $("asGhost").checked) };
+    case "checklist": return { ticks: { ...pend.ticks }, voltage: +fieldVal("ck-v"), current: +fieldVal("ck-i") };
+    case "autodone": return true;
+  }
+}
+function updateNext() {
+  const b = document.getElementById("next"), h = document.getElementById("nexthint"), bar = document.getElementById("nextbar");
+  if (!b || !bar) return;
+  const a = S.ask;
+  const hide = a && !NEXT_KINDS.includes(a.kind);
+  bar.querySelector(".nextwrap").hidden = !!hide;
+  if (!a) { b.disabled = true; h.textContent = S.running ? "The test is running." : "Please wait."; h.className = "nexthint"; return; }
+  if (hide) return;
+  const r = ready(a);
+  b.disabled = !r.ok || sentId === a.id;
+  b.textContent = a.kind === "notes" ? "Finish and save" : "Next test";
+  h.textContent = r.hint || ""; h.className = "nexthint" + (r.warn ? " warn" : "");
+  const cnt = document.getElementById("ckcount");
+  if (cnt && a.kind === "checklist") cnt.textContent = `${a.items.filter(i => i.kind === "network" || pend.ticks[i.key]).length} of ${a.items.length} done`;
+}
+function pressNext() {
+  const a = S.ask; if (!a || !NEXT_KINDS.includes(a.kind)) return;
+  if (!ready(a).ok) { updateNext(); return; }
+  answer(nextValue(a));
+}
+function pick(v) {
+  pend.choice = v;
+  screen.querySelectorAll("[data-pick]").forEach(b => { const on = (b.dataset.pick === "1") === v; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); b.textContent = (on ? "✓ " : "") + b.dataset.label; });
+  updateNext();
 }
 const badge = r => `<span class="badge ${esc(r)}">${esc(r === "PENDING" ? "NOT RUN" : r)}</span>`;
 function failedTable(rows) {
@@ -348,15 +487,26 @@ function mainHTML() {
 }
 
 function renderRun() {
-  const plan = S.plan, done = plan.filter(p => S.results[p.key]).length;
+  const plan = S.plan.filter(p => !p.hidden), done = plan.filter(p => S.results[p.key]).length;
   const key = JSON.stringify(["run", S.ask && S.ask.id, S.running && S.running.key, S.status]);
   if (key !== viewKey || !screen.querySelector(".body")) {
     viewKey = key; pendingWarn = null;
-    screen.innerHTML = `<div class="body"><aside class="side" id="side"></aside><main class="main"><div id="mainc" style="display:flex;flex-direction:column;gap:16px"></div><div class="msg" id="msg" role="status"></div><div id="lastc" style="margin-top:auto"></div></main></div>
+    const keep = S.ask && S.ask.previous && S.ask.previous.ticks ? { ...S.ask.previous.ticks } : {};
+    pend = { choice: null, ticks: keep };
+    const st = (S.ask && S.ask.step) || S.running, how = st && st.how && st.how.length ? st.how : null;
+    const open = store.get("ptc-how-open", "1") === "1";
+    screen.innerHTML = `<div class="body"><aside class="side" id="side"></aside><main class="main ${how && open ? "with-how" : ""}"><div class="stepcol"><div id="mainc" style="display:flex;flex-direction:column;gap:16px"></div><div class="msg" id="msg" role="status"></div>
+        <div class="nextbar" id="nextbar"><div id="lastc" style="flex:1;min-width:0"></div><div class="nextwrap"><button class="btn pri next" id="next" type="button" disabled>Next test</button><span class="nexthint" id="nexthint" role="status"></span></div></div></div>
+        ${how && open ? `<aside class="howcard" aria-label="How to run this test"><div class="howhd"><span>How to run this test</span><button class="howbtn" type="button" id="howhide">Hide</button></div><ol>${how.map(h => `<li>${esc(h)}</li>`).join("")}</ol></aside>` : ""}</main></div>
       <div class="foot"><span id="cnt"></span><div class="bar"><i id="barfill"></i></div><span id="footmode"></span></div>`;
     // keep the camera running from the front photo to the back photo, stop it otherwise
     if ((S.ask && S.ask.kind !== "photo") || S.running || S.status) stopCamera();
     document.getElementById("mainc").innerHTML = mainHTML();
+    if (how && !open) { const sec = screen.querySelector("#mainc .sec"); if (sec) sec.insertAdjacentHTML("beforeend", '<button class="howbtn" type="button" id="howshow" style="margin-left:auto">How to run this test</button>'); }
+    const hh = document.getElementById("howhide"), hs = document.getElementById("howshow");
+    if (hh) hh.onclick = () => { store.set("ptc-how-open", "0"); viewKey = ""; render(); };
+    if (hs) hs.onclick = () => { store.set("ptc-how-open", "1"); viewKey = ""; render(); };
+    document.getElementById("next").onclick = pressNext;
     bindMain();
     if (S.ask && S.ask.kind === "photo") bindPhoto(S.ask.side);
     const f = screen.querySelector("#v, #a"); if (f) f.focus();
@@ -367,6 +517,7 @@ function renderRun() {
   document.getElementById("cnt").textContent = `${done} of ${plan.length} recorded`;
   document.getElementById("barfill").style.width = `${Math.round(done / Math.max(1, plan.length) * 100)}%`;
   showError();
+  updateNext();
   if (S.ask && S.ask.kind === "photo") updateGhost(S.ask.side);
   const cur = document.getElementById("cur"); if (cur) cur.scrollIntoView({ block: "nearest" });
 }
@@ -377,33 +528,12 @@ function showError() {
 
 function bindMain() {
   const a = S.ask; if (!a) return;
-  const val = id => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
+  const val = fieldVal;
   const act = (name, el) => {
-    const st = a.step;
     switch (name) {
-      case "record": {
-        const raw = val("v"), n = Number(raw);
-        if (raw === "" || !isFinite(n)) { say("Enter a number.", "err"); return; }
-        if (st.limits) {
-          const [lo, hi] = st.limits, out = n < lo || (hi !== null && n > hi);
-          if (out && pendingWarn !== raw) { pendingWarn = raw; say(`${raw} ${unitText(st.unit)} is outside ${accText(st)}. Press Record again to save it as FAIL, or correct it.`, "warn"); return; }
-        }
-        answer(n); return; }
       case "yes": answer(true); return;
       case "no": answer(false); return;
       case "ok": answer(true); return;
-      case "jyes": case "jno": {
-        const raw = val("v"); if (!raw) { say("Enter the reading first.", "err"); return; }
-        answer({ ok: name === "jyes", value: raw }); return; }
-      case "text": {
-        const raw = val("v");
-        if (!raw && st.key !== "batch_number") { say("Enter or scan a value first.", "err"); return; }
-        answer(raw); return; }
-      case "counts": {
-        const x = val("a"), y = val("b");
-        if (x === "" || y === "" || !isFinite(+x) || !isFinite(+y)) { say("Enter both quantities as numbers.", "err"); return; }
-        answer({ ordered: +x, received: +y }); return; }
-      case "notes": answer(val("v")); return;
       case "choose": answer(el.dataset.v); return;
       case "chip": { const on = !el.classList.contains("on"); el.classList.toggle("on", on); el.setAttribute("aria-pressed", on); return; }
       case "saverep": {
@@ -416,22 +546,36 @@ function bindMain() {
     }
   };
   screen.querySelectorAll("[data-a]").forEach(b => b.onclick = () => act(b.dataset.a, b));
-  screen.querySelectorAll("input.field").forEach(f => {
-    f.oninput = () => { if (document.getElementById("msg").className.includes("err")) say(""); };
+  screen.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => pick(b.dataset.pick === "1"));
+  screen.querySelectorAll("[data-tick]").forEach(row => {
+    const toggle = () => {
+      const on = !pend.ticks[row.dataset.tick]; pend.ticks[row.dataset.tick] = on;
+      row.classList.toggle("on", on); row.setAttribute("aria-checked", on); row.querySelector(".box").textContent = on ? "✓" : "";
+      updateNext();
+    };
+    row.onclick = e => { if (!(e.target instanceof Element && e.target.closest("input"))) toggle(); };
+    row.onkeydown = e => { if ((e.key === " " || e.key === "Enter") && e.target === row) { e.preventDefault(); toggle(); } };
+  });
+  const re = document.getElementById("recheck");
+  if (re) re.onclick = () => { if (ws.readyState === 1) { sentId = a.id; ws.send(JSON.stringify({ type: "answer", id: a.id, value: { recheck: true, keep: nextValue(a) } })); updateNext(); } };
+  screen.querySelectorAll("input.field, textarea.field").forEach(f => {
+    f.oninput = () => { if (document.getElementById("msg").className.includes("err")) say(""); updateNext(); };
     f.onkeydown = e => {
-      if (e.key !== "Enter") return;
+      if (e.key !== "Enter" || f.tagName === "TEXTAREA") return;
       e.preventDefault();
       if (a.kind === "counts" && f.id === "a") { document.getElementById("b").focus(); return; }
-      if (["number", "text", "counts"].includes(a.kind)) act(a.kind === "number" ? "record" : a.kind);
+      if (a.kind === "checklist" && f.id === "ck-v") { document.getElementById("ck-i").focus(); return; }
+      pressNext();
     };
   });
 }
 document.addEventListener("keydown", e => {
-  const typing = e.target instanceof Element && e.target.closest("input, textarea");
-  if (!S || !S.ask || S.ask.kind !== "yesno" || typing || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!S || S.screen !== "run" || !S.ask || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target instanceof Element ? e.target : null;
+  if (t && t.closest("input, textarea, select, button, [data-tick]")) return;
   const k = e.key.toLowerCase();
-  if (k === "p" || k === "y") { e.preventDefault(); answer(true); }
-  if (k === "f" || k === "n") { e.preventDefault(); answer(false); }
+  if (S.ask.kind === "yesno" && (k === "y" || k === "n")) { e.preventDefault(); pick(k === "y"); }
+  else if (e.key === "Enter" && S.ask.kind !== "photo") { e.preventDefault(); pressNext(); }
 });
 
 // ---- start screen ----
@@ -554,7 +698,7 @@ function photoHTML(side, optional) {
       <button class="btn small" data-p="ghostclear" type="button" id="ghostClearBtn">Remove ghost</button>` : ""}
     </div>
     <div class="entry" id="liveBtns"><button class="btn pri" data-p="take" type="button" id="takeBtn" disabled>Take photo</button><button class="btn" data-p="file" type="button">Choose file…</button>${optional ? '<button class="btn" data-p="done" type="button">Done, no more photos</button>' : ""}</div>
-    <div class="entry" id="reviewBtns" hidden><button class="btn pri" data-p="use" type="button">Use this photo</button><button class="btn" data-p="retake" type="button">Retake</button>
+    <div class="entry" id="reviewBtns" hidden><button class="btn" data-p="retake" type="button">Retake</button>
       ${ghosted ? '<label class="check"><input type="checkbox" id="asGhost"><span id="asGhostLbl"></span></label>' : ""}</div>
     <div class="keys" id="photoKeys">Space takes the photo.</div>
     <input type="file" id="fileIn" accept="image/jpeg,image/png" hidden>
@@ -648,7 +792,8 @@ function showReview(dataUrl, source, side) {
     $("asGhost").checked = !hasGhost;
     $("asGhostLbl").textContent = hasGhost ? "Replace the ghost with this photo" : "Save as the ghost for the next boards";
   }
-  $("photoKeys").textContent = "Enter uses the photo. The ghost isn’t part of the photo.";
+  $("photoKeys").textContent = "Next test (or Enter) keeps this photo. The ghost isn’t part of the photo.";
+  updateNext();
   say("");
 }
 function showLive() {
@@ -659,6 +804,7 @@ function showLive() {
   $("takeBtn").disabled = !cam.stream;
   if (!cam.stream) startCamera();
   $("photoKeys").textContent = "Space takes the photo.";
+  updateNext();
 }
 
 function readImageFile(file, done) {
@@ -696,7 +842,7 @@ function bindPhoto(side) {
     file() { $("fileIn").click(); },
     retake() { showLive(); },
     retry() { stopCamera(); $("camEmptyText").textContent = "Starting the camera…"; startCamera($("camSel").value || undefined); },
-    use() { if (cam.shot) answer({ image: cam.shot, source: cam.source, ghost: !!($("asGhost") && $("asGhost").checked) }); },
+    use() { if (cam.shot) pressNext(); },
     done() { answer({ done: true }); },
     ghostset() { $("ghostIn").click(); },
     ghostclear() {

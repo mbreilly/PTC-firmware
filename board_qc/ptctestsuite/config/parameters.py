@@ -78,3 +78,10 @@ board_records_dir = "board_records"
 repair_test_type = "Repair"
 qc_test_type = "QC Test"
 max_repair_photos = 6
+
+# 4.2.3 test stand checklist: the QC board's 24 V supply as read from the supply's display.
+# Outside these the checklist row is saved as FAIL (the procedure only says "about 400 mA").
+qc_board_supply_v_limits = (23.5, 24.5)
+qc_board_current_ma_limits = (350.0, 450.0)
+# Seconds to wait for the QC board's SSH port in the checklist's network check
+qc_board_network_timeout = 3.0

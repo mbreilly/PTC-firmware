@@ -155,6 +155,23 @@ class TerminalUI(TesterUI):
         text = await input_dialog(title="Notes", text="Enter tester notes here:").run_async()
         return text or ""
 
+    async def ask_checklist(self, step: Step, items: list[dict], network: dict, previous: dict | None = None) -> dict:
+        print(f"\n--- {step.title} ({step.section}) ---")
+        ticks, volts, current = {}, None, None
+        for item in items:
+            if item.get("kind") == "network":
+                print(f"{item['title']}: {'OK' if network['ok'] else 'NOT ANSWERING'}. {network['detail']}")
+                if not network["ok"] and await self._yesno("Check the network again?"):
+                    return {"recheck": True}
+                continue
+            while not await self._yesno(f"{item['title']}? ({item['detail']})"):
+                print("Do this now, then answer y.")
+            ticks[item["key"]] = True
+            if item.get("kind") == "power":
+                volts = await self._float("QC board supply voltage on the display (V): ")
+                current = await self._float("QC board current on the display (mA): ")
+        return {"ticks": ticks, "voltage": volts, "current": current}
+
     async def ask_photo(self, step: Step, side: str, optional: bool = False):
         from ptctestsuite.utils.photos import Photo, PhotoError, from_file
         while True:
