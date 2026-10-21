@@ -109,6 +109,12 @@ After that the box offers to replace it. The tester can also set a ghost from a 
 it from the photo step at any time. Ghosts are kept in `ghost_images/` as `front.jpg` and
 `back.jpg` (or `.png`).
 
+Every board is photographed the same way round: front side up with the D-sub connector and SFP
+cages at the top, then turned over top to bottom for the back, so the connectors end up at the
+bottom. `reference_photos/` has a front and back photo of preproduction board BRD# 006 (taken by
+hand, not on the camera stand) as an example of the two sides. They aren't used as ghosts: the
+ghosts come from the station's own camera so they line up.
+
 The camera works when the page is opened at `http://localhost` on the station itself, which
 is what `python -m ptctestsuite` does. The browser asks once for permission to use it. If the
 PC has more than one camera, pick the right one in the Camera list; the choice is
@@ -116,6 +122,35 @@ remembered. Keys: Space takes the photo, Enter uses it.
 
 In `--terminal` mode the tester types the path of an image file, or presses Enter to use the
 older OpenCV camera window (Space takes the photo). There is no ghost image there.
+
+### Orientation check
+
+After each board photo the program checks that the polarised parts (ICs, tantalum and electrolytic
+capacitors, diodes, LEDs) are the right way round. It lines the photo up with a reference photo
+of a known-good board (feature matching, so the board can be a little rotated, shifted or closer
+than the reference), then compares every marked part with the same part on the reference, as
+placed and turned round (180°, and 90° for square ICs). The tester sees the photo with every part
+outlined (green fine, red looks reversed, orange doesn't match the reference) and a closeup of each
+flagged part beside the reference, and answers each one **Correct** or **Reversed**. Next test
+stays greyed out until all are answered. A photo that can't be lined up (wrong side, badly out of
+line, blurred) can be retaken, or the check skipped (saved as ERROR).
+
+The result is saved as `orientation_front` / `orientation_back`: PASS, or FAIL listing the parts
+answered Reversed, with the parts flagged but confirmed correct. The outlined photo is uploaded to
+the HWDB beside the board photo ("Run n, orientation check, front").
+
+**Setting it up.** Open `http://localhost:8080/inspection` (linked from the Look up a board screen).
+For each side, set the reference photo (the last photo taken of that side on the station, or a
+file), then drag a box around every polarised part and give it its reference designator and kind.
+**Suggest tantalum capacitors** finds the yellow tantalum bodies by colour as a starting point.
+**Try it on a photo** shows what the check flags. Everything is kept in `inspection/<side>/`
+(`reference.jpg`, `parts.json`). Until a side has a reference and parts, its check is skipped.
+
+Take the reference on the camera stand from a board checked by hand. The thresholds
+(`inspection_*` in `config/parameters.py`) were set on the preproduction photos and should be
+tuned on real boards from the stand; run the check beside the usual visual inspection at first.
+Parts under heatsinks, and parts too small for the camera to resolve, can't be checked. When the
+board's pick-and-place (centroid) file and BOM are available, they can generate the parts list.
 
 ### Production shipment entry
 

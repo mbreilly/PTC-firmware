@@ -85,3 +85,14 @@ qc_board_supply_v_limits = (23.5, 24.5)
 qc_board_current_ma_limits = (350.0, 450.0)
 # Seconds to wait for the QC board's SSH port in the checklist's network check
 qc_board_network_timeout = 3.0
+
+# Component orientation check on the board photos (utils/inspection.py). The reference photo and
+# the marked parts for each side are kept in inspection_dir/<side>/ and set on the /inspection page.
+inspection_dir = "inspection"
+inspection_align_width = 2000      # photos are lined up at this width (faster, still accurate)
+inspection_features = 6000
+inspection_min_matches = 60        # fewer matching features than this: the photo can't be lined up
+inspection_search_px = 8           # placement tolerance when comparing a part with the reference
+inspection_reverse_margin = 0.10   # turned round must match this much better to flag "reversed"
+inspection_min_match = 0.60        # below this a part doesn't look like the reference: "check it"
+# Tune these on real boards photographed on the camera stand before relying on the check.

@@ -70,7 +70,8 @@ STEP_PHOTO_FRONT = Step("photo_front", "Front photo", "4.1.3",
                         "Put the board front side up under the camera, line it up with the ghost image and "
                         "take the photo. You can choose an image file instead.", "Board photos", kind="photo", how=[
     "Take the PTC out of the test stand, if it’s in. Wear your ESD strap.",
-    "Lay it on the mat under the camera, front side (components and front panel) up. The SoM isn’t fitted yet.",
+    "Lay it on the mat under the camera, front side up (heatsinks and DC-DC converters), with the D-sub connector and "
+    "SFP cages at the top. The SoM isn’t fitted yet.",
     "Move the board until its edges, connectors and mounting holes sit under the ghost outline. Use the Ghost "
     "slider to fade it in and out.",
     "Check there’s no glare on the chips and the serial label is readable.",
@@ -81,10 +82,24 @@ STEP_PHOTO_FRONT = Step("photo_front", "Front photo", "4.1.3",
 STEP_PHOTO_BACK = Step("photo_back", "Back photo", "4.1.3",
                        "Turn the board over, line it up with the ghost image and take the photo.",
                        "Board photos", kind="photo", how=[
-    "Turn the board over without moving the camera or lights.",
+    "Turn the board over top to bottom, so the D-sub connector and SFP cages end up at the bottom. Don’t move the "
+    "camera or lights.",
     "Line it up with the back ghost the same way.",
     "Press Take photo, check it, and retake if needed.",
     "No back ghost yet? Leave “Save as the ghost” ticked on a good photo."])
+def _orient_step(side: str) -> Step:
+    return Step(f"orientation_{side}", f"{side.capitalize()} orientation check", "4.1.3",
+                f"The program checked that the polarised parts on the {side} are the right way round. Confirm any "
+                "it flagged.", "Board photos", kind="inspect", how=[
+        "Green boxes look right. Red ones look reversed and orange ones don’t match the reference: answer each "
+        "flagged part.",
+        "Compare the two closeups: the known-good reference on the left, this board on the right. Look at the band "
+        "on capacitors and diodes and the pin 1 dot or marking on ICs.",
+        "If a part really is reversed, answer Reversed. It’s saved as FAIL so the board goes for repair.",
+        "If glare or a blurred photo caused the flag, press Retake photo.",
+        "This check helps the visual inspection; it doesn’t replace it."])
+
+STEP_ORIENT = {"front": _orient_step("front"), "back": _orient_step("back")}
 STEP_PREP = Step("prep", "Prepare the test stand", "4.2.3",
                  "Seat the PTC on the QC board and power the QC board up. Tick each row as you do it.",
                  "Test stand preparation", kind="checklist", how=[
@@ -105,7 +120,7 @@ def _load_pct(amps: float) -> int:
 
 def board_plan() -> list[Step]:
     g = "Power checks, no SoM"
-    plan = [STEP_PHOTO_FRONT, STEP_PHOTO_BACK, STEP_PREP]
+    plan = [STEP_PHOTO_FRONT, STEP_ORIENT["front"], STEP_PHOTO_BACK, STEP_ORIENT["back"], STEP_PREP]
     plan += [Step(t["key"], t["title"], "4.2.3", t["detail"], "Test stand preparation", kind="check", hidden=True)
              for t in prep_checklist]
     plan += [Step.from_man_test(t, g) for t in pre_som_tests]
@@ -427,6 +442,36 @@ async def record_repair(ui: TesterUI, h: BoardHistory, tester: str, use_hwdb: bo
     return repair, where
 
 
+# ---- board photos and the orientation check -------------------------------------
+
+async def take_and_check_photo(ui: TesterUI, q: qc_record, side: str, step: Step):
+    """Takes one board photo and checks its polarised parts against the reference for that side.
+    Returns the photo and the orientation check image (None if the check isn't set up)."""
+    from ptctestsuite.utils import inspection
+    key = STEP_ORIENT[side].key
+    while True:
+        photo = await ui.ask_photo(step, side)
+        if not inspection.is_set_up(side):
+            ui.skipped([key])
+            lg.info(f"No orientation reference for the {side} yet; check skipped")
+            return photo, None
+        ui.status(f"Checking the parts on the {side}…")
+        result = await asyncio.to_thread(inspection.inspect, side, photo.data)
+        answer = await ui.ask_inspection(STEP_ORIENT[side], result)
+        if answer.get("retake"):
+            continue
+        break
+    if not result.aligned:
+        q.add_result(key, qc_result.ERROR, {"checked": 0, "not_checked": result.message})
+        return photo, None
+    answers = answer.get("answers") or {}
+    reversed_ = [r.ref for r in result.flagged if answers.get(r.ref) != "correct"]
+    confirmed = [r.ref for r in result.flagged if answers.get(r.ref) == "correct"]
+    q.add_result(key, qc_result.FAIL if reversed_ else qc_result.PASS,
+                 {"checked": len(result.results), "reversed": reversed_, "flagged_but_correct": confirmed})
+    return photo, inspection.overlay_from(result, answers)
+
+
 # ---- test stand checklist ------------------------------------------------------
 
 async def check_qc_board_network(debug: bool) -> dict:
@@ -531,14 +576,18 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
 
     # 4.1.3 photos of the front and back, kept here and uploaded to the HWDB with the results
     photos = {}
+    overlays = {}   # orientation check images, uploaded with the photos
     if not retake_photos:
-        ui.skipped([STEP_PHOTO_FRONT.key, STEP_PHOTO_BACK.key])
+        ui.skipped([STEP_PHOTO_FRONT.key, STEP_PHOTO_BACK.key, STEP_ORIENT["front"].key, STEP_ORIENT["back"].key])
     for side, step in (("front", STEP_PHOTO_FRONT), ("back", STEP_PHOTO_BACK)) if retake_photos else ():
-        photo = await ui.ask_photo(step, side)
+        photo, overlay = await take_and_check_photo(ui, q, side, step)
         path = save_board_photo(q.serial_number, photo)
         photos[side] = photo
         q.photos[side] = path.name
         ui.saved(step.key, path.name)
+        if overlay:
+            overlays[side] = (path.with_name(path.stem + "-orientation.jpg").name, overlay)
+            path.with_name(overlays[side][0]).write_bytes(overlay)
 
     # 4.2.3 test stand checklist: seat the board and power the QC board up
     await run_prep_checklist(ui, q, debug)
@@ -713,6 +762,9 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
             ui.status(f"Uploading the {side} photo to the HWDB…")
             await upload_ptc_image(part_id, photo.data, filename=q.photos[side],
                                    comments=f"Run {q.run_number}, board photo, {side}", mime=photo.mime)
+            if side in overlays:
+                await upload_ptc_image(part_id, overlays[side][1], filename=overlays[side][0],
+                                       comments=f"Run {q.run_number}, orientation check, {side}", mime="image/jpeg")
             photos_uploaded.append(side)
     except Exception as e:
         lg.exception(e)

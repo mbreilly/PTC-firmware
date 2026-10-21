@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inspection setup</title>
+<style>
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; src: url(/fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; src: url(/fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; src: url(/fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); }
+:root {
+  --g-bg: #0F1418; --g-panel: #172026; --g-side: #121A1F; --g-line: #2A363E; --g-ink: #E6EDF1; --g-dim: #8A9AA5;
+  --g-accent: #3BA7C9; --g-pass: #3FB767; --g-fail: #E5534B; --g-warn: #E0A33A; --g-field: #0B1013; --g-r: 6px;
+  --g-font: "IBM Plex Sans", "Segoe UI", Ubuntu, Arial, sans-serif; --g-mono: "IBM Plex Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--g-bg); color: var(--g-ink); font: 15px/1.4 var(--g-font); display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; gap: 20px; padding: 10px 22px; border-bottom: 1px solid var(--g-line); background: var(--g-side); }
+.top h1 { font-size: 1.15em; margin: 0; font-weight: 600; }
+.top a { color: var(--g-accent); margin-left: auto; }
+.seg { display: flex; border: 1px solid var(--g-line); border-radius: var(--g-r); overflow: hidden; }
+.seg button { background: transparent; border: 0; color: var(--g-dim); font: 600 .95em var(--g-font); padding: 8px 18px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--g-line); }
+.seg button.on { background: var(--g-accent); color: #0B0D0E; }
+.body { flex: 1; min-height: 0; display: flex; }
+.stage { flex: 1; min-width: 0; overflow: auto; padding: 16px; background: var(--g-panel); }
+.stage canvas { display: block; max-width: 100%; border: 1px solid var(--g-line); border-radius: var(--g-r); cursor: crosshair; touch-action: none; }
+.empty { color: var(--g-dim); padding: 40px; text-align: center; border: 1px dashed var(--g-line); border-radius: var(--g-r); }
+.panel { width: 360px; flex: none; overflow: auto; padding: 16px 18px; border-left: 1px solid var(--g-line); background: var(--g-side); display: flex; flex-direction: column; gap: 18px; }
+.panel h2 { font-size: .78em; font-weight: 600; color: var(--g-dim); letter-spacing: .05em; text-transform: uppercase; margin: 0 0 8px; }
+.btn { font: 600 .92em var(--g-font); color: var(--g-ink); background: transparent; border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 8px 12px; cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: var(--g-dim); }
+.btn.pri { background: var(--g-accent); border-color: var(--g-accent); color: #0B0D0E; }
+.btn.danger { color: var(--g-fail); border-color: var(--g-fail); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 1px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: .85em; color: var(--g-dim); }
+input, select { background: var(--g-field); color: var(--g-ink); border: 1px solid var(--g-line); border-radius: var(--g-r); font: 1em var(--g-font); padding: 7px 9px; }
+.list { display: flex; flex-direction: column; max-height: 260px; overflow: auto; border: 1px solid var(--g-line); border-radius: var(--g-r); }
+.list button { text-align: left; background: var(--g-field); color: var(--g-ink); border: 0; border-top: 1px solid var(--g-line); padding: 6px 10px; font: .9em var(--g-font); cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+.list button:first-child { border-top: 0; }
+.list button.sel { background: color-mix(in srgb, var(--g-accent) 22%, var(--g-field)); }
+.list .k { color: var(--g-dim); }
+.hint { font-size: .84em; color: var(--g-dim); }
+.msg { font-size: .9em; min-height: 1.3em; }
+.msg.err { color: var(--g-fail); } .msg.ok { color: var(--g-pass); } .msg.warn { color: var(--g-warn); }
+.result img { width: 100%; border: 1px solid var(--g-line); border-radius: var(--g-r); margin-top: 6px; }
+.mono { font-family: var(--g-mono); }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Inspection setup</h1>
+  <div class="seg" role="group" aria-label="Board side"><button type="button" data-side="front" class="on">Front</button><button type="button" data-side="back">Back</button></div>
+  <span class="hint" id="conn"></span>
+  <a href="/">Back to the test station</a>
+</div>
+<div class="body">
+  <div class="stage" id="stage"><div class="empty" id="empty">Loading…</div><canvas id="cv" hidden></canvas></div>
+  <div class="panel">
+    <section>
+      <h2>Reference photo</h2>
+      <div class="hint" id="refinfo"></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="uselast" type="button">Use the last photo of this side</button><button class="btn" id="pickref" type="button">Choose file…</button></div>
+      <input type="file" id="reffile" accept="image/jpeg,image/png" hidden>
+    </section>
+    <section>
+      <h2>Parts to check</h2>
+      <div class="hint">Drag on the photo to draw a box around each polarised part. Drag a box to move it, its bottom-right corner to resize it. Arrow keys nudge the selected box.</div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="suggest" type="button">Suggest tantalum capacitors</button></div>
+      <div class="list" id="list" style="margin-top:10px"></div>
+    </section>
+    <section id="edit" hidden>
+      <h2>Selected part</h2>
+      <div class="row">
+        <label style="flex:1">Reference designator<input id="eref" autocomplete="off" placeholder="CT29"></label>
+        <label style="flex:1">Kind<select id="ekind"></select></label>
+      </div>
+      <div class="row" style="margin-top:8px"><button class="btn danger" id="edel" type="button">Delete part</button></div>
+    </section>
+    <section>
+      <div class="row"><button class="btn pri" id="save" type="button">Save parts</button><span class="hint" id="dirty"></span></div>
+      <div class="msg" id="msg" role="status"></div>
+    </section>
+    <section>
+      <h2>Try it</h2>
+      <div class="hint">Check any board photo of this side against the saved reference and parts.</div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="trybtn" type="button">Try it on a photo…</button></div>
+      <input type="file" id="tryfile" accept="image/jpeg,image/png" hidden>
+      <div class="result" id="result"></div>
+    </section>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let ws, side = "front", info = null, parts = [], sel = -1, img = new Image(), scale = 1, dirty = false, lastKind = "tantalum";
+const cv = $("cv"), g = cv.getContext("2d");
+const KIND_COL = { tantalum: "#E0A33A", electrolytic: "#9A8AEA", diode: "#3BA7C9", led: "#3FB767", ic: "#E5534B", other: "#E6EDF1" };
+
+function say(t, k) { $("msg").textContent = t; $("msg").className = "msg " + (k || ""); }
+function setDirty(d) { dirty = d; $("dirty").textContent = d ? "Unsaved changes" : ""; }
+function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); else say("Not connected to the test station.", "err"); }
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/setup`);
+  ws.onopen = () => { $("conn").textContent = ""; send({ type: "get", side }); };
+  ws.onclose = () => { $("conn").textContent = "Reconnecting…"; setTimeout(connect, 1000); };
+  ws.onmessage = e => handle(JSON.parse(e.data));
+}
+
+function handle(m) {
+  if (m.type === "side" && m.side === side) {
+    info = m; parts = m.parts.map(p => ({ ...p, box: [...p.box] })); sel = -1; setDirty(false);
+    if (!$("ekind").options.length) $("ekind").innerHTML = Object.entries(m.kinds).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+    $("refinfo").textContent = m.has_reference ? `${m.width} × ${m.height} px. Take it on the camera stand from a board that has been checked by hand.` : "No reference photo for this side yet.";
+    if (m.has_reference) { img = new Image(); img.onload = () => { $("empty").hidden = true; cv.hidden = false; layout(); }; img.src = m.ref_url; }
+    else { cv.hidden = true; $("empty").hidden = false; $("empty").textContent = `Set a reference photo for the ${side} first.`; }
+    ["suggest", "trybtn", "save"].forEach(id => $(id).disabled = !m.has_reference);
+    renderList(); renderEdit();
+  } else if (m.type === "suggestions") {
+    const added = m.parts.filter(p => !parts.some(q => overlap(p.box, q.box) > 0.3));
+    added.forEach((p, i) => { p.ref = ""; parts.push(p); });
+    say(added.length ? `${added.length} added. Give each one its reference designator, then save.` : "No new tantalum capacitors found.", added.length ? "ok" : "warn");
+    if (added.length) { setDirty(true); sel = parts.length - added.length; }
+    renderList(); renderEdit(); draw();
+  } else if (m.type === "saved") { say(m.message, "ok"); setDirty(false); }
+  else if (m.type === "tried") {
+    $("result").innerHTML = m.aligned
+      ? `<div class="msg ${m.flagged.length ? "warn" : "ok"}">${m.checked} parts checked. ${m.flagged.length ? "Flagged: " + m.flagged.map(f => `${esc(f.ref)} (${esc(f.status)}, ${f.score} as placed, ${f.turned_score} turned)`).join(", ") : "Nothing flagged."}</div><img src="${m.overlay}" alt="The photo with each part outlined">`
+      : `<div class="msg err">${esc(m.message)}</div>`;
+  } else if (m.type === "error") say(m.message, "err");
+}
+
+function overlap(a, b) {
+  const x1 = Math.max(a[0], b[0]), y1 = Math.max(a[1], b[1]), x2 = Math.min(a[0] + a[2], b[0] + b[2]), y2 = Math.min(a[1] + a[3], b[1] + b[3]);
+  const i = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+  return i / (a[2] * a[3] + b[2] * b[3] - i);
+}
+
+function layout() {
+  const w = Math.min(Math.max(320, $("stage").clientWidth - 34), img.naturalWidth);
+  scale = w / img.naturalWidth; cv.width = Math.round(w); cv.height = Math.round(img.naturalHeight * scale); draw();
+}
+function draw() {
+  if (cv.hidden) return;
+  g.drawImage(img, 0, 0, cv.width, cv.height);
+  g.font = "600 12px " + getComputedStyle(document.body).fontFamily;
+  parts.forEach((p, i) => {
+    const [x, y, w, h] = p.box.map(v => v * scale), on = i === sel;
+    g.lineWidth = on ? 3 : 2; g.strokeStyle = on ? "#ffffff" : KIND_COL[p.kind] || "#fff";
+    g.strokeRect(x - 2, y - 2, w + 4, h + 4);
+    if (on) { g.fillStyle = "#ffffff"; g.fillRect(x + w - 3, y + h - 3, 8, 8); }
+    const label = p.ref || "?";
+    g.fillStyle = "rgba(0,0,0,.65)"; const tw = g.measureText(label).width; g.fillRect(x - 2, y - 18, tw + 8, 15);
+    g.fillStyle = p.ref ? "#fff" : "#E0A33A"; g.fillText(label, x + 2, y - 6);
+  });
+  if (drag && drag.mode === "new") { g.strokeStyle = "#fff"; g.setLineDash([5, 4]); g.strokeRect(...drag.rect); g.setLineDash([]); }
+}
+
+function renderList() {
+  $("list").innerHTML = parts.length ? parts.map((p, i) => `<button type="button" data-i="${i}" class="${i === sel ? "sel" : ""}"><span class="mono">${esc(p.ref || "Unnamed")}</span><span class="k">${esc(info.kinds[p.kind] || p.kind)}</span></button>`).join("")
+    : `<div class="hint" style="padding:10px">No parts marked yet.</div>`;
+  $("list").querySelectorAll("[data-i]").forEach(b => b.onclick = () => { sel = +b.dataset.i; renderList(); renderEdit(); draw(); });
+}
+function renderEdit() {
+  $("edit").hidden = sel < 0;
+  if (sel < 0) return;
+  $("eref").value = parts[sel].ref; $("ekind").value = parts[sel].kind;
+}
+$("eref").oninput = () => { if (sel >= 0) { parts[sel].ref = $("eref").value.trim(); setDirty(true); renderList(); draw(); } };
+$("ekind").onchange = () => { if (sel >= 0) { parts[sel].kind = lastKind = $("ekind").value; setDirty(true); renderList(); draw(); } };
+$("edel").onclick = () => { if (sel >= 0) { parts.splice(sel, 1); sel = -1; setDirty(true); renderList(); renderEdit(); draw(); } };
+
+// drawing, moving and resizing boxes
+let drag = null;
+const at = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; };
+cv.addEventListener("pointerdown", e => {
+  const [mx, my] = at(e); cv.setPointerCapture(e.pointerId);
+  if (sel >= 0) {
+    const [x, y, w, h] = parts[sel].box.map(v => v * scale);
+    if (Math.abs(mx - (x + w)) < 9 && Math.abs(my - (y + h)) < 9) { drag = { mode: "resize", i: sel }; return; }
+  }
+  const hit = parts.findIndex(p => { const [x, y, w, h] = p.box.map(v => v * scale); return mx >= x && mx <= x + w && my >= y && my <= y + h; });
+  if (hit >= 0) { sel = hit; drag = { mode: "move", i: hit, ox: mx, oy: my, box: [...parts[hit].box] }; renderList(); renderEdit(); draw(); return; }
+  drag = { mode: "new", x0: mx, y0: my, rect: [mx, my, 0, 0] };
+});
+cv.addEventListener("pointermove", e => {
+  if (!drag) return; const [mx, my] = at(e);
+  if (drag.mode === "new") drag.rect = [Math.min(drag.x0, mx), Math.min(drag.y0, my), Math.abs(mx - drag.x0), Math.abs(my - drag.y0)];
+  else if (drag.mode === "move") { const b = parts[drag.i].box; b[0] = Math.round(drag.box[0] + (mx - drag.ox) / scale); b[1] = Math.round(drag.box[1] + (my - drag.oy) / scale); setDirty(true); }
+  else { const b = parts[drag.i].box; b[2] = Math.max(6, Math.round(mx / scale - b[0])); b[3] = Math.max(6, Math.round(my / scale - b[1])); setDirty(true); }
+  draw();
+});
+cv.addEventListener("pointerup", () => {
+  if (drag && drag.mode === "new") {
+    const [x, y, w, h] = drag.rect.map(v => Math.round(v / scale));
+    if (w >= 6 && h >= 6) { parts.push({ ref: "", kind: lastKind, box: [x, y, w, h] }); sel = parts.length - 1; setDirty(true); renderList(); renderEdit(); $("eref").focus(); }
+  }
+  drag = null; draw();
+});
+document.addEventListener("keydown", e => {
+  if (sel < 0 || e.target.closest("input, select")) return;
+  const d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+  if (d) { e.preventDefault(); parts[sel].box[0] += d[0]; parts[sel].box[1] += d[1]; setDirty(true); draw(); }
+  if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); $("edel").click(); }
+});
+window.addEventListener("resize", () => { if (!cv.hidden) layout(); });
+
+// side, reference, suggestions, save, try
+document.querySelectorAll("[data-side]").forEach(b => b.onclick = () => {
+  if (dirty && !confirm("Leave without saving the parts for this side?")) return;
+  side = b.dataset.side; document.querySelectorAll("[data-side]").forEach(x => x.classList.toggle("on", x === b));
+  $("result").innerHTML = ""; say(""); send({ type: "get", side });
+});
+$("uselast").onclick = () => { if (!parts.length || confirm("Replace the reference photo? The marked parts stay where they are, so check they still line up.")) send({ type: "reference", side, source: "last" }); };
+$("pickref").onclick = () => $("reffile").click();
+const readFile = (f, done) => { if (!f) return; if (!/^image\/(jpeg|png)$/.test(f.type)) { say("Choose a JPEG or PNG image.", "err"); return; } const r = new FileReader(); r.onload = () => done(r.result); r.readAsDataURL(f); };
+$("reffile").onchange = e => { readFile(e.target.files[0], url => send({ type: "reference", side, source: "file", image: url })); e.target.value = ""; };
+$("suggest").onclick = () => send({ type: "suggest", side });
+$("save").onclick = () => {
+  const names = parts.map(p => p.ref);
+  if (names.some(n => !n)) { say("Give every part a reference designator first.", "err"); sel = names.findIndex(n => !n); renderList(); renderEdit(); draw(); $("eref").focus(); return; }
+  const dup = names.find((n, i) => names.indexOf(n) !== i);
+  if (dup) { say(`${dup} is used twice.`, "err"); return; }
+  send({ type: "save", side, parts });
+};
+$("trybtn").onclick = () => { if (dirty) { say("Save the parts first, then try them.", "warn"); return; } $("tryfile").click(); };
+$("tryfile").onchange = e => { readFile(e.target.files[0], url => { $("result").innerHTML = '<div class="hint">Checking…</div>'; send({ type: "test", side, image: url }); }); e.target.value = ""; };
+window.addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+connect();
+</script>
+</body>
+</html>

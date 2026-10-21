@@ -155,6 +155,20 @@ class TerminalUI(TesterUI):
         text = await input_dialog(title="Notes", text="Enter tester notes here:").run_async()
         return text or ""
 
+    async def ask_inspection(self, step: Step, result) -> dict:
+        print(f"\n--- {step.title} ---")
+        if not result.aligned:
+            print(result.message)
+            return {"retake": True} if await self._yesno("Retake the photo?") else {"skip": True}
+        print(f"{len(result.results)} parts checked, {len(result.flagged)} flagged.")
+        answers = {}
+        for r in result.flagged:
+            what = {"reversed": "looks reversed", "rotated": f"looks turned {r.best_turn}°", "check": "doesn’t match the reference"}[r.status]
+            if await self._yesno(f"{r.ref} {what}. Retake the photo instead?"):
+                return {"retake": True}
+            answers[r.ref] = "correct" if await self._yesno(f"Is {r.ref} the right way round on the board?") else "reversed"
+        return {"answers": answers}
+
     async def ask_checklist(self, step: Step, items: list[dict], network: dict, previous: dict | None = None) -> dict:
         print(f"\n--- {step.title} ({step.section}) ---")
         ticks, volts, current = {}, None, None

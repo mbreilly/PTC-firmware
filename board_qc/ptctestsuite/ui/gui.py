@@ -8,6 +8,7 @@ which the test suite already uses.
 """
 
 import asyncio
+import base64
 import re
 import json
 import webbrowser
@@ -20,10 +21,11 @@ from websockets.http11 import Response
 
 from ptctestsuite.config import parameters
 from ptctestsuite.ui.base import TesterUI, Step, TestAborted, format_value
-from ptctestsuite.utils import photos
+from ptctestsuite.utils import photos, inspection
 
 PAGE = Path(__file__).with_name("static") / "index.html"
 FONTS = PAGE.with_name("fonts")
+SETUP_PAGE = PAGE.with_name("inspection.html")
 
 
 def _is_number(v) -> bool:
@@ -43,6 +45,7 @@ class GuiUI(TesterUI):
         self._pending = None          # (id, future, validator)
         self._abort = False
         self._photos: dict[str, photos.Photo] = {}   # this run's photos, served at /photo/<side>
+        self._inspection_images: dict[str, bytes] = {}   # orientation check images, served at /inspect/<side>
         self.state = {
             "title": title, "station": station,
             "hwdb": {"on": hwdb_on, "label": hwdb_label},
@@ -71,8 +74,16 @@ class GuiUI(TesterUI):
 
     def _http(self, connection, request):
         path = request.path.split("?")[0]
-        if path == "/ws":
+        if path in ("/ws", "/setup"):
             return None
+        if path == "/inspection":
+            body = SETUP_PAGE.read_bytes()
+            return Response(200, "OK", Headers([("Content-Type", "text/html; charset=utf-8"),
+                                                ("Content-Length", str(len(body))), ("Cache-Control", "no-store")]), body)
+        if path in ("/inspection/ref/front", "/inspection/ref/back"):
+            ref = inspection.reference_path(path.rsplit("/", 1)[1])
+            if ref.is_file():
+                return self._file_response(ref.read_bytes(), "image/jpeg")
         if path in ("/", "/index.html"):
             body = PAGE.read_bytes()
             return Response(200, "OK", Headers([("Content-Type", "text/html; charset=utf-8"),
@@ -89,6 +100,8 @@ class GuiUI(TesterUI):
             g = photos.ghost_path(path.rsplit("/", 1)[1])
             if g:
                 return self._file_response(g.read_bytes(), photos.EXT_MIME[g.suffix])
+        if path in ("/inspect/front", "/inspect/back") and self._inspection_images.get(path.rsplit("/", 1)[1]):
+            return self._file_response(self._inspection_images[path.rsplit("/", 1)[1]], "image/jpeg")
         if path.startswith("/stored/"):
             name = path[len("/stored/"):]
             stored = Path(parameters.photo_dir) / name
@@ -106,6 +119,14 @@ class GuiUI(TesterUI):
                                             ("Cache-Control", "no-store")]), body)
 
     async def _handler(self, ws):
+        if ws.request.path.split("?")[0] == "/setup":
+            async for raw in ws:
+                try:
+                    await self._setup_message(ws, json.loads(raw))
+                except Exception as e:   # keep the setup page usable whatever goes wrong
+                    lg.exception(e)
+                    await ws.send(json.dumps({"type": "error", "message": f"That didn’t work: {e}"}))
+            return
         self.clients.add(ws)
         try:
             await ws.send(self._snapshot())
@@ -194,6 +215,59 @@ class GuiUI(TesterUI):
         self.state["tester"] = v["tester"].strip()
         return {"mode": v["mode"], "tester": self.state["tester"], "serial": str(v.get("serial", "")),
                 "po": str(v.get("po", "")), "batch": str(v.get("batch", "")).strip()}
+
+    # ---- inspection setup page (/inspection) ---------------------------------------
+    async def _setup_message(self, ws, m: dict):
+        side = m.get("side")
+        if side not in photos.SIDES:
+            return
+        send = lambda d: ws.send(json.dumps(d, default=str))
+        kind = m.get("type")
+        if kind == "reference":
+            if m.get("source") == "file":
+                data = photos.from_data_url(side, m.get("image"), "file").data
+            else:
+                data = self._photos[side].data if side in self._photos else None
+                if data is None:
+                    stored = sorted((p for p in Path(parameters.photo_dir).glob(f"*-{side}-*")
+                                     if p.suffix in photos.EXT_MIME and "orientation" not in p.name),
+                                    key=lambda p: p.stat().st_mtime)
+                    if not stored:
+                        await send({"type": "error", "message": f"No {side} photo has been taken on this station yet."})
+                        return
+                    data = stored[-1].read_bytes()
+            await asyncio.to_thread(inspection.save_reference, side, data)
+            kind = "get"
+        if kind == "suggest":
+            import cv2
+            img = await asyncio.to_thread(cv2.imread, str(inspection.reference_path(side)))
+            await send({"type": "suggestions", "parts": inspection.suggest_tantalums(img) if img is not None else []})
+            return
+        if kind == "save":
+            saved = inspection.save_parts(side, m.get("parts") or [])
+            await send({"type": "saved", "message": f"Saved {len(saved)} parts for the {side}."})
+            return
+        if kind == "test":
+            photo = photos.from_data_url(side, m.get("image"), "file")
+            r = await asyncio.to_thread(inspection.inspect, side, photo.data)
+            if r is None:
+                await send({"type": "tried", "aligned": False, "message": "Set the reference photo and save some parts first."})
+                return
+            await send({"type": "tried", "aligned": r.aligned, "message": r.message, "checked": len(r.results),
+                        "flagged": [{"ref": f.ref, "status": f.status, "score": f.score, "turned_score": f.turned_score}
+                                    for f in r.flagged],
+                        "overlay": "data:image/jpeg;base64," + base64.b64encode(r.overlay).decode() if r.overlay else None})
+            return
+        if kind == "get":
+            ref = inspection.reference_path(side)
+            w = h = None
+            if ref.is_file():
+                import cv2
+                im = await asyncio.to_thread(cv2.imread, str(ref))
+                h, w = im.shape[:2]
+            await send({"type": "side", "side": side, "has_reference": ref.is_file(), "width": w, "height": h,
+                        "ref_url": f"/inspection/ref/{side}?v={ref.stat().st_mtime_ns if ref.is_file() else 0}",
+                        "parts": [vars(p) for p in inspection.load_parts(side)], "kinds": inspection.KINDS})
 
     def _ghost_message(self, data: dict):
         """The tester replaced or removed a ghost image from the photo step."""
@@ -327,6 +401,28 @@ class GuiUI(TesterUI):
             return {"recheck": True, "keep": v.get("keep")}
         return {"ticks": {k: True for k in manual if v["ticks"].get(k)},
                 "voltage": float(v["voltage"]), "current": float(v["current"])}
+
+    async def ask_inspection(self, step, result):
+        self._inspection_images[result.side] = result.overlay
+        flagged = [{"ref": r.ref, "kind": r.kind, "kind_name": inspection.KINDS.get(r.kind, r.kind), "status": r.status,
+                    "turn": r.best_turn, "score": r.score, "crops": r.crops} for r in result.flagged]
+        refs = {f["ref"] for f in flagged}
+
+        def check(v):
+            if not isinstance(v, dict):
+                return "Answer every flagged part first."
+            if v.get("retake") or (v.get("skip") and not result.aligned):
+                return None
+            answers = v.get("answers") or {}
+            if not result.aligned:
+                return "Retake the photo, or carry on without the check."
+            if any(answers.get(r) not in ("correct", "reversed") for r in refs):
+                return "Answer every flagged part first."
+            return None
+
+        v = await self._ask("inspect", step, check, side=result.side, aligned=result.aligned, message=result.message,
+                            checked=len(result.results), flagged=flagged, overlay_id=self._ask_id + 1)
+        return v
 
     async def after_auto(self, step, result, value_text):
         await self._ask("autodone", step, result=result.name, value=value_text)
