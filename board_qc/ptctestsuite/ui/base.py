@@ -237,6 +237,10 @@ class TesterUI:
     def end_page(self) -> None:
         """The page started by begin_page is finished."""
 
+    async def ask_choice(self, step: Step, options: list[dict]) -> str:
+        """One of several options [{key, label, detail}]. Returns the chosen key."""
+        raise NotImplementedError
+
     async def after_auto(self, step: Step, result: qc_result, value_text: str) -> None:
         """An automatic test has finished. The GUI shows its result and waits for Next test."""
 

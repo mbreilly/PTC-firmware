@@ -219,15 +219,37 @@ def board_plan() -> list[Step]:
     plan.append(STEP_NOTES)
     return plan
 
-def ship_plan() -> list[Step]:
-    plan = []
-    for shipment_type, label in shipment_types.items():
-        plan.append(Step(f"{shipment_type}_count_vs_po", step_title(f"{shipment_type}_count_vs_po"), "4.1",
+STEP_SHIP_TYPE = Step("product_type", "What’s in this shipment?", "4.1",
+                      "Each delivery holds one kind of product. Choose it, and only its checks follow.", "Shipment",
+                      kind="choice", how=[
+    "Check the packing list and the boxes: front panels, bare PCBs and assembled PCBs arrive separately.",
+    "Choose the kind of product in this delivery. Only its checks follow.",
+    "If the same purchase order delivers another product later, enter that delivery separately."])
+
+
+def ship_plan(product_type: str | None = None) -> list[Step]:
+    """The shipment entry: the product choice, then the checks for that product only."""
+    plan = [STEP_SHIP_TYPE]
+    if product_type:
+        label = shipment_types[product_type]
+        plan.append(Step(f"{product_type}_count_vs_po", step_title(f"{product_type}_count_vs_po"), "4.1",
                          f"Count the {label.lower()} received and compare with the purchase order.", label,
                          kind="counts"))
-        plan += [Step.from_man_test(t, label) for t in reception_checks[shipment_type]]
+        plan += [Step.from_man_test(t, label) for t in reception_checks[product_type]]
     plan.append(STEP_NOTES)
     return plan
+
+
+def ship_options() -> list[dict]:
+    out = []
+    for key, label in shipment_types.items():
+        names = []
+        for t in reception_checks[key]:   # "Bare PCB vendor certificate" -> "vendor certificate"
+            n = step_title(t["test_name"]).removeprefix(label[:-1] + " ")
+            names.append(n[0].lower() + n[1:] if not n.split()[0].isupper() else n)
+        checks = ["count against the PO"] + names
+        out.append({"key": key, "label": label, "detail": f"{len(checks)} checks: " + ", ".join(checks)})
+    return out
 
 
 # ---- helpers ------------------------------------------------------------------
@@ -876,25 +898,30 @@ async def run_reception_check(ui: TesterUI, entry: dict, disable_hwdb: bool = Fa
     """Production shipment entry: the reception checks (procedure 4.1), recorded
     once per delivery instead of for every board."""
     po = entry["po"].strip()
-    if already_recorded(po):
-        await ui.stopped(f"The shipment for PO {po} is already recorded. Nothing to do.")
-        return
     r = reception_record(po, entry["tester"])
     watch(r, ui)
-    plan_list = ship_plan()
-    ui.begin("ship", po, r.tester_name, plan_list)
+    ui.begin("ship", po, r.tester_name, ship_plan())
     if not disable_hwdb:
         await renew_token_if_needed()
         await check_hwdb(ui)
 
     batch = entry.get("batch")
-    r.batch_number = batch if batch is not None else await ui.ask_text(STEP_BATCH)
-    for shipment_type, label in shipment_types.items():
-        step = next(s for s in plan_list if s.key == f"{shipment_type}_count_vs_po")
-        ordered, received = await ui.ask_counts(step)
-        count_ok = qc_result.PASS if received == ordered else qc_result.FAIL
-        r.add_result(f"{shipment_type}_count_vs_po", count_ok, {"ordered": ordered, "received": received})
-        await run_manual_tests(ui, r, reception_checks[shipment_type])
+    r.batch_number = (batch if batch is not None else await ui.ask_text(STEP_BATCH)).strip()
+    # one kind of product per delivery: choose it, then only its checks
+    r.product_type = await ui.ask_choice(STEP_SHIP_TYPE, ship_options())
+    label = shipment_types[r.product_type]
+    if already_recorded(po, r.product_type, r.batch_number):
+        await ui.stopped(f"{label} on purchase order {po}" + (f", batch {r.batch_number}," if r.batch_number else "")
+                         + " are already recorded. Nothing to do.", title="Already recorded")
+        return
+    ui.begin("ship", f"{po}, {label}", r.tester_name, ship_plan(r.product_type))
+    ui.saved(STEP_SHIP_TYPE.key, label)
+    step = Step(f"{r.product_type}_count_vs_po", step_title(f"{r.product_type}_count_vs_po"), "4.1",
+                f"Count the {label.lower()} received and compare with the purchase order.", label, kind="counts")
+    ordered, received = await ui.ask_counts(step)
+    count_ok = qc_result.PASS if received == ordered else qc_result.FAIL
+    r.add_result(f"{r.product_type}_count_vs_po", count_ok, {"ordered": ordered, "received": received})
+    await run_manual_tests(ui, r, reception_checks[r.product_type])
 
     notes = await ui.ask_notes()
     if notes:
@@ -914,7 +941,7 @@ async def run_reception_check(ui: TesterUI, entry: dict, disable_hwdb: bool = Fa
         await ui.finish(r, f"The HWDB upload failed. {e} The shipment is saved in {parameters.reception_log_file}.",
                         False)
         return
-    await ui.finish(r, f"Saved to the HWDB as {parameters.reception_serial_prefix}{po}.", True)
+    await ui.finish(r, f"Saved to the HWDB as {r.hwdb_serial}.", True)
 
 
 # ---- main loop ----------------------------------------------------------------

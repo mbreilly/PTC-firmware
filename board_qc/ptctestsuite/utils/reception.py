@@ -18,19 +18,29 @@ shipment_types = {
     "bare_pcbs": "Bare PCBs",
     "assembled_pcbs": "Assembled PCBs",
 }
+# Each delivery holds one kind of product, so it gets its own HWDB entry with this code in its name
+shipment_codes = {"front_panels": "FP", "bare_pcbs": "BARE", "assembled_pcbs": "ASSY"}
 
 @dataclass
 class reception_record(qc_record):
     # serial_number holds the purchase order number for a shipment
     batch_number: str = ""
+    product_type: str = ""   # a key of shipment_types: one kind of product per delivery
 
     @property
     def key(self) -> str:
-        return self.serial_number
+        return delivery_key(self.serial_number, self.product_type, self.batch_number)
+
+    @property
+    def hwdb_serial(self) -> str:
+        """The delivery's own HWDB entry, e.g. SHIPMENT-PO-2026-118-FP-B07."""
+        name = f"{parameters.reception_serial_prefix}{self.serial_number}-{shipment_codes.get(self.product_type, 'ALL')}"
+        return f"{name}-{self.batch_number}" if self.batch_number else name
 
     def gen_hwdb_datasheet(self):
         dd = super().gen_hwdb_datasheet()
         dd['purchase_order'] = dd.pop('serial_number')
+        dd['product_type'] = shipment_types.get(self.product_type, self.product_type)
         dd.pop('som_serial', None)
         dd.pop('eeprom_serial', None)
         dd.pop('ambient_temperature', None)
@@ -41,12 +51,17 @@ class reception_record(qc_record):
         return dd
 
 
-def already_recorded(purchase_order: str) -> bool:
-    """Checks the local log so the same delivery isn't recorded twice."""
+def delivery_key(purchase_order: str, product_type: str, batch: str = "") -> str:
+    return "|".join((purchase_order.strip(), product_type, batch.strip()))
+
+
+def already_recorded(purchase_order: str, product_type: str, batch: str = "") -> bool:
+    """Checks the local log so the same delivery (order, product and batch) isn't recorded twice.
+    Other products, or another batch, on the same purchase order are separate deliveries."""
     path = Path(parameters.reception_log_file)
     if not path.exists():
         return False
-    key = purchase_order
+    key = delivery_key(purchase_order, product_type, batch)
     with path.open() as f:
         for line in f:
             try:
@@ -62,4 +77,4 @@ def save_locally(record: reception_record) -> None:
     entry['key'] = record.key
     with Path(parameters.reception_log_file).open('a') as f:
         f.write(json.dumps(entry) + "\n")
-    lg.info(f"Saved reception record for PO {record.serial_number}")
+    lg.info(f"Saved reception record {record.hwdb_serial}")

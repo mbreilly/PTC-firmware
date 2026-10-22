@@ -245,6 +245,9 @@ table.mini { width: 100%; border-collapse: collapse; font-size: .9em; }
 .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 820px; }
 .choice { min-height: var(--g-bh); padding: 12px 18px; text-align: left; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); color: var(--g-ink); font: inherit; cursor: pointer; }
 .choice b { display: block; font-size: 1.05em; font-weight: 600; } .choice span { color: var(--g-dim); font-size: .86em; }
+.choice.on { border-color: var(--g-accent); box-shadow: inset 0 0 0 2px var(--g-accent); background: color-mix(in srgb, var(--g-accent) 18%, var(--g-field)); }
+.choices.three { grid-template-columns: repeat(3, 1fr); max-width: 980px; }
+.choices.three .choice { min-height: 110px; }
 .choice.pri { border-color: var(--g-accent); background: color-mix(in srgb, var(--g-accent) 14%, var(--g-field)); }
 .choice:focus-visible { outline: 2px solid var(--g-ink); outline-offset: 2px; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -435,6 +438,9 @@ function askHTML(a) {
     case "checklist": return stepHead(st, "checklist") + checklistHTML(a);
     case "inspect": return stepHead(st, "inspect") + inspectHTML(a);
     case "page": return pageHTML(a);
+    case "choice": return stepHead(st, "manual") + `<div class="choices three">${a.options.map((o, i) =>
+        `<button class="choice ${pend.opt === o.key ? "on" : ""}" type="button" data-opt="${esc(o.key)}" aria-pressed="${pend.opt === o.key}"><b>${pend.opt === o.key ? "✓ " : ""}${i + 1}. ${esc(o.label)}</b><span>${esc(o.detail)}</span></button>`).join("")}</div>
+        <div class="keys">Keys: ${a.options.map((_, i) => i + 1).join(", ")} to choose, Enter for Next test.</div>`;
     case "autodone": return stepHead(st, "auto") + `<div class="autores"><span>Result</span><b>${esc(a.value || "No value")}</b>${badge(a.result)}</div>`;
     case "retest": return retestHTML(a.board);
     case "repair": return repairHTML(a.form);
@@ -445,7 +451,7 @@ function askHTML(a) {
   return "";
 }
 // what the current page still needs before Next test unlocks
-const NEXT_KINDS = ["number", "yesno", "judged", "text", "counts", "photo", "checklist", "autodone", "notes", "inspect", "page"];
+const NEXT_KINDS = ["number", "yesno", "judged", "text", "counts", "photo", "checklist", "autodone", "notes", "inspect", "page", "choice"];
 function fieldVal(id) { const el = document.getElementById(id); return el ? el.value.trim() : ""; }
 function ready(a) {
   const st = a.step || {};
@@ -499,6 +505,7 @@ function ready(a) {
       if (serial) parts.push("The SoM serial isn’t 10 digits; you’ll be asked to check it.");
       return parts.length ? { ok: true, warn: true, hint: parts.join(" ") } : { ok: true };
     }
+    case "choice": return pend.opt ? { ok: true } : { ok: false, hint: "Choose one of the options." };
     case "autodone": case "notes": return { ok: true };
   }
   return { ok: false, hint: "" };
@@ -514,6 +521,7 @@ function nextValue(a) {
     case "checklist": return { ticks: { ...pend.ticks }, voltage: +fieldVal("ck-v"), current: +fieldVal("ck-i") };
     case "autodone": return true;
     case "inspect": return { answers: { ...pend.answers } };
+    case "choice": return pend.opt;
     case "page": return Object.fromEntries(a.fields.map(f => { const v = pageValue(f); return [f.key, f.kind === "number" ? Number(v) : v]; }));
   }
 }
@@ -536,6 +544,14 @@ function pressNext() {
   const a = S.ask; if (!a || !NEXT_KINDS.includes(a.kind)) return;
   if (!ready(a).ok) { updateNext(); return; }
   answer(nextValue(a));
+}
+function chooseOpt(key) {
+  pend.opt = key;
+  screen.querySelectorAll("[data-opt]").forEach(b => {
+    const on = b.dataset.opt === key; b.classList.toggle("on", on); b.setAttribute("aria-pressed", on);
+    const t = b.querySelector("b"); t.textContent = (on ? "✓ " : "") + t.textContent.replace(/^✓ /, "");
+  });
+  updateNext();
 }
 function pick(v) {
   pend.choice = v;
@@ -599,7 +615,7 @@ function renderRun() {
     const keep = S.ask && S.ask.previous && S.ask.previous.ticks ? { ...S.ask.previous.ticks } : {};
     const prevPage = {};
     if (S.ask && S.ask.kind === "page") Object.entries(S.ask.previous || {}).forEach(([k, v]) => { if (typeof v === "boolean") prevPage[k] = v; else if (v && typeof v === "object") prevPage[k + "#ok"] = v.ok; });
-    pend = { choice: null, ticks: keep, answers: {}, page: prevPage };
+    pend = { choice: null, ticks: keep, answers: {}, page: prevPage, opt: null };
     const st = (S.ask && S.ask.step) || S.running, how = st && st.how && st.how.length ? st.how : null;
     const howKey = st && st.kind === "page" ? "ptc-how-page-open" : "ptc-how-open";
     const open = store.get(howKey, st && st.kind === "page" ? "0" : "1") === "1";
@@ -657,6 +673,7 @@ function bindMain() {
   };
   screen.querySelectorAll("[data-a]").forEach(b => b.onclick = () => act(b.dataset.a, b));
   screen.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => pick(b.dataset.pick === "1"));
+  screen.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => chooseOpt(b.dataset.opt));
   screen.querySelectorAll("[data-pkey]").forEach(b => b.onclick = () => {
     const v = b.dataset.pv === "1"; pend.page[b.dataset.pkey] = v;
     b.parentElement.querySelectorAll("[data-pkey]").forEach(o => { const on = (o.dataset.pv === "1") === v; o.classList.toggle("on", on); o.setAttribute("aria-pressed", on); o.textContent = (on ? "✓ " : "") + o.dataset.label; });
@@ -701,9 +718,14 @@ function bindMain() {
 document.addEventListener("keydown", e => {
   if (!S || S.screen !== "run" || !S.ask || e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target instanceof Element ? e.target : null;
+  if (S.ask.kind === "choice" && t && t.closest("[data-opt]")) {   // a choice button keeps focus after a click
+    if (e.key === "Enter") { e.preventDefault(); pressNext(); return; }
+    if (/^[1-9]$/.test(e.key) && S.ask.options[+e.key - 1]) { e.preventDefault(); chooseOpt(S.ask.options[+e.key - 1].key); return; }
+  }
   if (t && t.closest("input, textarea, select, button, [data-tick]")) return;
   const k = e.key.toLowerCase();
   if (S.ask.kind === "yesno" && (k === "y" || k === "n")) { e.preventDefault(); pick(k === "y"); }
+  else if (S.ask.kind === "choice" && /^[1-9]$/.test(k) && S.ask.options[+k - 1]) { e.preventDefault(); chooseOpt(S.ask.options[+k - 1].key); }
   else if (e.key === "Enter" && S.ask.kind !== "photo") { e.preventDefault(); pressNext(); }
 });
 

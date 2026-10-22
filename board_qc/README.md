@@ -195,16 +195,21 @@ board's pick-and-place (centroid) file and BOM are available, they can generate 
 
 ### Production shipment entry
 
-One run per delivery, not per board. The tester enters the purchase order and batch number, then
-does the 7 reception checks from section 4.1:
+One run per delivery, not per board. Front panels, bare PCBs and assembled PCBs arrive
+separately, so each delivery holds one kind of product. The tester enters the purchase order and
+batch number, then chooses **what's in this shipment**, and only that product's reception
+checks from section 4.1 follow:
 
 - Front panels: count vs purchase order, 10% sample under the microscope with thumb screws present, 10% sample mechanical fit vs drawings
 - Bare PCBs: count vs purchase order, vendor quality certificate review
 - Assembled PCBs: count vs purchase order, vendor quality certificate review
 
-The shipment goes to the same HWDB as the boards, as its own entry with serial `SHIPMENT-<PO>`
-and a "Reception Check" test. It is also saved in `reception_records.jsonl`, and a second entry
-for the same PO is refused.
+Each delivery goes to the same HWDB as the boards, as its own entry named after the purchase
+order, the product and the batch, for example `SHIPMENT-PO-2026-118-FP-B07` (`FP` front panels,
+`BARE` bare PCBs, `ASSY` assembled PCBs; no batch suffix if the batch is left empty), with a
+"Reception Check" test that also records the product. It is saved in `reception_records.jsonl`
+too. Other products, or a later batch, on the same purchase order are separate deliveries; only
+an exact repeat (same order, product and batch) is refused.
 
 ## Board history, retests and repairs
 

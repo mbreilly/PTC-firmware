@@ -254,8 +254,7 @@ async def upload_ptc_image(part_id: str, image: Buffer, filename: str | None = N
 async def upload_reception_record(record) -> dict:
     """Creates an entry for the shipment in the same HWDB as the boards and attaches
     the one-time reception checks (procedure 4.1) to it as a test."""
-    item = await create_hwdb_item(record, part_type_id=reception_part_type_id,
-                                  serial_number=f"{reception_serial_prefix}{record.serial_number}")
+    item = await create_hwdb_item(record, part_type_id=reception_part_type_id, serial_number=record.hwdb_serial)
     p = f"{dune_hwdb_api_path}/components/{item['part_id']}/tests"
     test_res = record.gen_hwdb_datasheet()
     test_res['Test Date'] = test_res.pop('test_date')

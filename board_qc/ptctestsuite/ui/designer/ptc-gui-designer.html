@@ -255,6 +255,10 @@ button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accen
 .g-flag-crops { display: flex; gap: 10px; } .g-flag-crops figure { margin: 0; font-size: .78em; color: var(--g-dim); }
 .g-flag-crops img { display: block; width: 120px; border: 1px solid var(--g-line); border-radius: var(--g-r); margin-top: 3px; }
 .g-flag .g-btn.opt { min-width: 110px; height: 42px; }
+.g-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.g-choice { min-height: 100px; padding: 12px 16px; text-align: left; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); color: var(--g-ink); font: inherit; cursor: pointer; display: flex; flex-direction: column; gap: 6px; }
+.g-choice b { font-size: 1.05em; } .g-choice span { color: var(--g-dim); font-size: .86em; }
+.g-choice.on { border-color: var(--g-accent); box-shadow: inset 0 0 0 2px var(--g-accent); background: color-mix(in srgb, var(--g-accent) 18%, var(--g-field)); }
 .pg { display: flex; flex-direction: column; gap: 10px; }
 .pg-t { border-collapse: collapse; width: 100%; font-size: .92em; }
 .pg-t th, .pg-t td { padding: 4px 8px 4px 0; text-align: left; vertical-align: middle; border-bottom: 1px solid color-mix(in srgb, var(--g-line) 60%, transparent); }
@@ -519,7 +523,17 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", "
 
 // ---- GUI run state ----
 const run = { screen:"start", mode:"board", tester:"Mike Reilly", serial:"PTC-0042", po:"", batch:"", idx:0, results:{}, notes:"", msg:"", msgKind:"", scanWarned:false, running:false, review:null, ticks:{}, qccur:"", qcvolt:"", runLabel:null, sel:0, chips:{}, closeups:0, mockSom:false, howOpen:true, howPageOpen:false, pg:{}, autoSt:null, choice:null, autoDone:false, photoReview:false, photoSrc:"camera", ghostOp:40, hasGhost:{ front:true, back:true }, off:{ x:9, y:-6, r:1.4 } };
-const steps = () => run.mode === "board" ? BOARD_STEPS : SHIP_STEPS;
+// a shipment holds one kind of product: choose it first, then only its checks follow
+const SHIP_CHOICE = { grp:"Shipment", sec:"4.1", key:"product_type", name:"What’s in this shipment?", type:"choice", acc:"One kind of product per delivery",
+  prompt:"Each delivery holds one kind of product. Choose it, and only its checks follow.",
+  options:[{ key:"Front panels", detail:"3 checks: count against the PO, microscope sample, fit sample" },
+           { key:"Bare PCBs", detail:"2 checks: count against the PO, vendor certificate" },
+           { key:"Assembled PCBs", detail:"2 checks: count against the PO, vendor certificate" }],
+  how:["Check the packing list and the boxes: front panels, bare PCBs and assembled PCBs arrive separately.",
+       "Choose the kind of product in this delivery. Only its checks follow.",
+       "If the same purchase order delivers another product later, enter that delivery separately."] };
+const steps = () => run.mode === "board" ? BOARD_STEPS
+  : [SHIP_CHOICE, ...SHIP_STEPS.filter(x => x.grp === "Finish" || x.grp === run.shipType)];
 const gui = document.getElementById("gui"), frame = document.getElementById("frame");
 
 function applyStyle() {
@@ -596,6 +610,8 @@ function entryHTML(s) {
     }
     case "checklist": return checklistHTML();
     case "page": if (s.page === "auto") setTimeout(startAutoPage, 0); return pageHTML(s);
+    case "choice": return `<div class="g-choices">${s.options.map((o, i) =>
+        `<button class="g-choice ${run.opt === o.key ? "on" : ""}" data-act="opt" data-v="${esc(o.key)}"><b>${run.opt === o.key ? "✓ " : ""}${i + 1}. ${esc(o.key)}</b><span>${esc(o.detail)}</span></button>`).join("")}</div>`;
     case "notes": return `<div class="g-entry" style="flex-direction:column;align-items:stretch;max-width:640px"><textarea class="g-field" data-in="notes" style="height:110px;width:100%;padding:10px 14px;font-size:1.05em;font-family:var(--g-font)" placeholder="Anything unusual about this board">${esc(run.notes)}</textarea></div>`;
   }
   return "";
@@ -637,6 +653,7 @@ function stepReady(s) {
     }
     case "auto": return run.autoDone ? { ok:true } : { ok:false, hint: run.running ? "The test is running." : "Run the test first." };
     case "photo": return run.photoReview ? { ok:true } : { ok:false, hint:"Take the photo or choose a file." };
+    case "choice": return run.opt ? { ok:true } : { ok:false, hint:"Choose one of the options." };
     case "page": {
       if (s.page === "auto") {
         const st = run.autoSt || {}, keys = PAGES.auto.tests.map(t => t.k);
@@ -955,7 +972,7 @@ const say = (msg, kind) => { run.msg = msg; run.msgKind = kind || ""; };
 function record(ok, v) {
   const s = steps()[run.idx];
   run.results[s.key] = { v, ok }; run.idx = Math.min(run.idx + 1, steps().length - 1);
-  run.choice = null; run.autoDone = false; run.photoReview = false; run.ans = null;
+  run.choice = null; run.autoDone = false; run.photoReview = false; run.ans = null; run.opt = null;
   run.scanWarned = false; say(""); render();
   const f = gui.querySelector("[data-in]"); if (f && frameFocus) f.focus({ preventScroll:true });
 }
@@ -973,7 +990,8 @@ function act(a, el) {
       updateNext(); break;
     case "nextstep": {
       if (!stepReady(s).ok) break;
-      if (s.type === "yn") record(s.ask === "yesno" ? run.choice === s.expect : run.choice, run.choice ? "Yes" : "No");
+      if (s.type === "choice") { run.shipType = run.opt; record(null, run.opt); }
+      else if (s.type === "yn") record(s.ask === "yesno" ? run.choice === s.expect : run.choice, run.choice ? "Yes" : "No");
       else if (s.type === "value") { const n = Number(val("v")); record(s.judge ? run.choice : n >= s.lo && n <= s.hi, `${n} ${s.unit}`); }
       else if (s.type === "scan") record(null, val("v"));
       else if (s.type === "po") { const a1 = +val("a"), b1 = +val("b"); record(a1 === b1, `${b1} of ${a1}`); }
@@ -990,6 +1008,7 @@ function act(a, el) {
     case "ans": run.ans = el.dataset.v; render(); break;
     case "retakephoto": run.idx = Math.max(0, run.idx - 1); delete run.results[st[run.idx].key]; run.photoReview = false; run.ans = null; say(""); render(); break;
     case "howtoggle": if (s.type === "page") run.howPageOpen = !run.howPageOpen; else run.howOpen = !run.howOpen; render(); break;
+    case "opt": run.opt = el.dataset.v; render(); break;
     case "pgyn": run.pg[el.dataset.k] = el.dataset.v === "1"; render(); { const b = gui.querySelector(`[data-act="pgyn"][data-k="${el.dataset.k}"][data-v="${el.dataset.v}"]`); if (b) b.focus({ preventScroll:true }); } break;
     case "take": run.photoReview = true; run.photoSrc = "camera"; render(); break;
     case "pfile": run.photoReview = true; run.photoSrc = "file"; render(); break;
@@ -1024,7 +1043,7 @@ function act(a, el) {
       if (run.review === "t1b" && run.screen === "review" && !prepDone()) { say("Finish the preparation list first.", "err"); render(); break; }
       if (run.mode === "board" && !run.serial.trim()) { say("Scan the PTC serial first.", "err"); render(); break; }
       if (run.mode === "ship" && !run.po.trim()) { say("Enter the purchase order number first.", "err"); render(); break; }
-      run.idx = 0; run.results = {}; run.notes = ""; say(""); run.screen = "run"; render(); break;
+      run.idx = 0; run.results = {}; run.notes = ""; run.shipType = null; run.opt = null; say(""); run.screen = "run"; render(); break;
     case "yn": record(el.dataset.v === "1", el.dataset.v === "1" ? "Yes" : "No"); break;
     case "judge": {
       const raw = val("v") || s.demo, n = parseFloat(raw);
@@ -1112,6 +1131,7 @@ function fillDemo(n) {
     else if (s.type === "notes") run.results[s.key] = { v:"No notes", ok:null };
     else if (s.type === "photo") run.results[s.key] = { v:`PTC-0042-${s.side}.jpg`, ok:null };
     else if (s.type === "page") run.results[s.key] = { v:"All checks fine", ok:true };
+    else if (s.type === "choice") run.results[s.key] = { v:run.shipType || "Front panels", ok:null };
     else if (s.type === "inspect") run.results[s.key] = { v:"Checked, none reversed", ok:true };
     else if (s.type === "checklist") run.results[s.key] = { v:"24.1 V, 410 mA", ok:true };
   });
@@ -1144,6 +1164,7 @@ document.getElementById("fillex").addEventListener("click", () => {
   else if (s.type === "checklist") { PREP.forEach((p, i) => { if (!p.auto) run.ticks[i] = true; }); run.qcvolt = "24.1"; run.qccur = "410"; render(); }
   else if (s.type === "photo") { act("take"); return; }
   else if (s.type === "inspect") { act("ans", { dataset:{ v:"correct" } }); return; }
+  else if (s.type === "choice") { act("opt", { dataset:{ v:s.options[0].key } }); return; }
   else if (s.type === "page") {
     if (s.page === "auto") { const keys = PAGES.auto.tests.map(t => t.k); run.autoSt = Object.fromEntries(keys.map(k => [k, "pass"])); run.pg.over_temp_led = true; }
     else pageFields(s.page).forEach(f => { run.pg[f.k] = f.type === "yn" ? true : f.demo; if (f.type === "judged") run.pg[f.k + "_ok"] = true; });
@@ -1198,7 +1219,7 @@ document.getElementById("screens").addEventListener("click", e => {
   frameFocus = false; run.running = false; say("");
   if (!run.serial) run.serial = "PTC-0042";
   if (b.dataset.screen === "start") run.screen = "start";
-  if (b.dataset.screen === "run") { run.screen = "run"; run.idx = run.mode === "board" ? 4 : 3; fillDemo(run.idx); }
+  if (b.dataset.screen === "run") { run.screen = "run"; if (run.mode !== "board") run.shipType = "Front panels"; run.idx = run.mode === "board" ? 4 : 2; fillDemo(run.idx); }
   if (b.dataset.screen === "results") { run.screen = "results"; fillDemo(steps().length); }
   render();
 });

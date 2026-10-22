@@ -454,6 +454,10 @@ class GuiUI(TesterUI):
         self.state["page"] = None
         self._push()
 
+    async def ask_choice(self, step, options):
+        keys = {o["key"] for o in options}
+        return await self._ask("choice", step, lambda v: None if v in keys else "Choose one of the options.", options=options)
+
     async def ask_page(self, step, fields, layout, previous=None, note=None):
         by_key = {f["key"]: f for f in fields}
         out = {}

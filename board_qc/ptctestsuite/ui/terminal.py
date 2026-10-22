@@ -169,6 +169,9 @@ class TerminalUI(TesterUI):
             answers[r.ref] = "correct" if await self._yesno(f"Is {r.ref} the right way round on the board?") else "reversed"
         return {"answers": answers}
 
+    async def ask_choice(self, step: Step, options: list[dict]) -> str:
+        return await self._choose(f"{step.title}: {step.prompt}", [(o["key"], f"{o['label']} ({o['detail']})") for o in options])
+
     async def ask_page(self, step: Step, fields: list[dict], layout: dict, previous: dict | None = None,
                        note: str | None = None) -> dict:
         print(f"\n--- {step.title} ({step.section}) ---")
