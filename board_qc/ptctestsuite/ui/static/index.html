@@ -148,6 +148,12 @@ textarea.field { font: 1.05em var(--g-font); height: 140px; width: 100%; max-wid
 .pg-yn { display: inline-flex; gap: 6px; }
 .pg-yn .btn.opt { min-width: 66px; height: 38px; padding: 0 12px; font-size: .95em; }
 .pg-run { color: var(--g-auto); } .pg-dim { color: var(--g-dim); }
+.filedrop { border: 2px dashed var(--g-line); border-radius: var(--g-r); padding: 22px; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center; max-width: 720px; background: var(--g-field); }
+.filedrop.over { border-color: var(--g-accent); background: color-mix(in srgb, var(--g-accent) 12%, var(--g-field)); }
+.filelist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-width: 720px; }
+.filelist li { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); }
+.filelist .fn { flex: 1; font-family: var(--g-mono); font-size: .92em; word-break: break-all; }
+.filelist .fs { color: var(--g-dim); font-size: .85em; }
 .insp { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
 .insp-img { display: block; width: min(100%, 540px); border: 1px solid var(--g-line); border-radius: var(--g-r); }
 .insp-side { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 12px; }
@@ -438,6 +444,9 @@ function askHTML(a) {
     case "checklist": return stepHead(st, "checklist") + checklistHTML(a);
     case "inspect": return stepHead(st, "inspect") + inspectHTML(a);
     case "page": return pageHTML(a);
+    case "files": return stepHead(st, "manual") + `<div class="filedrop" id="drop"><b>Drag the files here</b><div>or <button class="btn small" type="button" id="pickfiles">Choose files…</button></div>
+        <div class="keys">PDF, Excel, PNG or JPEG, up to ${a.max_mb} MB each, at most ${a.max_files} files</div>
+        <input type="file" id="filein" multiple accept="${a.accept.join(",")}" hidden></div><ul class="filelist" id="filelist"></ul>`;
     case "choice": return stepHead(st, "manual") + `<div class="choices three">${a.options.map((o, i) =>
         `<button class="choice ${pend.opt === o.key ? "on" : ""}" type="button" data-opt="${esc(o.key)}" aria-pressed="${pend.opt === o.key}"><b>${pend.opt === o.key ? "✓ " : ""}${i + 1}. ${esc(o.label)}</b><span>${esc(o.detail)}</span></button>`).join("")}</div>
         <div class="keys">Keys: ${a.options.map((_, i) => i + 1).join(", ")} to choose, Enter for Next test.</div>`;
@@ -451,7 +460,7 @@ function askHTML(a) {
   return "";
 }
 // what the current page still needs before Next test unlocks
-const NEXT_KINDS = ["number", "yesno", "judged", "text", "counts", "photo", "checklist", "autodone", "notes", "inspect", "page", "choice"];
+const NEXT_KINDS = ["number", "yesno", "judged", "text", "counts", "photo", "checklist", "autodone", "notes", "inspect", "page", "choice", "files"];
 function fieldVal(id) { const el = document.getElementById(id); return el ? el.value.trim() : ""; }
 function ready(a) {
   const st = a.step || {};
@@ -506,6 +515,7 @@ function ready(a) {
       return parts.length ? { ok: true, warn: true, hint: parts.join(" ") } : { ok: true };
     }
     case "choice": return pend.opt ? { ok: true } : { ok: false, hint: "Choose one of the options." };
+    case "files": return pend.files.length ? { ok: true } : { ok: false, hint: "Add the certificate file." };
     case "autodone": case "notes": return { ok: true };
   }
   return { ok: false, hint: "" };
@@ -522,6 +532,7 @@ function nextValue(a) {
     case "autodone": return true;
     case "inspect": return { answers: { ...pend.answers } };
     case "choice": return pend.opt;
+    case "files": return { files: pend.files.map(f => ({ name: f.name, data: f.data })) };
     case "page": return Object.fromEntries(a.fields.map(f => { const v = pageValue(f); return [f.key, f.kind === "number" ? Number(v) : v]; }));
   }
 }
@@ -544,6 +555,33 @@ function pressNext() {
   const a = S.ask; if (!a || !NEXT_KINDS.includes(a.kind)) return;
   if (!ready(a).ok) { updateNext(); return; }
   answer(nextValue(a));
+}
+// ---- adding files (vendor certificates) ----
+function showFiles() {
+  const ul = document.getElementById("filelist"); if (!ul) return;
+  const size = n => n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " kB";
+  ul.innerHTML = pend.files.map((f, i) => `<li><span class="fn">${esc(f.name)}</span><span class="fs">${size(f.size)}</span><button class="btn small" type="button" data-rm="${i}" aria-label="Remove ${esc(f.name)}">Remove</button></li>`).join("");
+  ul.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { pend.files.splice(+b.dataset.rm, 1); showFiles(); updateNext(); });
+}
+function bindFiles(a) {
+  const drop = document.getElementById("drop"), input = document.getElementById("filein");
+  const add = list => [...list].forEach(file => {
+    const ext = "." + file.name.split(".").pop().toLowerCase();
+    if (!a.accept.includes(ext)) { say(`${file.name}: use a PDF, Excel, PNG or JPEG file.`, "err"); return; }
+    if (file.size > a.max_mb * 1048576) { say(`${file.name} is larger than ${a.max_mb} MB.`, "err"); return; }
+    if (pend.files.length >= a.max_files) { say(`Add at most ${a.max_files} files.`, "err"); return; }
+    if (pend.files.some(f => f.name === file.name && f.size === file.size)) return;
+    const r = new FileReader();
+    r.onload = () => { pend.files.push({ name: file.name, size: file.size, data: r.result }); say(""); showFiles(); updateNext(); };
+    r.onerror = () => say(`${file.name} couldn’t be read.`, "err");
+    r.readAsDataURL(file);
+  });
+  document.getElementById("pickfiles").onclick = () => input.click();
+  input.onchange = () => { add(input.files); input.value = ""; };
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); add(e.dataTransfer.files); };
+  showFiles();
 }
 function chooseOpt(key) {
   pend.opt = key;
@@ -615,7 +653,7 @@ function renderRun() {
     const keep = S.ask && S.ask.previous && S.ask.previous.ticks ? { ...S.ask.previous.ticks } : {};
     const prevPage = {};
     if (S.ask && S.ask.kind === "page") Object.entries(S.ask.previous || {}).forEach(([k, v]) => { if (typeof v === "boolean") prevPage[k] = v; else if (v && typeof v === "object") prevPage[k + "#ok"] = v.ok; });
-    pend = { choice: null, ticks: keep, answers: {}, page: prevPage, opt: null };
+    pend = { choice: null, ticks: keep, answers: {}, page: prevPage, opt: null, files: [] };
     const st = (S.ask && S.ask.step) || S.running, how = st && st.how && st.how.length ? st.how : null;
     const howKey = st && st.kind === "page" ? "ptc-how-page-open" : "ptc-how-open";
     const open = store.get(howKey, st && st.kind === "page" ? "0" : "1") === "1";
@@ -674,6 +712,7 @@ function bindMain() {
   screen.querySelectorAll("[data-a]").forEach(b => b.onclick = () => act(b.dataset.a, b));
   screen.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => pick(b.dataset.pick === "1"));
   screen.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => chooseOpt(b.dataset.opt));
+  if (a.kind === "files") bindFiles(a);
   screen.querySelectorAll("[data-pkey]").forEach(b => b.onclick = () => {
     const v = b.dataset.pv === "1"; pend.page[b.dataset.pkey] = v;
     b.parentElement.querySelectorAll("[data-pkey]").forEach(o => { const on = (o.dataset.pv === "1") === v; o.classList.toggle("on", on); o.setAttribute("aria-pressed", on); o.textContent = (on ? "✓ " : "") + o.dataset.label; });
@@ -812,7 +851,7 @@ function renderResults() {
     ${F.message ? `<div class="upload ${up}">${esc(F.message)}</div>` : ""}
     <div class="tbl"><table><thead><tr><th>Step</th>${SHOW_KEYS ? "<th>Database key</th>" : ""}<th>Value</th>${SHOW_LIMITS ? "<th>Accept</th>" : ""}<th>Result</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${F.notes ? `<div><span class="lbl">Notes</span>${esc(F.notes)}</div>` : ""}
-    ${Object.keys(S.photos || {}).length ? `<div class="thumbs">${["front", "back", "front_panel"].filter(sd => S.photos[sd]).map(sd => `<figure><a href="/photo/${sd}?v=${S.photos[sd]}" target="_blank" rel="noopener">${{ front: "Front", back: "Back", front_panel: "Front panel" }[sd]}<img src="/photo/${sd}?v=${S.photos[sd]}" alt="${{ front: "Front of the board", back: "Back of the board", front_panel: "The front panel" }[sd]}"></a></figure>`).join("")}</div>` : ""}
+    ${Object.keys(S.photos || {}).length ? `<div class="thumbs">${["front", "back", "front_panel", "bare_front", "bare_back"].filter(sd => S.photos[sd]).map(sd => `<figure><a href="/photo/${sd}?v=${S.photos[sd]}" target="_blank" rel="noopener">${{ front: "Front", back: "Back", front_panel: "Front panel", bare_front: "Bare PCB, front", bare_back: "Bare PCB, back" }[sd]}<img src="/photo/${sd}?v=${S.photos[sd]}" alt="${{ front: "Front", back: "Back", front_panel: "Front panel", bare_front: "Bare PCB, front", bare_back: "Bare PCB, back" }[sd]} photo"></a></figure>`).join("")}</div>` : ""}
     <div class="actions"><button class="btn pri" id="next" type="button">${S.mode === "ship" ? "New entry" : "Test next board"}</button></div></div>`;
   document.getElementById("next").onclick = () => answer(true);
   document.getElementById("next").focus();
@@ -915,7 +954,7 @@ async function startCamera(deviceId) {
 function updateGhost(side) {
   const g = $("ghost"); if (!g) return;
   if (!$("ghostOp")) { g.hidden = true; return; }   // close-ups have no ghost
-  const ver = S.ghosts[side], name = { front: "front", back: "back", front_panel: "front panel" }[side] || side;
+  const ver = S.ghosts[side], name = { front: "front", back: "back", front_panel: "front panel", bare_front: "bare PCB front", bare_back: "bare PCB back" }[side] || side;
   if (ver) {
     const src = `/ghost/${side}?v=${ver}`;
     if (g.dataset.src !== src) {
@@ -943,7 +982,7 @@ function showReview(dataUrl, source, side) {
   if ($("asGhost")) {
     $("asGhost").checked = !hasGhost;
     $("asGhostLbl").textContent = hasGhost ? "Replace the ghost with this photo"
-      : `Save as the ghost for the next ${side === "front_panel" ? "deliveries" : "boards"}`;
+      : `Save as the ghost for the next ${["front_panel", "bare_front", "bare_back"].includes(side) ? "deliveries" : "boards"}`;
   }
   $("photoKeys").textContent = "Next test (or Enter) keeps this photo. The ghost isn’t part of the photo.";
   updateNext();

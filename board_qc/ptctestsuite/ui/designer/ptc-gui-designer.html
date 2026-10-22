@@ -274,6 +274,9 @@ button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accen
 .pg-yn { display: inline-flex; gap: 6px; }
 .pg-yn .g-btn.opt { min-width: 62px; height: 34px; padding: 0 10px; font-size: .92em; }
 .pg-dim { color: var(--g-dim); font-size: .9em; } .pg-run { color: var(--g-auto); }
+.g-drop { border: 2px dashed var(--g-line); border-radius: var(--g-r); padding: 18px; display: flex; flex-direction: column; gap: 6px; align-items: center; text-align: center; background: var(--g-field); }
+.g-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.g-files li { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 6px 10px; border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-field); font-size: .9em; }
 .g-check2 { gap: 10px; align-items: center; font-size: .92em; cursor: pointer; }
 .g-check2 input { width: 22px; height: 22px; accent-color: var(--g-accent); }
 </style>
@@ -511,8 +514,18 @@ const SHIP_STEPS = [
   { grp:"Front panels", sec:"4.1.1", key:"fp_microscope_sample", name:"Microscope sample", prompt:"Inspect 10% under the microscope. Thumb screws present and no defects?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Front panels", sec:"4.1.1", key:"fp_mechanical_fit_sample", name:"Mechanical fit sample", prompt:"Check 10% against the drawings. Do they fit?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Bare PCBs", sec:"4.1.2", key:"bare_pcbs_count_vs_po", name:"Bare PCB count", prompt:"Count the bare PCBs received and compare with the purchase order.", type:"po", acc:"Received equals ordered", demo:[52,52] },
+  { grp:"Bare PCBs", sec:"4.1.2", key:"bare_pcb_photo_front", name:"Bare PCB photo, front", side:"bare_front", type:"photo", acc:"No pass or fail; saved with the delivery",
+    prompt:"Put a bare PCB from this delivery front side up under the camera, line it up with the ghost image and take the photo.",
+    how:["Take one bare PCB from the delivery and wear your ESD strap. Handle it by the edges.", "Lay it front side up, the same way round every time, and line it up with the ghost outline.", "Check there’s no glare on the pads, then press Take photo, or Space.", "No ghost yet? Leave “Save as the ghost” ticked on a well lined-up photo."] },
+  { grp:"Bare PCBs", sec:"4.1.2", key:"bare_pcb_photo_back", name:"Bare PCB photo, back", side:"bare_back", type:"photo", acc:"No pass or fail; saved with the delivery",
+    prompt:"Turn the bare PCB over top to bottom, line it up with the ghost image and take the photo.",
+    how:["Turn the board over top to bottom without moving the camera or lights.", "Line it up with the back ghost the same way, then press Take photo.", "No back ghost yet? Leave “Save as the ghost” ticked on a good photo."] },
+  { grp:"Bare PCBs", sec:"4.1.2", key:"bare_pcbs_certificate_file", name:"Vendor certificate upload", type:"files", acc:"At least one file",
+    prompt:"Add the vendor’s quality certificate for these bare PCBs: the completed form as PDF or Excel, or a scan. You can add more than one file.", how:["Find the certificate in the delivery paperwork or the vendor’s email.", "Drag the files onto the box, or press Choose files. PDF, Excel, PNG and JPEG are accepted.", "Check the list shows every file, then press Next test. The files go to this delivery’s HWDB entry.", "The next step asks whether the certificate is complete and acceptable."] },
   { grp:"Bare PCBs", sec:"4.1.2", key:"bare_pcb_certificate_review", name:"Vendor certificate", prompt:"Review the vendor quality certificate. Is it complete and acceptable?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Assembled PCBs", sec:"4.1.3", key:"assembled_pcbs_count_vs_po", name:"Assembled PCB count", prompt:"Count the assembled PCBs received and compare with the purchase order.", type:"po", acc:"Received equals ordered", demo:[50,50] },
+  { grp:"Assembled PCBs", sec:"4.1.3", key:"assembled_pcbs_certificate_file", name:"Vendor certificate upload", type:"files", acc:"At least one file",
+    prompt:"Add the vendor’s quality certificate for these assembled PCBs: the completed form as PDF or Excel, or a scan. You can add more than one file.", how:["Find the certificate in the delivery paperwork or the vendor’s email.", "Drag the files onto the box, or press Choose files. PDF, Excel, PNG and JPEG are accepted.", "Check the list shows every file, then press Next test. The files go to this delivery’s HWDB entry.", "The next step asks whether the certificate is complete and acceptable."] },
   { grp:"Assembled PCBs", sec:"4.1.3", key:"assembled_pcb_certificate_review", name:"Vendor certificate", prompt:"Review the vendor quality certificate. Is it complete and acceptable?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Finish", sec:"End", key:"overall_result", name:"Notes and finish", prompt:"Add any notes for this shipment, then save it.", type:"notes", acc:"Pass if every check passed" },
 ];
@@ -529,13 +542,13 @@ const onColor = h => lum(h) > 0.35 ? "#0B0D0E" : "#FFFFFF";
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
 
 // ---- GUI run state ----
-const run = { screen:"start", mode:"board", tester:"Mike Reilly", serial:"PTC-0042", po:"", batch:"", idx:0, results:{}, notes:"", msg:"", msgKind:"", scanWarned:false, running:false, review:null, ticks:{}, qccur:"", qcvolt:"", runLabel:null, sel:0, chips:{}, closeups:0, mockSom:false, howOpen:true, howPageOpen:false, pg:{}, autoSt:null, choice:null, autoDone:false, photoReview:false, photoSrc:"camera", ghostOp:40, hasGhost:{ front:true, back:true, front_panel:false }, off:{ x:9, y:-6, r:1.4 } };
+const run = { screen:"start", mode:"board", tester:"Mike Reilly", serial:"PTC-0042", po:"", batch:"", idx:0, results:{}, notes:"", msg:"", msgKind:"", scanWarned:false, running:false, review:null, ticks:{}, qccur:"", qcvolt:"", files:[], runLabel:null, sel:0, chips:{}, closeups:0, mockSom:false, howOpen:true, howPageOpen:false, pg:{}, autoSt:null, choice:null, autoDone:false, photoReview:false, photoSrc:"camera", ghostOp:40, hasGhost:{ front:true, back:true, front_panel:false, bare_front:false, bare_back:false }, off:{ x:9, y:-6, r:1.4 } };
 // a shipment holds one kind of product: choose it first, then only its checks follow
 const SHIP_CHOICE = { grp:"Shipment", sec:"4.1", key:"product_type", name:"What’s in this shipment?", type:"choice", acc:"One kind of product per delivery",
   prompt:"Each delivery holds one kind of product. Choose it, and only its checks follow.",
   options:[{ key:"Front panels", detail:"4 checks: count against the PO, photo, microscope sample, fit sample" },
-           { key:"Bare PCBs", detail:"2 checks: count against the PO, vendor certificate" },
-           { key:"Assembled PCBs", detail:"2 checks: count against the PO, vendor certificate" }],
+           { key:"Bare PCBs", detail:"4 checks: count against the PO, front and back photos, certificate upload, certificate review" },
+           { key:"Assembled PCBs", detail:"3 checks: count against the PO, certificate upload, certificate review" }],
   how:["Check the packing list and the boxes: front panels, bare PCBs and assembled PCBs arrive separately.",
        "Choose the kind of product in this delivery. Only its checks follow.",
        "If the same purchase order delivers another product later, enter that delivery separately."] };
@@ -617,6 +630,9 @@ function entryHTML(s) {
     }
     case "checklist": return checklistHTML();
     case "page": if (s.page === "auto") setTimeout(startAutoPage, 0); return pageHTML(s);
+    case "files": return `<div class="g-drop"><b>Drag the files here</b><div>or <button class="g-btn" data-act="pickfiles" style="height:36px;padding:0 12px;font-size:.9em">Choose files…</button></div>
+        <div class="g-hint">PDF, Excel, PNG or JPEG, up to 20 MB each, at most 5 files</div><input type="file" id="dfilein" multiple accept=".pdf,.xlsx,.xls,.png,.jpg,.jpeg" hidden></div>
+        <ul class="g-files">${run.files.map((f, i) => `<li><span class="mono">${esc(f)}</span><button class="g-btn" data-act="rmfile" data-v="${i}" style="height:32px;padding:0 10px;font-size:.85em">Remove</button></li>`).join("")}</ul>`;
     case "choice": return `<div class="g-choices">${s.options.map((o, i) =>
         `<button class="g-choice ${run.opt === o.key ? "on" : ""}" data-act="opt" data-v="${esc(o.key)}"><b>${run.opt === o.key ? "✓ " : ""}${i + 1}. ${esc(o.key)}</b><span>${esc(o.detail)}</span></button>`).join("")}</div>`;
     case "notes": return `<div class="g-entry" style="flex-direction:column;align-items:stretch;max-width:640px"><textarea class="g-field" data-in="notes" style="height:110px;width:100%;padding:10px 14px;font-size:1.05em;font-family:var(--g-font)" placeholder="Anything unusual about this board">${esc(run.notes)}</textarea></div>`;
@@ -661,6 +677,7 @@ function stepReady(s) {
     case "auto": return run.autoDone ? { ok:true } : { ok:false, hint: run.running ? "The test is running." : "Run the test first." };
     case "photo": return run.photoReview ? { ok:true } : { ok:false, hint:"Take the photo or choose a file." };
     case "choice": return run.opt ? { ok:true } : { ok:false, hint:"Choose one of the options." };
+    case "files": return run.files.length ? { ok:true } : { ok:false, hint:"Add the certificate file." };
     case "page": {
       if (s.page === "auto") {
         const st = run.autoSt || {}, keys = PAGES.auto.tests.map(t => t.k);
@@ -724,7 +741,11 @@ function panelSVG(outline, dx, dy, rot) {
 function photoEntry(s) {
   const has = run.hasGhost[s.side], rv = run.photoReview;
   let ghost, board;
-  if (s.side === "front_panel") {   // no photo of a front panel yet, so a drawing stands in for it
+  if (s.side === "bare_front" || s.side === "bare_back") {   // a drawn board stands in for the camera
+    const sd = s.side === "bare_back" ? "back" : "front";
+    ghost = has ? pcbSVG(true, 0, 0, 0, sd) : "";
+    board = pcbSVG(false, run.off.x, run.off.y, run.off.r, sd);
+  } else if (s.side === "front_panel") {   // no photo of a front panel yet, so a drawing stands in for it
     ghost = has ? panelSVG(true, 0, 0, 0) : "";
     board = panelSVG(false, run.off.x, run.off.y, run.off.r);
   } else {
@@ -735,7 +756,7 @@ function photoEntry(s) {
   }
   return `<div class="g-cam">
     <div class="g-cambox photo">${board}${ghost}<span class="g-camtag">${rv ? (run.photoSrc === "file" ? "Chosen file" : "Photo") : "Live"}</span>
-      ${!has && !rv ? `<div class="g-camnote" style="align-items:flex-end;padding-bottom:12px">No ${s.side === "front_panel" ? "front panel" : s.side} ghost yet</div>` : ""}</div>
+      ${!has && !rv ? `<div class="g-camnote" style="align-items:flex-end;padding-bottom:12px">No ${{ front_panel: "front panel", bare_front: "bare PCB front", bare_back: "bare PCB back" }[s.side] || s.side} ghost yet</div>` : ""}</div>
     <div class="g-camtools">
       <label>Camera <select aria-label="Camera"><option>USB camera</option></select></label>
       <label>Ghost <input type="range" min="0" max="100" step="5" value="${run.ghostOp}" data-op ${has ? "" : "disabled"} aria-label="Ghost opacity"><span class="mono" data-opout>${run.ghostOp} %</span></label>
@@ -743,7 +764,7 @@ function photoEntry(s) {
       ${has ? '<button class="g-btn" style="height:36px;padding:0 12px;font-size:.88em">Remove ghost</button>' : ""}
     </div>
     ${rv ? `<div class="g-entry" style="margin:0"><button class="g-btn" data-act="retake">Retake</button>
-        <label class="g-check2"><input type="checkbox" id="asghost" ${has ? "" : "checked"}>${has ? "Replace the ghost with this photo" : `Save as the ghost for the next ${s.side === "front_panel" ? "deliveries" : "boards"}`}</label></div>
+        <label class="g-check2"><input type="checkbox" id="asghost" ${has ? "" : "checked"}>${has ? "Replace the ghost with this photo" : `Save as the ghost for the next ${["front_panel", "bare_front", "bare_back"].includes(s.side) ? "deliveries" : "boards"}`}</label></div>
         <div class="g-hint">Next test keeps this photo. The ghost isn’t part of the photo.</div>`
       : `<div class="g-entry" style="margin:0"><button class="g-btn pri" data-act="take">Take photo</button><button class="g-btn" data-act="pfile">Choose file…</button></div>
         <div class="g-hint">Space takes the photo. In this mockup the arrow keys move the board.</div>`}
@@ -997,7 +1018,7 @@ const say = (msg, kind) => { run.msg = msg; run.msgKind = kind || ""; };
 function record(ok, v) {
   const s = steps()[run.idx];
   run.results[s.key] = { v, ok }; run.idx = Math.min(run.idx + 1, steps().length - 1);
-  run.choice = null; run.autoDone = false; run.photoReview = false; run.ans = null; run.opt = null;
+  run.choice = null; run.autoDone = false; run.photoReview = false; run.ans = null; run.opt = null; run.files = [];
   run.scanWarned = false; say(""); render();
   const f = gui.querySelector("[data-in]"); if (f && frameFocus) f.focus({ preventScroll:true });
 }
@@ -1016,6 +1037,7 @@ function act(a, el) {
     case "nextstep": {
       if (!stepReady(s).ok) break;
       if (s.type === "choice") { run.shipType = run.opt; record(null, run.opt); }
+      else if (s.type === "files") record(null, run.files.join(", "));
       else if (s.type === "yn") record(s.ask === "yesno" ? run.choice === s.expect : run.choice, run.choice ? "Yes" : "No");
       else if (s.type === "value") { const n = Number(val("v")); record(s.judge ? run.choice : n >= s.lo && n <= s.hi, `${n} ${s.unit}`); }
       else if (s.type === "scan") record(null, val("v"));
@@ -1034,6 +1056,8 @@ function act(a, el) {
     case "retakephoto": run.idx = Math.max(0, run.idx - 1); delete run.results[st[run.idx].key]; run.photoReview = false; run.ans = null; say(""); render(); break;
     case "howtoggle": if (s.type === "page") run.howPageOpen = !run.howPageOpen; else run.howOpen = !run.howOpen; render(); break;
     case "opt": run.opt = el.dataset.v; render(); break;
+    case "pickfiles": { const inp = gui.querySelector("#dfilein"); inp.onchange = () => { [...inp.files].forEach(f => { if (run.files.length < 5 && !run.files.includes(f.name)) run.files.push(f.name); }); render(); }; inp.click(); break; }
+    case "rmfile": run.files.splice(+el.dataset.v, 1); render(); break;
     case "pgyn": run.pg[el.dataset.k] = el.dataset.v === "1"; render(); { const b = gui.querySelector(`[data-act="pgyn"][data-k="${el.dataset.k}"][data-v="${el.dataset.v}"]`); if (b) b.focus({ preventScroll:true }); } break;
     case "take": run.photoReview = true; run.photoSrc = "camera"; render(); break;
     case "pfile": run.photoReview = true; run.photoSrc = "file"; render(); break;
@@ -1042,7 +1066,7 @@ function act(a, el) {
       const cb = gui.querySelector("#asghost"), side = s.side;
       if (cb && cb.checked) run.hasGhost[side] = true;
       run.photoReview = false; run.off = { x:-7, y:5, r:-1.1 };
-      record(null, side === "front_panel" ? "SHIPMENT-PO-2026-118-FP-B07-front_panel.jpg" : `PTC-0042-${side}-20261021-1432.jpg`); break; }
+      record(null, run.mode === "ship" ? `SHIPMENT-PO-2026-118-${side}.jpg` : `PTC-0042-${side}-20261021-1432.jpg`); break; }
     case "home": run.screen = "start"; run.review = null; run.runLabel = null; say(""); render(); break;
     case "lookup": run.screen = "review"; run.review = "l1"; render(); break;
     case "open": run.screen = "review"; run.review = "l2"; run.sel = 0; render(); break;
@@ -1157,6 +1181,7 @@ function fillDemo(n) {
     else if (s.type === "photo") run.results[s.key] = { v:`PTC-0042-${s.side}.jpg`, ok:null };
     else if (s.type === "page") run.results[s.key] = { v:"All checks fine", ok:true };
     else if (s.type === "choice") run.results[s.key] = { v:run.shipType || "Front panels", ok:null };
+    else if (s.type === "files") run.results[s.key] = { v:"Certificate of conformance.pdf", ok:null };
     else if (s.type === "inspect") run.results[s.key] = { v:"Checked, none reversed", ok:true };
     else if (s.type === "checklist") run.results[s.key] = { v:"24.1 V, 410 mA", ok:true };
   });
@@ -1190,6 +1215,7 @@ document.getElementById("fillex").addEventListener("click", () => {
   else if (s.type === "photo") { act("take"); return; }
   else if (s.type === "inspect") { act("ans", { dataset:{ v:"correct" } }); return; }
   else if (s.type === "choice") { act("opt", { dataset:{ v:s.options[0].key } }); return; }
+  else if (s.type === "files") { if (!run.files.length) run.files = ["Certificate of conformance.pdf", "Inspection form.xlsx"]; render(); return; }
   else if (s.type === "page") {
     if (s.page === "auto") { const keys = PAGES.auto.tests.map(t => t.k); run.autoSt = Object.fromEntries(keys.map(k => [k, "pass"])); run.pg.over_temp_led = true; }
     else pageFields(s.page).forEach(f => { run.pg[f.k] = f.type === "yn" ? true : f.demo; if (f.type === "judged") run.pg[f.k + "_ok"] = true; });

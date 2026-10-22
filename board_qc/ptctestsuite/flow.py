@@ -16,7 +16,7 @@ from ptctestsuite.config.test_names import (pre_som_tests, som_boot_tests, alert
 from ptctestsuite.ui.base import TesterUI, Step, TestAborted, step_title, format_value
 from ptctestsuite.utils import qc_result, qc_record, init_ptc, start_client, manual_test
 from ptctestsuite.utils.qc_board import qc_board_handler
-from ptctestsuite.utils.photos import save_board_photo
+from ptctestsuite.utils.photos import save_board_photo, save_document
 from ptctestsuite.utils import board_records
 from ptctestsuite.utils.reception import reception_record, shipment_types, already_recorded, save_locally
 
@@ -238,6 +238,40 @@ STEP_FP_PHOTO = Step("front_panel_photo", "Front panel photo", "4.1.1",
     "The photo is kept on the station and uploaded to this delivery’s HWDB entry."])
 
 
+def _ship_photo(key, title, prompt, group, how):
+    return Step(key, title, "4.1", prompt, group, kind="photo", how=how)
+
+STEP_BARE_FRONT = _ship_photo("bare_pcb_photo_front", "Bare PCB photo, front", "Put a bare PCB from this delivery front "
+                              "side up under the camera, line it up with the ghost image and take the photo.", "Bare PCBs", [
+    "Take one bare PCB from the delivery and wear your ESD strap. Handle it by the edges.",
+    "Lay it front side up (the side with the Penn logo and part outlines), the same way round every time, and line it "
+    "up with the ghost outline.",
+    "Check there’s no glare on the pads, then press Take photo, or Space.",
+    "No ghost yet? Leave “Save as the ghost” ticked on a well lined-up photo."])
+STEP_BARE_BACK = _ship_photo("bare_pcb_photo_back", "Bare PCB photo, back", "Turn the bare PCB over top to bottom, line "
+                             "it up with the ghost image and take the photo.", "Bare PCBs", [
+    "Turn the board over top to bottom without moving the camera or lights.",
+    "Line it up with the back ghost the same way, then press Take photo.",
+    "No back ghost yet? Leave “Save as the ghost” ticked on a good photo."])
+
+def _cert_step(product_type: str) -> Step:
+    label = shipment_types[product_type]
+    return Step(f"{product_type}_certificate_file", "Vendor certificate upload", "4.1",
+                f"Add the vendor’s quality certificate for these {label.lower()}: the completed form as PDF or Excel, or "
+                "a scan. You can add more than one file.", label, kind="files", how=[
+        "Find the certificate in the delivery paperwork or the vendor’s email.",
+        "Drag the files onto the box, or press Choose files. PDF, Excel, PNG and JPEG are accepted.",
+        "Check the list shows every file, then press Next test. The files go to this delivery’s HWDB entry.",
+        "The next step asks whether the certificate is complete and acceptable."])
+
+# photos and certificate files for each kind of delivery: (step, photo side, HWDB comment)
+SHIP_PHOTOS = {"front_panels": [(STEP_FP_PHOTO, "front_panel", "Front panel photo")],
+               "bare_pcbs": [(STEP_BARE_FRONT, "bare_front", "Bare PCB photo, front"),
+                             (STEP_BARE_BACK, "bare_back", "Bare PCB photo, back")],
+               "assembled_pcbs": []}   # each assembled board is photographed in its own test
+SHIP_CERTIFICATE = {"bare_pcbs": _cert_step("bare_pcbs"), "assembled_pcbs": _cert_step("assembled_pcbs")}
+
+
 def ship_plan(product_type: str | None = None) -> list[Step]:
     """The shipment entry: the product choice, then the checks for that product only."""
     plan = [STEP_SHIP_TYPE]
@@ -246,8 +280,9 @@ def ship_plan(product_type: str | None = None) -> list[Step]:
         plan.append(Step(f"{product_type}_count_vs_po", step_title(f"{product_type}_count_vs_po"), "4.1",
                          f"Count the {label.lower()} received and compare with the purchase order.", label,
                          kind="counts"))
-        if product_type == "front_panels":
-            plan.append(STEP_FP_PHOTO)
+        plan += [step for step, _, _ in SHIP_PHOTOS[product_type]]
+        if product_type in SHIP_CERTIFICATE:
+            plan.append(SHIP_CERTIFICATE[product_type])
         plan += [Step.from_man_test(t, label) for t in reception_checks[product_type]]
     plan.append(STEP_NOTES)
     return plan
@@ -260,7 +295,9 @@ def ship_options() -> list[dict]:
         for t in reception_checks[key]:   # "Bare PCB vendor certificate" -> "vendor certificate"
             n = step_title(t["test_name"]).removeprefix(label[:-1] + " ")
             names.append(n[0].lower() + n[1:] if not n.split()[0].isupper() else n)
-        checks = ["count against the PO"] + (["photo"] if key == "front_panels" else []) + names
+        extra = {"front_panels": ["photo"], "bare_pcbs": ["front and back photos", "certificate upload"],
+                 "assembled_pcbs": ["certificate upload"]}[key]
+        checks = ["count against the PO"] + extra + [n.replace("vendor certificate", "certificate review") for n in names]
         out.append({"key": key, "label": label, "detail": f"{len(checks)} checks: " + ", ".join(checks)})
     return out
 
@@ -934,13 +971,21 @@ async def run_reception_check(ui: TesterUI, entry: dict, disable_hwdb: bool = Fa
     ordered, received = await ui.ask_counts(step)
     count_ok = qc_result.PASS if received == ordered else qc_result.FAIL
     r.add_result(f"{r.product_type}_count_vs_po", count_ok, {"ordered": ordered, "received": received})
-    panel_photo = None
-    if r.product_type == "front_panels":
-        # a photo of one front panel from the delivery, lined up with its own ghost like the board photos
-        panel_photo = await ui.ask_photo(STEP_FP_PHOTO, "front_panel")
-        path = save_board_photo(r.hwdb_serial, panel_photo)
-        r.photos["front_panel"] = path.name
-        ui.saved(STEP_FP_PHOTO.key, path.name)
+    attachments = []   # (file name, bytes, MIME type, HWDB comment), uploaded after the record
+    for step, side, comment in SHIP_PHOTOS[r.product_type]:
+        # lined up with its own ghost, like the board photos
+        photo = await ui.ask_photo(step, side)
+        path = save_board_photo(r.hwdb_serial, photo)
+        r.photos[side] = path.name
+        ui.saved(step.key, path.name)
+        attachments.append((path.name, photo.data, photo.mime, comment))
+    if r.product_type in SHIP_CERTIFICATE:
+        step = SHIP_CERTIFICATE[r.product_type]
+        for doc in await ui.ask_files(step, parameters.max_certificate_files):
+            path = save_document(r.hwdb_serial, doc)
+            r.documents.append(path.name)
+            attachments.append((path.name, doc.data, doc.mime, "Vendor certificate"))
+        ui.saved(step.key, ", ".join(r.documents))
     await run_manual_tests(ui, r, reception_checks[r.product_type])
 
     notes = await ui.ask_notes()
@@ -959,20 +1004,28 @@ async def run_reception_check(ui: TesterUI, entry: dict, disable_hwdb: bool = Fa
     except Exception as e:
         lg.exception(e)
         await ui.finish(r, f"The HWDB upload failed. {e} The shipment is saved in {parameters.reception_log_file}"
-                           + (f" and the photo in {parameters.photo_dir}" if panel_photo else "") + ".", False)
+                           + (f", with its files in {parameters.photo_dir} and {parameters.shipment_docs_dir}"
+                              if attachments else "") + ".", False)
         return
-    if panel_photo:
-        try:
-            from ptctestsuite.utils.hwdb import upload_ptc_image
-            ui.status("Uploading the front panel photo to the HWDB…")
-            await upload_ptc_image(item["part_id"], panel_photo.data, filename=r.photos["front_panel"],
-                                   comments="Front panel photo", mime=panel_photo.mime)
-        except Exception as e:
-            lg.exception(e)
-            await ui.finish(r, f"Saved to the HWDB as {r.hwdb_serial}, but the front panel photo upload failed. {e} "
-                               f"The photo is in {parameters.photo_dir}; add it to {item['part_id']} by hand.", False)
+    if attachments:
+        from ptctestsuite.utils.hwdb import upload_ptc_image
+        failed = []
+        for name, data, mime, comment in attachments:
+            try:
+                ui.status(f"Uploading {comment.lower()} to the HWDB…")
+                await upload_ptc_image(item["part_id"], data, filename=name, comments=comment, mime=mime)
+            except Exception as e:
+                lg.exception(e)
+                failed.append(f"{name} ({e})")
+        if failed:
+            await ui.finish(r, f"Saved to the HWDB as {r.hwdb_serial}, but these files didn’t upload: "
+                               + "; ".join(failed) + f". They’re kept on the station; add them to {item['part_id']} by "
+                               "hand.", False)
             return
-        await ui.finish(r, f"Saved to the HWDB as {r.hwdb_serial}, with the front panel photo.", True)
+        what = " and ".join(x for x in (f"{len(r.photos)} photo{'s' if len(r.photos) > 1 else ''}" if r.photos else "",
+                                        f"{len(r.documents)} certificate file{'s' if len(r.documents) > 1 else ''}"
+                                        if r.documents else "") if x)
+        await ui.finish(r, f"Saved to the HWDB as {r.hwdb_serial}, with {what}.", True)
         return
     await ui.finish(r, f"Saved to the HWDB as {r.hwdb_serial}.", True)
 

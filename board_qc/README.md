@@ -201,8 +201,8 @@ batch number, then chooses **what's in this shipment**, and only that product's 
 checks from section 4.1 follow:
 
 - Front panels: count vs purchase order, a photo of one front panel, 10% sample under the microscope with thumb screws present, 10% sample mechanical fit vs drawings
-- Bare PCBs: count vs purchase order, vendor quality certificate review
-- Assembled PCBs: count vs purchase order, vendor quality certificate review
+- Bare PCBs: count vs purchase order, photos of one bare PCB (front and back), the vendor certificate files, vendor quality certificate review
+- Assembled PCBs: count vs purchase order, the vendor certificate files, vendor quality certificate review (no photos: each assembled board is photographed in its own test)
 
 Each delivery goes to the same HWDB as the boards, as its own entry named after the purchase
 order, the product and the batch, for example `SHIPMENT-PO-2026-118-FP-B07` (`FP` front panels,
@@ -215,7 +215,15 @@ The front panel photo uses the same camera step as the board photos: a live view
 image to line the panel up, Take photo or Choose file, and Retake. The front panel has its own
 ghost (`ghost_images/front_panel.jpg`), set from the first good photo and changeable from the step.
 The photo is kept in `board_photos/` and uploaded to the delivery's HWDB entry as "Front panel photo".
-There's no orientation check on it, as a front panel has no polarised parts.
+There's no orientation check on it, as a front panel has no polarised parts. The bare PCB photos
+work the same way, with their own front and back ghosts (`bare_front.jpg`, `bare_back.jpg`),
+separate from the assembled board's.
+
+The vendor certificate step takes one or more files (PDF, Excel, PNG or JPEG, up to `photo_max_mb`
+each and `max_certificate_files` in all), chosen or dragged in. Each file is checked to really be the
+type its name says, kept in `shipment_documents/` and uploaded to the delivery's HWDB entry as
+"Vendor certificate"; the file names are recorded with the delivery. `hwdb_check` tries a PDF
+upload, as the HWDB's image endpoint may not take every file type.
 
 ## Board history, retests and repairs
 

@@ -169,6 +169,23 @@ class TerminalUI(TesterUI):
             answers[r.ref] = "correct" if await self._yesno(f"Is {r.ref} the right way round on the board?") else "reversed"
         return {"answers": answers}
 
+    async def ask_files(self, step: Step, max_files: int = 5) -> list:
+        from ptctestsuite.utils.photos import PhotoError, document_from_file
+        print(f"\n{self._msg(step)}")
+        docs = []
+        while len(docs) < max_files:
+            path = (await self.session.prompt_async(
+                f"Path to a PDF, Excel, PNG or JPEG file{' (Enter when done)' if docs else ''}: ")).strip().strip('"\'')
+            if not path:
+                if docs:
+                    break
+                continue
+            try:
+                docs.append(document_from_file(path))
+            except PhotoError as e:
+                print(e)
+        return docs
+
     async def ask_choice(self, step: Step, options: list[dict]) -> str:
         return await self._choose(f"{step.title}: {step.prompt}", [(o["key"], f"{o['label']} ({o['detail']})") for o in options])
 

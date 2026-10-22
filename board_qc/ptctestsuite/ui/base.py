@@ -237,6 +237,10 @@ class TesterUI:
     def end_page(self) -> None:
         """The page started by begin_page is finished."""
 
+    async def ask_files(self, step: Step, max_files: int = 5) -> list:
+        """One or more files (PDF, Excel, PNG, JPEG), e.g. a vendor certificate. Returns utils.photos.Document."""
+        raise NotImplementedError
+
     async def ask_choice(self, step: Step, options: list[dict]) -> str:
         """One of several options [{key, label, detail}]. Returns the chosen key."""
         raise NotImplementedError

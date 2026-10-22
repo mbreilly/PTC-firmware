@@ -26,6 +26,7 @@ class reception_record(qc_record):
     # serial_number holds the purchase order number for a shipment
     batch_number: str = ""
     product_type: str = ""   # a key of shipment_types: one kind of product per delivery
+    documents: list = field(default_factory=list)   # file names of the vendor certificates
 
     @property
     def key(self) -> str:

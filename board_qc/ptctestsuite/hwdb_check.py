@@ -110,6 +110,15 @@ async def main() -> int:
         report("Photo upload", True, "1x1 test image attached")
     except hwdb.HwdbError as e:
         report("Photo upload", False, str(e))
+    # vendor certificates are uploaded the same way, as PDF or Excel files
+    pdf = (b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\n"
+           b"trailer<</Root 1 0 R>>\n%%EOF\n")
+    try:
+        await hwdb.upload_ptc_image(part_id, pdf, filename=f"{serial}-certificate.pdf", comments="hwdb_check PDF",
+                                    mime="application/pdf")
+        report("PDF upload (vendor certificates)", True, "a small PDF attached")
+    except hwdb.HwdbError as e:
+        report("PDF upload (vendor certificates)", False, f"{e} Certificates would then stay on the station only.")
 
     print(f"\nThe throwaway board {serial} ({part_id}) stays in the dev HWDB.")
     return summary()

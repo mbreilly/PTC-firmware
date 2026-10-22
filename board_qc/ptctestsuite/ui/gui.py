@@ -454,6 +454,25 @@ class GuiUI(TesterUI):
         self.state["page"] = None
         self._push()
 
+    async def ask_files(self, step, max_files=5):
+        got = {}
+
+        def check(v):
+            files = (v or {}).get("files") if isinstance(v, dict) else None
+            if not files:
+                return "Add the certificate file first."
+            if len(files) > max_files:
+                return f"Add at most {max_files} files."
+            try:
+                got["docs"] = [photos.document_from_data_url(str(f.get("name", "file")), f.get("data")) for f in files]
+            except photos.PhotoError as e:
+                return str(e)
+            return None
+
+        await self._ask("files", step, check, accept=sorted(photos.DOC_TYPES), max_files=max_files,
+                        max_mb=parameters.photo_max_mb)
+        return got["docs"]
+
     async def ask_choice(self, step, options):
         keys = {o["key"] for o in options}
         return await self._ask("choice", step, lambda v: None if v in keys else "Choose one of the options.", options=options)

@@ -17,7 +17,7 @@ from loguru import logger as lg
 from ptctestsuite.config import parameters
 
 BOARD_SIDES = ("front", "back")           # the PTC's two sides, which also have the orientation check
-SIDES = BOARD_SIDES + ("front_panel",)    # photos with a ghost image (the front panel from a shipment too)
+SIDES = BOARD_SIDES + ("front_panel", "bare_front", "bare_back")   # photos with a ghost (shipments too)
 PHOTO_SIDES = SIDES + ("closeup",)        # close-ups of a defect or repair have no ghost
 MIME_EXT = {"image/jpeg": ".jpg", "image/png": ".png"}
 EXT_MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
@@ -83,6 +83,68 @@ def from_file(side: str, path: str | Path) -> Photo:
         raise PhotoError(f"Can't read {p} ({e.strerror}).")
     _check(mime, data)
     return Photo(side, data, mime, "file")
+
+
+# ---- documents (vendor certificates) ---------------------------------------------------
+
+DOC_TYPES = {".pdf": "application/pdf", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+             ".xls": "application/vnd.ms-excel", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+_DOC_MAGIC = {".pdf": (b"%PDF",), ".xlsx": (b"PK\x03\x04",), ".xls": (b"\xd0\xcf\x11\xe0",),
+              ".png": (b"\x89PNG\r\n\x1a\n",), ".jpg": (b"\xff\xd8",), ".jpeg": (b"\xff\xd8",)}
+
+
+@dataclass
+class Document:
+    name: str
+    data: bytes
+    mime: str
+
+
+def document(name: str, data: bytes) -> Document:
+    """A vendor certificate or similar file, checked to be the type its name says."""
+    ext = Path(name).suffix.lower()
+    if ext not in DOC_TYPES:
+        raise PhotoError(f"{name}: use a PDF, Excel, PNG or JPEG file.")
+    if not data:
+        raise PhotoError(f"{name} is empty.")
+    if len(data) > parameters.photo_max_mb * 1024 * 1024:
+        raise PhotoError(f"{name} is larger than {parameters.photo_max_mb} MB.")
+    if not data.startswith(_DOC_MAGIC[ext]):
+        raise PhotoError(f"{name} isn’t a valid {ext[1:].upper()} file.")
+    return Document(Path(name).name, data, DOC_TYPES[ext])
+
+
+def document_from_data_url(name: str, url: str) -> Document:
+    m = _DATA_URL.match(url or "")
+    if not m:
+        raise PhotoError(f"{name} didn’t arrive. Add it again.")
+    try:
+        data = base64.b64decode(m.group(2), validate=True)
+    except (binascii.Error, ValueError):
+        raise PhotoError(f"{name} arrived damaged. Add it again.")
+    return document(name, data)
+
+
+def document_from_file(path: str | Path) -> Document:
+    p = Path(path).expanduser()
+    try:
+        return document(p.name, p.read_bytes())
+    except OSError as e:
+        raise PhotoError(f"Can’t read {p} ({e.strerror}).")
+
+
+def save_document(serial: str, doc: Document) -> Path:
+    folder = Path(parameters.shipment_docs_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    stem, ext = Path(doc.name).stem, Path(doc.name).suffix.lower()
+    path = folder / f"{_safe(serial)}-{_safe(stem)}{ext}"
+    n = 2
+    while path.exists():
+        path = folder / f"{_safe(serial)}-{_safe(stem)}-{n}{ext}"
+        n += 1
+    path.write_bytes(doc.data)
+    lg.info(f"Saved {doc.name} for {serial} to {path}")
+    return path
 
 
 def _safe(name: str) -> str:
