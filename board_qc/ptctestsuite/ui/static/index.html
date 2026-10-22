@@ -812,7 +812,7 @@ function renderResults() {
     ${F.message ? `<div class="upload ${up}">${esc(F.message)}</div>` : ""}
     <div class="tbl"><table><thead><tr><th>Step</th>${SHOW_KEYS ? "<th>Database key</th>" : ""}<th>Value</th>${SHOW_LIMITS ? "<th>Accept</th>" : ""}<th>Result</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${F.notes ? `<div><span class="lbl">Notes</span>${esc(F.notes)}</div>` : ""}
-    ${Object.keys(S.photos || {}).length ? `<div class="thumbs">${["front", "back"].filter(sd => S.photos[sd]).map(sd => `<figure><a href="/photo/${sd}?v=${S.photos[sd]}" target="_blank" rel="noopener">${sd === "front" ? "Front" : "Back"}<img src="/photo/${sd}?v=${S.photos[sd]}" alt="${sd} of the board"></a></figure>`).join("")}</div>` : ""}
+    ${Object.keys(S.photos || {}).length ? `<div class="thumbs">${["front", "back", "front_panel"].filter(sd => S.photos[sd]).map(sd => `<figure><a href="/photo/${sd}?v=${S.photos[sd]}" target="_blank" rel="noopener">${{ front: "Front", back: "Back", front_panel: "Front panel" }[sd]}<img src="/photo/${sd}?v=${S.photos[sd]}" alt="${{ front: "Front of the board", back: "Back of the board", front_panel: "The front panel" }[sd]}"></a></figure>`).join("")}</div>` : ""}
     <div class="actions"><button class="btn pri" id="next" type="button">${S.mode === "ship" ? "New entry" : "Test next board"}</button></div></div>`;
   document.getElementById("next").onclick = () => answer(true);
   document.getElementById("next").focus();
@@ -915,7 +915,7 @@ async function startCamera(deviceId) {
 function updateGhost(side) {
   const g = $("ghost"); if (!g) return;
   if (!$("ghostOp")) { g.hidden = true; return; }   // close-ups have no ghost
-  const ver = S.ghosts[side], name = side === "front" ? "front" : "back";
+  const ver = S.ghosts[side], name = { front: "front", back: "back", front_panel: "front panel" }[side] || side;
   if (ver) {
     const src = `/ghost/${side}?v=${ver}`;
     if (g.dataset.src !== src) {
@@ -942,7 +942,8 @@ function showReview(dataUrl, source, side) {
   const hasGhost = !!S.ghosts[side];
   if ($("asGhost")) {
     $("asGhost").checked = !hasGhost;
-    $("asGhostLbl").textContent = hasGhost ? "Replace the ghost with this photo" : "Save as the ghost for the next boards";
+    $("asGhostLbl").textContent = hasGhost ? "Replace the ghost with this photo"
+      : `Save as the ghost for the next ${side === "front_panel" ? "deliveries" : "boards"}`;
   }
   $("photoKeys").textContent = "Next test (or Enter) keeps this photo. The ghost isn’t part of the photo.";
   updateNext();

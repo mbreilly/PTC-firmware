@@ -200,7 +200,7 @@ separately, so each delivery holds one kind of product. The tester enters the pu
 batch number, then chooses **what's in this shipment**, and only that product's reception
 checks from section 4.1 follow:
 
-- Front panels: count vs purchase order, 10% sample under the microscope with thumb screws present, 10% sample mechanical fit vs drawings
+- Front panels: count vs purchase order, a photo of one front panel, 10% sample under the microscope with thumb screws present, 10% sample mechanical fit vs drawings
 - Bare PCBs: count vs purchase order, vendor quality certificate review
 - Assembled PCBs: count vs purchase order, vendor quality certificate review
 
@@ -210,6 +210,12 @@ order, the product and the batch, for example `SHIPMENT-PO-2026-118-FP-B07` (`FP
 "Reception Check" test that also records the product. It is saved in `reception_records.jsonl`
 too. Other products, or a later batch, on the same purchase order are separate deliveries; only
 an exact repeat (same order, product and batch) is refused.
+
+The front panel photo uses the same camera step as the board photos: a live view with a ghost
+image to line the panel up, Take photo or Choose file, and Retake. The front panel has its own
+ghost (`ghost_images/front_panel.jpg`), set from the first good photo and changeable from the step.
+The photo is kept in `board_photos/` and uploaded to the delivery's HWDB entry as "Front panel photo".
+There's no orientation check on it, as a front panel has no polarised parts.
 
 ## Board history, retests and repairs
 

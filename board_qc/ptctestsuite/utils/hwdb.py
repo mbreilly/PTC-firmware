@@ -270,4 +270,4 @@ async def upload_reception_record(record) -> dict:
     }
     rj = await _request("POST", p, f"add the reception record for PO {record.serial_number}", json=req_payload)
     lg.info(f"Posted reception record for PO {record.serial_number}")
-    return rj
+    return {**(rj if isinstance(rj, dict) else {}), "part_id": item["part_id"]}

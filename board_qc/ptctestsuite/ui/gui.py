@@ -97,7 +97,7 @@ class GuiUI(TesterUI):
                 return Response(200, "OK", Headers([("Content-Type", "font/woff2"),
                                                     ("Content-Length", str(len(body))),
                                                     ("Cache-Control", "max-age=86400")]), body)
-        if path in ("/ghost/front", "/ghost/back"):
+        if path.startswith("/ghost/") and path.rsplit("/", 1)[1] in photos.SIDES:
             g = photos.ghost_path(path.rsplit("/", 1)[1])
             if g:
                 return self._file_response(g.read_bytes(), photos.EXT_MIME[g.suffix])
@@ -108,7 +108,7 @@ class GuiUI(TesterUI):
             stored = Path(parameters.photo_dir) / name
             if re.fullmatch(r"[A-Za-z0-9._-]+", name) and stored.suffix in photos.EXT_MIME and stored.is_file():
                 return self._file_response(stored.read_bytes(), photos.EXT_MIME[stored.suffix])
-        if path in ("/photo/front", "/photo/back"):
+        if path.startswith("/photo/") and path.rsplit("/", 1)[1] in photos.SIDES:
             p = self._photos.get(path.rsplit("/", 1)[1])
             if p:
                 return self._file_response(p.data, p.mime)
@@ -220,7 +220,7 @@ class GuiUI(TesterUI):
     # ---- inspection setup page (/inspection) ---------------------------------------
     async def _setup_message(self, ws, m: dict):
         side = m.get("side")
-        if side not in photos.SIDES:
+        if side not in photos.BOARD_SIDES:
             return
         send = lambda d: ws.send(json.dumps(d, default=str))
         kind = m.get("type")

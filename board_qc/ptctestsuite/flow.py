@@ -227,6 +227,17 @@ STEP_SHIP_TYPE = Step("product_type", "What’s in this shipment?", "4.1",
     "If the same purchase order delivers another product later, enter that delivery separately."])
 
 
+STEP_FP_PHOTO = Step("front_panel_photo", "Front panel photo", "4.1.1",
+                     "Put a front panel from this delivery under the camera, line it up with the ghost image and take "
+                     "the photo. You can choose an image file instead.", "Front panels", kind="photo", how=[
+    "Take one front panel from the delivery. Handle it by the edges; wear gloves if the finish marks easily.",
+    "Lay it under the camera outside face up, the same way round every time, and line it up with the ghost outline.",
+    "Check there’s no glare on the printing and the openings are sharp, then press Take photo, or Space.",
+    "No ghost yet? This is the first delivery. If the photo is well lined up, leave “Save as the ghost” ticked so the "
+    "next deliveries line up to it.",
+    "The photo is kept on the station and uploaded to this delivery’s HWDB entry."])
+
+
 def ship_plan(product_type: str | None = None) -> list[Step]:
     """The shipment entry: the product choice, then the checks for that product only."""
     plan = [STEP_SHIP_TYPE]
@@ -235,6 +246,8 @@ def ship_plan(product_type: str | None = None) -> list[Step]:
         plan.append(Step(f"{product_type}_count_vs_po", step_title(f"{product_type}_count_vs_po"), "4.1",
                          f"Count the {label.lower()} received and compare with the purchase order.", label,
                          kind="counts"))
+        if product_type == "front_panels":
+            plan.append(STEP_FP_PHOTO)
         plan += [Step.from_man_test(t, label) for t in reception_checks[product_type]]
     plan.append(STEP_NOTES)
     return plan
@@ -247,7 +260,7 @@ def ship_options() -> list[dict]:
         for t in reception_checks[key]:   # "Bare PCB vendor certificate" -> "vendor certificate"
             n = step_title(t["test_name"]).removeprefix(label[:-1] + " ")
             names.append(n[0].lower() + n[1:] if not n.split()[0].isupper() else n)
-        checks = ["count against the PO"] + names
+        checks = ["count against the PO"] + (["photo"] if key == "front_panels" else []) + names
         out.append({"key": key, "label": label, "detail": f"{len(checks)} checks: " + ", ".join(checks)})
     return out
 
@@ -921,6 +934,13 @@ async def run_reception_check(ui: TesterUI, entry: dict, disable_hwdb: bool = Fa
     ordered, received = await ui.ask_counts(step)
     count_ok = qc_result.PASS if received == ordered else qc_result.FAIL
     r.add_result(f"{r.product_type}_count_vs_po", count_ok, {"ordered": ordered, "received": received})
+    panel_photo = None
+    if r.product_type == "front_panels":
+        # a photo of one front panel from the delivery, lined up with its own ghost like the board photos
+        panel_photo = await ui.ask_photo(STEP_FP_PHOTO, "front_panel")
+        path = save_board_photo(r.hwdb_serial, panel_photo)
+        r.photos["front_panel"] = path.name
+        ui.saved(STEP_FP_PHOTO.key, path.name)
     await run_manual_tests(ui, r, reception_checks[r.product_type])
 
     notes = await ui.ask_notes()
@@ -935,11 +955,24 @@ async def run_reception_check(ui: TesterUI, entry: dict, disable_hwdb: bool = Fa
         from ptctestsuite.utils.hwdb import upload_reception_record
         await renew_token_if_needed()
         ui.status("Uploading the shipment to the HWDB…")
-        await upload_reception_record(r)
+        item = await upload_reception_record(r)
     except Exception as e:
         lg.exception(e)
-        await ui.finish(r, f"The HWDB upload failed. {e} The shipment is saved in {parameters.reception_log_file}.",
-                        False)
+        await ui.finish(r, f"The HWDB upload failed. {e} The shipment is saved in {parameters.reception_log_file}"
+                           + (f" and the photo in {parameters.photo_dir}" if panel_photo else "") + ".", False)
+        return
+    if panel_photo:
+        try:
+            from ptctestsuite.utils.hwdb import upload_ptc_image
+            ui.status("Uploading the front panel photo to the HWDB…")
+            await upload_ptc_image(item["part_id"], panel_photo.data, filename=r.photos["front_panel"],
+                                   comments="Front panel photo", mime=panel_photo.mime)
+        except Exception as e:
+            lg.exception(e)
+            await ui.finish(r, f"Saved to the HWDB as {r.hwdb_serial}, but the front panel photo upload failed. {e} "
+                               f"The photo is in {parameters.photo_dir}; add it to {item['part_id']} by hand.", False)
+            return
+        await ui.finish(r, f"Saved to the HWDB as {r.hwdb_serial}, with the front panel photo.", True)
         return
     await ui.finish(r, f"Saved to the HWDB as {r.hwdb_serial}.", True)
 

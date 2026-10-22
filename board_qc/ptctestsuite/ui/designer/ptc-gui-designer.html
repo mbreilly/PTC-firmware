@@ -501,6 +501,13 @@ const BOARD_STEPS = [
 ];
 const SHIP_STEPS = [
   { grp:"Front panels", sec:"4.1.1", key:"front_panels_count_vs_po", name:"Front panel count", prompt:"Count the front panels received and compare with the purchase order.", type:"po", acc:"Received equals ordered", demo:[50,50] },
+  { grp:"Front panels", sec:"4.1.1", key:"front_panel_photo", name:"Front panel photo", side:"front_panel", type:"photo", acc:"No pass or fail; saved with the delivery",
+    prompt:"Put a front panel from this delivery under the camera, line it up with the ghost image and take the photo.",
+    how:["Take one front panel from the delivery. Handle it by the edges; wear gloves if the finish marks easily.",
+         "Lay it under the camera outside face up, the same way round every time, and line it up with the ghost outline.",
+         "Check there’s no glare on the printing and the openings are sharp, then press Take photo, or Space.",
+         "No ghost yet? This is the first delivery. If the photo is well lined up, leave “Save as the ghost” ticked so the next deliveries line up to it.",
+         "The photo is kept on the station and uploaded to this delivery’s HWDB entry."] },
   { grp:"Front panels", sec:"4.1.1", key:"fp_microscope_sample", name:"Microscope sample", prompt:"Inspect 10% under the microscope. Thumb screws present and no defects?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Front panels", sec:"4.1.1", key:"fp_mechanical_fit_sample", name:"Mechanical fit sample", prompt:"Check 10% against the drawings. Do they fit?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Bare PCBs", sec:"4.1.2", key:"bare_pcbs_count_vs_po", name:"Bare PCB count", prompt:"Count the bare PCBs received and compare with the purchase order.", type:"po", acc:"Received equals ordered", demo:[52,52] },
@@ -522,11 +529,11 @@ const onColor = h => lum(h) > 0.35 ? "#0B0D0E" : "#FFFFFF";
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
 
 // ---- GUI run state ----
-const run = { screen:"start", mode:"board", tester:"Mike Reilly", serial:"PTC-0042", po:"", batch:"", idx:0, results:{}, notes:"", msg:"", msgKind:"", scanWarned:false, running:false, review:null, ticks:{}, qccur:"", qcvolt:"", runLabel:null, sel:0, chips:{}, closeups:0, mockSom:false, howOpen:true, howPageOpen:false, pg:{}, autoSt:null, choice:null, autoDone:false, photoReview:false, photoSrc:"camera", ghostOp:40, hasGhost:{ front:true, back:true }, off:{ x:9, y:-6, r:1.4 } };
+const run = { screen:"start", mode:"board", tester:"Mike Reilly", serial:"PTC-0042", po:"", batch:"", idx:0, results:{}, notes:"", msg:"", msgKind:"", scanWarned:false, running:false, review:null, ticks:{}, qccur:"", qcvolt:"", runLabel:null, sel:0, chips:{}, closeups:0, mockSom:false, howOpen:true, howPageOpen:false, pg:{}, autoSt:null, choice:null, autoDone:false, photoReview:false, photoSrc:"camera", ghostOp:40, hasGhost:{ front:true, back:true, front_panel:false }, off:{ x:9, y:-6, r:1.4 } };
 // a shipment holds one kind of product: choose it first, then only its checks follow
 const SHIP_CHOICE = { grp:"Shipment", sec:"4.1", key:"product_type", name:"What’s in this shipment?", type:"choice", acc:"One kind of product per delivery",
   prompt:"Each delivery holds one kind of product. Choose it, and only its checks follow.",
-  options:[{ key:"Front panels", detail:"3 checks: count against the PO, microscope sample, fit sample" },
+  options:[{ key:"Front panels", detail:"4 checks: count against the PO, photo, microscope sample, fit sample" },
            { key:"Bare PCBs", detail:"2 checks: count against the PO, vendor certificate" },
            { key:"Assembled PCBs", detail:"2 checks: count against the PO, vendor certificate" }],
   how:["Check the packing list and the boxes: front panels, bare PCBs and assembled PCBs arrive separately.",
@@ -702,15 +709,33 @@ function pcbSVG(outline, dx, dy, rot, side) {
       ${chips}
     </g></svg>`;
 }
+function panelSVG(outline, dx, dy, rot) {
+  const f = c => outline ? "none" : c, st = outline ? 'stroke="#ffffff" stroke-width="2.2"' : 'stroke="#55585c" stroke-width="1"';
+  const hole = (x, y, w, h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="1.5" fill="${f("#1a1c1e")}" ${st}/>`;
+  return `<svg viewBox="0 0 320 240" class="${outline ? "ghost" : ""}" style="${outline ? `opacity:${run.ghostOp / 100}` : ""}" aria-hidden="true">
+    <g transform="translate(${dx} ${dy}) rotate(${rot} 160 120)">
+      <rect x="20" y="95" width="280" height="50" rx="3" fill="${f("#b9bcbf")}" ${st}/>
+      ${[0, 1, 2].map(i => hole(150 + i * 26, 108, 20, 24)).join("")}${hole(234, 110, 22, 20)}${hole(72, 108, 40, 16)}
+      ${[0, 1, 2, 3, 4, 5].map(i => `<circle cx="${30 + i * 7}" cy="120" r="2" fill="${f("#2e3133")}" ${st}/>`).join("")}
+      ${[[27, 102], [293, 102], [27, 138], [293, 138]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3" fill="${f("#8d9195")}" ${st}/>`).join("")}
+      ${outline ? "" : '<text x="270" y="141" font-size="6" fill="#3a3d40" font-family="sans-serif">PTC</text>'}
+    </g></svg>`;
+}
 function photoEntry(s) {
   const has = run.hasGhost[s.side], rv = run.photoReview;
-  // the preproduction board photos (BRD# 006) stand in for the live camera and the ghost
-  const src = s.side === "back" ? REF_PHOTO.back : REF_PHOTO.front;
-  const ghost = has ? `<img class="ghost" src="${src}" alt="" style="opacity:${run.ghostOp / 100}">` : "";
-  const board = `<img src="${src}" alt="Live camera view" style="transform:translate(${(run.off.x / 3.2).toFixed(2)}%, ${(run.off.y / 1.8).toFixed(2)}%) rotate(${run.off.r}deg)">`;
+  let ghost, board;
+  if (s.side === "front_panel") {   // no photo of a front panel yet, so a drawing stands in for it
+    ghost = has ? panelSVG(true, 0, 0, 0) : "";
+    board = panelSVG(false, run.off.x, run.off.y, run.off.r);
+  } else {
+    // the preproduction board photos (BRD# 006) stand in for the live camera and the ghost
+    const src = s.side === "back" ? REF_PHOTO.back : REF_PHOTO.front;
+    ghost = has ? `<img class="ghost" src="${src}" alt="" style="opacity:${run.ghostOp / 100}">` : "";
+    board = `<img src="${src}" alt="Live camera view" style="transform:translate(${(run.off.x / 3.2).toFixed(2)}%, ${(run.off.y / 1.8).toFixed(2)}%) rotate(${run.off.r}deg)">`;
+  }
   return `<div class="g-cam">
     <div class="g-cambox photo">${board}${ghost}<span class="g-camtag">${rv ? (run.photoSrc === "file" ? "Chosen file" : "Photo") : "Live"}</span>
-      ${!has && !rv ? `<div class="g-camnote" style="align-items:flex-end;padding-bottom:12px">No ${s.side} ghost yet</div>` : ""}</div>
+      ${!has && !rv ? `<div class="g-camnote" style="align-items:flex-end;padding-bottom:12px">No ${s.side === "front_panel" ? "front panel" : s.side} ghost yet</div>` : ""}</div>
     <div class="g-camtools">
       <label>Camera <select aria-label="Camera"><option>USB camera</option></select></label>
       <label>Ghost <input type="range" min="0" max="100" step="5" value="${run.ghostOp}" data-op ${has ? "" : "disabled"} aria-label="Ghost opacity"><span class="mono" data-opout>${run.ghostOp} %</span></label>
@@ -718,7 +743,7 @@ function photoEntry(s) {
       ${has ? '<button class="g-btn" style="height:36px;padding:0 12px;font-size:.88em">Remove ghost</button>' : ""}
     </div>
     ${rv ? `<div class="g-entry" style="margin:0"><button class="g-btn" data-act="retake">Retake</button>
-        <label class="g-check2"><input type="checkbox" id="asghost" ${has ? "" : "checked"}>${has ? "Replace the ghost with this photo" : "Save as the ghost for the next boards"}</label></div>
+        <label class="g-check2"><input type="checkbox" id="asghost" ${has ? "" : "checked"}>${has ? "Replace the ghost with this photo" : `Save as the ghost for the next ${s.side === "front_panel" ? "deliveries" : "boards"}`}</label></div>
         <div class="g-hint">Next test keeps this photo. The ghost isn’t part of the photo.</div>`
       : `<div class="g-entry" style="margin:0"><button class="g-btn pri" data-act="take">Take photo</button><button class="g-btn" data-act="pfile">Choose file…</button></div>
         <div class="g-hint">Space takes the photo. In this mockup the arrow keys move the board.</div>`}
@@ -1017,7 +1042,7 @@ function act(a, el) {
       const cb = gui.querySelector("#asghost"), side = s.side;
       if (cb && cb.checked) run.hasGhost[side] = true;
       run.photoReview = false; run.off = { x:-7, y:5, r:-1.1 };
-      record(null, `PTC-0042-${side}-20261021-1432.jpg`); break; }
+      record(null, side === "front_panel" ? "SHIPMENT-PO-2026-118-FP-B07-front_panel.jpg" : `PTC-0042-${side}-20261021-1432.jpg`); break; }
     case "home": run.screen = "start"; run.review = null; run.runLabel = null; say(""); render(); break;
     case "lookup": run.screen = "review"; run.review = "l1"; render(); break;
     case "open": run.screen = "review"; run.review = "l2"; run.sel = 0; render(); break;

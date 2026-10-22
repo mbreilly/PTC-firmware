@@ -16,7 +16,8 @@ from loguru import logger as lg
 
 from ptctestsuite.config import parameters
 
-SIDES = ("front", "back")                 # sides with a ghost image
+BOARD_SIDES = ("front", "back")           # the PTC's two sides, which also have the orientation check
+SIDES = BOARD_SIDES + ("front_panel",)    # photos with a ghost image (the front panel from a shipment too)
 PHOTO_SIDES = SIDES + ("closeup",)        # close-ups of a defect or repair have no ghost
 MIME_EXT = {"image/jpeg": ".jpg", "image/png": ".png"}
 EXT_MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png"}
