@@ -290,7 +290,7 @@ button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accen
     </div>
     <div class="note" id="mockNote" hidden></div>
     <div class="frame" id="frame"><div class="gui" id="gui"></div></div>
-    <div class="hint">The preview works like the real thing. Each step fills in first (Pass or Fail, a reading, a photo) and <b>Next test</b> stays greyed out until the page is complete; Enter presses it. <button type="button" id="fillex" style="margin-left:6px">Fill this step with an example</button></div>
+    <div class="hint">The preview works like the real thing. Each step fills in first (Pass or Fail, a reading, a photo) and <b>Next test</b> stays greyed out until the page is complete; Enter presses it. <button type="button" id="fillex" style="margin-left:6px">Fill this step with an example</button> <span id="fillmsg" role="status"></span></div>
   </section>
 
   <section>
@@ -1117,7 +1117,25 @@ function fillDemo(n) {
   });
 }
 document.getElementById("fillex").addEventListener("click", () => {
-  if (run.screen !== "run") return;
+  const note = t => { const m = document.getElementById("fillmsg"); m.textContent = t; clearTimeout(note.t); note.t = setTimeout(() => m.textContent = "", 3500); };
+  if (run.screen === "start") {   // the start screen: tester, then a board serial or a shipment PO and batch
+    if (!run.tester.trim()) run.tester = "Mike Reilly";
+    if (run.mode === "board") run.serial = run.serial.trim() || "PTC-0042";
+    else { run.po = run.po.trim() || "PO-2026-118"; run.batch = run.batch.trim() || "B07"; }
+    say(""); render(); note("Filled in. Press " + (run.mode === "board" ? "Start board test." : "Start shipment entry.")); return;
+  }
+  if (run.screen === "review" && run.review === "r2") {   // the repair form mockup
+    const ins = gui.querySelectorAll(".g-in"), tas = gui.querySelectorAll(".g-ta");
+    if (ins[1]) ins[1].value = "C112";
+    if (tas[0]) tas[0].value = "Cold solder joint on U43 pin E7";
+    if (tas[1]) tas[1].value = "Reflowed U43 and checked the joints around it";
+    note("Filled in a sample repair."); return;
+  }
+  if (run.screen === "review" && run.review === "l1") {
+    const q = gui.querySelector('.g-form input.g-field'); if (q) q.value = "PTC-0042";
+    note("Filled in. Press Show history."); return;
+  }
+  if (run.screen !== "run") { note("There’s nothing to fill in on this screen."); return; }
   const s = steps()[run.idx], set = (n, v) => { const f = gui.querySelector(`[data-in="${n}"]`); if (f) f.value = v; };
   if (s.type === "value") { set("v", s.demo); if (s.judge) act("pick", { dataset:{ v:"1" } }); }
   else if (s.type === "yn") act("pick", { dataset:{ v:"1" } });
