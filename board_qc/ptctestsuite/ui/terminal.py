@@ -169,6 +169,31 @@ class TerminalUI(TesterUI):
             answers[r.ref] = "correct" if await self._yesno(f"Is {r.ref} the right way round on the board?") else "reversed"
         return {"answers": answers}
 
+    async def ask_page(self, step: Step, fields: list[dict], layout: dict, previous: dict | None = None,
+                       note: str | None = None) -> dict:
+        print(f"\n--- {step.title} ({step.section}) ---")
+        if note:
+            print(note)
+        out = dict(previous or {})
+        grid_hint = {k: r["hint"] for r in (layout.get("grid") or {}).get("rows", []) for k in r["keys"]}
+        for f in fields:
+            if f["key"] in out:
+                continue
+            label = f["label"] + (f" ({grid_hint[f['key']]})" if f["key"] in grid_hint else "")
+            if f.get("hint"):
+                label += f": {f['hint']}"
+            if f["kind"] == "number":
+                acc = f" [{f['acceptance']}]" if f.get("acceptance") else ""
+                out[f["key"]] = await self._float(f"{label}{acc}: ")
+            elif f["kind"] == "yesno":
+                out[f["key"]] = await self._yesno(label)
+            elif f["kind"] == "judged":
+                value = await self.session.prompt_async(f"{label} ({f.get('unit') or ''}): ")
+                out[f["key"]] = {"ok": await self._yesno("Is that a pass?"), "value": value}
+            else:
+                out[f["key"]] = await self.session.prompt_async(f"{label}: ")
+        return out
+
     async def ask_checklist(self, step: Step, items: list[dict], network: dict, previous: dict | None = None) -> dict:
         print(f"\n--- {step.title} ({step.section}) ---")
         ticks, volts, current = {}, None, None

@@ -100,6 +100,66 @@ def _orient_step(side: str) -> Step:
         "This check helps the visual inspection; it doesn’t replace it."])
 
 STEP_ORIENT = {"front": _orient_step("front"), "back": _orient_step("back")}
+STEP_PAGE_POWER = Step("page_power", "Power checks, no SoM", "4.3.1",
+                       "With no SoM fitted, take each reading and check each LED. Next test unlocks when all are filled in.",
+                       "Power checks, no SoM", kind="page", how=[
+    "Power the QC board with no SoM in the PTC.",
+    "Read the 48 V current on the supply’s display and measure VP12_LOCAL on the DVM.",
+    "For each DC-DC converter set SWT1 to that converter’s position only, measure the voltage at its RIPPLE test "
+    "point on the DVM, read its switching period on the scope (AC, 20 mV, 2 µs) and check its WIB LED.",
+    "Tab or Enter moves to the next box. A reading outside its limits turns orange: check it, as it’s saved as FAIL."])
+STEP_PAGE_SOM = Step("page_som", "SoM and boot", "4.3.2",
+                     "Fit the SoM and boot the PTC. Fill in everything on this page; Next test unlocks when it’s complete.",
+                     "SoM and boot", kind="page", how=[
+    "Power off. Scan the Data Matrix code on the SoM, then fit it, checking the connector keying.",
+    "Power on and read the boot current a few seconds later; watch the amber LED on the SoM.",
+    "Check the front panel LEDs once it has booted, then log in as root on the serial port (115200 8N1).",
+    "Run init 0, power off for 60 s and power on; do this 5 times and count the good boots.",
+    "Enter the room temperature from the bench thermometer."])
+STEP_PAGE_AUTO = Step("page_auto", "Automatic tests", "4.5.1",
+                      "These run on the PTC one after another. Watch the OVER TEMP LED while the sensor alert test runs.",
+                      "Automatic tests", kind="page", how=[
+    "The tests start by themselves and each shows its result as it finishes.",
+    "While the sensor alert test runs, watch the OVER TEMP LED on the front panel: it should light red.",
+    "When every test has finished, answer the OVER TEMP LED question. Next test then unlocks."])
+AUTO_PAGE_KEYS = ["eeprom", "memory", "iv_sensors", "qc_iv_sensors_25pct", "temperature", "alert"]
+
+
+def _hide(step: Step) -> Step:
+    step.hidden = True
+    return step
+
+
+def page_field(step: Step) -> dict:
+    """One check on a page, from its Step."""
+    kind = {"number": "number", "yesno": "yesno", "judged": "judged"}.get(step.kind, "text")
+    question = kind == "yesno"
+    return {"key": step.key, "label": step.prompt if question else step.title, "hint": "" if question else step.prompt,
+            "kind": kind, "unit": "µs" if step.unit == "us" else step.unit, "limits": step.limits,
+            "acceptance": step.acceptance or ("You decide" if kind == "judged" else "")}
+
+
+def record_page_answers(q: qc_record, tests: list, answers: dict) -> None:
+    """Records a page's man_test answers exactly as run_manual_tests would, one result per check."""
+    for t in tests:
+        with manual_test(**t) as test:
+            v = answers[test.test_name]
+            if test.limits is not None:
+                q.add_result(test.test_name, test.evaluate(float(v)), float(v), test.unit, test.limits)
+            elif test.accepts_value:
+                q.add_result(test.test_name, qc_result(int(bool(v["ok"]))), _number_or_text(v["value"]), test.unit)
+            else:
+                q.add_result(test.test_name, qc_result(int(bool(v))), "Yes" if v else "No", test.unit)
+
+
+def report_page(ui: TesterUI, q: qc_record, step: Step, keys: list[str]) -> None:
+    """Puts the page's overall result on its entry in the step list."""
+    bad = [k for k in keys if k in q.test_status and q.test_status[k]["result"] != qc_result.PASS]
+    worst = qc_result.ERROR if any(q.test_status[k]["result"] == qc_result.ERROR for k in bad) else qc_result.FAIL
+    ui.result(step.key, worst if bad else qc_result.PASS,
+              f"All {len(keys)} fine" if not bad else f"{len(bad)} of {len(keys)} not fine: " + ", ".join(step_title(k) for k in bad))
+
+
 STEP_PREP = Step("prep", "Prepare the test stand", "4.2.3",
                  "Seat the PTC on the QC board and power the QC board up. Tick each row as you do it.",
                  "Test stand preparation", kind="checklist", how=[
@@ -123,18 +183,19 @@ def board_plan() -> list[Step]:
     plan = [STEP_PHOTO_FRONT, STEP_ORIENT["front"], STEP_PHOTO_BACK, STEP_ORIENT["back"], STEP_PREP]
     plan += [Step(t["key"], t["title"], "4.2.3", t["detail"], "Test stand preparation", kind="check", hidden=True)
              for t in prep_checklist]
-    plan += [Step.from_man_test(t, g) for t in pre_som_tests]
+    plan += [STEP_PAGE_POWER] + [_hide(Step.from_man_test(t, g)) for t in pre_som_tests]
     g = "SoM and boot"
-    plan += [STEP_SOM_SERIAL] + [Step.from_man_test(t, g) for t in som_boot_tests] + [STEP_AMBIENT]
+    plan += [STEP_PAGE_SOM] + [_hide(s) for s in [STEP_SOM_SERIAL] + [Step.from_man_test(t, g) for t in som_boot_tests]
+                                + [STEP_AMBIENT]]
     g = "Automatic tests"
-    plan += [
+    plan += [STEP_PAGE_AUTO] + [_hide(s) for s in [
         _auto("eeprom", "4.5.2", "Reads the unique serial ID from the EEPROM.", g),
         _auto("memory", "4.5", "Runs fillmem on the PTC to check its memory.", g),
         _auto("iv_sensors", "4.5.1", "Reads the voltage and current sensors on the PTC with all WIB outputs on.", g),
         _auto("qc_iv_sensors_25pct", "4.5.1", "Reads the 6 QC board sensors with every converter at 25% load.", g),
         _auto("temperature", "4.5.1", "Reads the board temperature sensors and compares them with the room.", g),
         _auto("alert", "4.5.1", "Triggers each sensor alert and checks the sensor and FPGA both flag it.", g),
-    ] + [Step.from_man_test(t, g) for t in alert_led_tests]
+    ] + [Step.from_man_test(t, g) for t in alert_led_tests]]
     g = "DC-DC load test"
     for n in range(6):
         for _, amps in load_steps:
@@ -596,20 +657,37 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
     if await ui.confirm("Power checks without the SoM",
                         "Run the manual checks without the SoM (4.3)? The SoM must not be installed for these. Skip them if it already is.",
                         yes="Run them", no="Skip, SoM is installed"):
-        await run_manual_tests(ui, q, pre_som_tests)
+        fields = {f["key"]: f for f in (page_field(Step.from_man_test(t)) for t in pre_som_tests)}
+        board_rows = [k for k in fields if not k.startswith(("ripple", "wib"))]
+        layout = {"rows": board_rows, "grid": {
+            "columns": [{"label": "Output at RIPPLE n", "hint": fields["ripple0"]["acceptance"] + " on the DVM"},
+                        {"label": "Switching period", "hint": fields["ripple0_switch_period"]["acceptance"] + " on the scope"},
+                        {"label": "WIB n LED on?", "hint": "Yes"}],
+            "rows": [{"label": f"DC-DC {n}", "hint": f"SWT1 position {n + 1} only",
+                      "keys": [f"ripple{n}", f"ripple{n}_switch_period", f"wib{n}_led"]} for n in range(6)]}}
+        answers = await ui.ask_page(STEP_PAGE_POWER, list(fields.values()), layout)
+        record_page_answers(q, pre_som_tests, answers)
+        report_page(ui, q, STEP_PAGE_POWER, list(fields))
         await ui.instruct("Install the SoM", "Set all DIP switches OFF, power off, install the SoM and put the PTC "
                                              "back on the QC board.")
     else:
-        ui.skipped([t["test_name"] for t in pre_som_tests])
+        ui.skipped([STEP_PAGE_POWER.key] + [t["test_name"] for t in pre_som_tests])
 
     # 4.3.2 SoM tests
     # the Enclustra label is a Data Matrix code holding only the 10 digit serial printed beside it
+    som_fields = [page_field(STEP_SOM_SERIAL)] + [page_field(Step.from_man_test(t)) for t in som_boot_tests] \
+        + [page_field(STEP_AMBIENT)]
+    answers, note = None, None
     while True:
-        q.som_serial = (await ui.ask_text(STEP_SOM_SERIAL)).strip()
+        answers = await ui.ask_page(STEP_PAGE_SOM, som_fields, {"rows": [f["key"] for f in som_fields]},
+                                    previous=answers, note=note)
+        note = None
+        q.som_serial = str(answers["som_serial"]).strip()
         if not (q.som_serial.isdigit() and len(q.som_serial) == 10) and not await ui.confirm(
                 "Check the SoM serial",
                 f"{q.som_serial or 'That'} doesn’t look like a 10 digit Enclustra serial. Keep it anyway?",
                 yes="Keep it", no="Scan again"):
+            answers.pop("som_serial"); note = "Scan the SoM serial again."
             continue
         # a SoM should only ever be on one PTC: warn (don't block) if it was recorded on another
         others = board_records.boards_with_som(q.som_serial, serial)
@@ -621,13 +699,15 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
                     "only be on one PTC. If it was moved to this board on purpose, keep it and the move is noted with "
                     "the results. Otherwise scan the SoM again.",
                     yes="Keep it, the SoM was moved", no="Scan again"):
+                answers.pop("som_serial"); note = "Scan the SoM serial again."
                 continue
             q.som_moved_from = o["serial"]
         break
     ui.saved("som_serial", q.som_serial + (f", moved from {q.som_moved_from}" if q.som_moved_from else ""))
-    await run_manual_tests(ui, q, som_boot_tests)
-    q.ambient_temperature = await ui.ask_number(STEP_AMBIENT)
+    record_page_answers(q, som_boot_tests, answers)
+    q.ambient_temperature = float(answers["ambient_temperature"])
     ui.saved("ambient_temperature", f"{q.ambient_temperature:g} °C")
+    report_page(ui, q, STEP_PAGE_SOM, [t["test_name"] for t in som_boot_tests])
 
     # try to init the PTC on the default serial port, discovering its DHCP IP
     ui.status("Setting up the PTC network over the serial port…")
@@ -662,6 +742,7 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
     try:
         qc = qc_board_handler(debug_run=debug)
         async with connect(f"ws://{ptc_ip}:{parameters.ws_port}") as ws:
+            ui.begin_page(STEP_PAGE_AUTO, [{"key": k, "label": plan[k].title} for k in AUTO_PAGE_KEYS])
             for t in test_sequence:
                 _, values = await run_remote_test(ui, plan, ws, q, t['test_type'], t['test_params'], t.get('test_name'))
                 if t['test_type'] == 'eeprom' and values:
@@ -684,7 +765,11 @@ async def run_ptc_test(ui: TesterUI, entry: dict, debug: bool = False, disable_h
             await run_remote_test(ui, plan, ws, q, "qc_iv_sensors", test_name="qc_iv_sensors_25pct")
             await run_remote_test(ui, plan, ws, q, "temperature", {"ambient": q.ambient_temperature})
             await run_remote_test(ui, plan, ws, q, "alert")
-            await run_manual_tests(ui, q, alert_led_tests)
+            led = [page_field(Step.from_man_test(t)) for t in alert_led_tests]
+            answers = await ui.ask_page(STEP_PAGE_AUTO, led, {"rows": [f["key"] for f in led], "progress": True})
+            record_page_answers(q, alert_led_tests, answers)
+            ui.end_page()
+            report_page(ui, q, STEP_PAGE_AUTO, AUTO_PAGE_KEYS + [t["test_name"] for t in alert_led_tests])
 
             # 4.4.1 load test
             await run_load_tests(ui, plan, ws, q, qc)

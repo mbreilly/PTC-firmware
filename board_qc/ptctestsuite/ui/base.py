@@ -223,6 +223,20 @@ class TesterUI:
         the photo again, or {"skip": True} to carry on without the check when it couldn't run."""
         raise NotImplementedError
 
+    async def ask_page(self, step: Step, fields: list[dict], layout: dict, previous: dict | None = None,
+                       note: str | None = None) -> dict:
+        """Several checks answered on one page. fields are page_field() dicts; layout has "rows" (keys
+        in order), an optional "grid" (a table of keys) and "progress" (show the automatic tests run
+        since begin_page above the fields). Returns {key: value}: a float for number fields, a bool for
+        yesno, {"ok": bool, "value": str} for judged, a str for text. previous fills the page in again."""
+        raise NotImplementedError
+
+    def begin_page(self, step: Step, tests: list[dict]) -> None:
+        """Automatic tests [{key, label}] are about to run as one page; their results show on it."""
+
+    def end_page(self) -> None:
+        """The page started by begin_page is finished."""
+
     async def after_auto(self, step: Step, result: qc_result, value_text: str) -> None:
         """An automatic test has finished. The GUI shows its result and waits for Next test."""
 

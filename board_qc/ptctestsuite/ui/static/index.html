@@ -132,6 +132,22 @@ textarea.field { font: 1.05em var(--g-font); height: 140px; width: 100%; max-wid
 .ci .pw { display: flex; gap: 6px; align-items: center; }
 .ci .pw .field { height: 42px; width: 92px; font-size: 1.05em; padding: 0 10px; }
 .ci .pw .unit { font-size: 1em; }
+.pg { display: flex; flex-direction: column; gap: 10px; }
+.pg-t { border-collapse: collapse; width: 100%; font-size: .94em; }
+.pg-t th, .pg-t td { padding: 5px 10px 5px 0; text-align: left; vertical-align: middle; border-bottom: 1px solid color-mix(in srgb, var(--g-line) 60%, transparent); }
+.pg-t tbody th { font-weight: 500; width: 36%; }
+.pg-t th span { display: block; font-weight: 400; font-size: .8em; color: var(--g-dim); }
+.pg-t thead th { color: var(--g-dim); font-weight: 500; font-size: .86em; }
+.pg-grid tbody th { width: 18%; }
+.pg-cell { display: inline-flex; gap: 6px; align-items: center; }
+.pg-in { height: 40px; width: 104px; font-size: 1.1em; padding: 0 10px; }
+.pg-in.wide { width: 220px; }
+.pg-in.ok { border-color: color-mix(in srgb, var(--g-pass) 70%, var(--g-line)); }
+.pg-in.warn { border-color: var(--g-warn); box-shadow: 0 0 0 1px var(--g-warn); }
+.pg-acc { color: var(--g-dim); font-size: .86em; }
+.pg-yn { display: inline-flex; gap: 6px; }
+.pg-yn .btn.opt { min-width: 66px; height: 38px; padding: 0 12px; font-size: .95em; }
+.pg-run { color: var(--g-auto); } .pg-dim { color: var(--g-dim); }
 .insp { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
 .insp-img { display: block; width: min(100%, 540px); border: 1px solid var(--g-line); border-radius: var(--g-r); }
 .insp-side { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 12px; }
@@ -325,7 +341,7 @@ function renderSide() {
 
 // ---- main panel ----
 function stepHead(st, kindLabel) {
-  const kind = kindLabel === "auto" ? '<span class="kind auto">Automatic</span>' : kindLabel === "manual" ? '<span class="kind manual">Manual check</span>' : kindLabel === "photo" ? '<span class="kind manual">Photo</span>' : kindLabel === "checklist" ? '<span class="kind manual">Checklist</span>' : kindLabel === "inspect" ? '<span class="kind auto">Checked automatically</span>' : "";
+  const kind = kindLabel === "auto" ? '<span class="kind auto">Automatic</span>' : kindLabel === "manual" ? '<span class="kind manual">Manual check</span>' : kindLabel === "photo" ? '<span class="kind manual">Photo</span>' : kindLabel === "checklist" ? '<span class="kind manual">Checklist</span>' : kindLabel === "inspect" ? '<span class="kind auto">Checked automatically</span>' : kindLabel === "page" ? '<span class="kind manual">All on one page</span>' : kindLabel === "autopage" ? '<span class="kind auto">Automatic</span>' : "";
   const acc = accText(st);
   return `<div class="sec">${st.section ? `<span>Section ${esc(st.section)}</span>` : ""}${kind}</div>
     <h1 class="name">${esc(st.title)}</h1><p class="prompt">${esc(st.prompt)}</p>
@@ -364,6 +380,48 @@ function inspectHTML(a) {
     <div class="insp-side"><div class="insp-sum">${a.flagged.length ? `${a.checked} parts checked: ${ok} look right, <b>${a.flagged.length} to confirm</b>.` : `All ${a.checked} parts look the right way round.`}</div>
       ${flags}<div><button class="btn small" data-a="retake" type="button">Retake photo</button></div></div></div>`;
 }
+// ---- several checks on one page ----
+function pageValue(f) {   // the current answer for a field, from the page
+  if (f.kind === "yesno") return pend.page[f.key];
+  const el = document.querySelector(`[data-pk="${f.key}"]`), raw = el ? el.value.trim() : "";
+  if (f.kind === "judged") return { ok: pend.page[f.key + "#ok"], value: raw };
+  return raw;
+}
+function pageState(f) {
+  const v = pageValue(f);
+  if (f.kind === "yesno") return v === undefined ? "empty" : v ? "ok" : "warn";
+  if (f.kind === "judged") return !v.value || v.ok === undefined ? "empty" : v.ok ? "ok" : "warn";
+  if (v === "") return "empty";
+  if (f.kind === "text") return f.key === "som_serial" && !/^\d{10}$/.test(v) ? "warn" : "ok";
+  const n = Number(v); if (!isFinite(n)) return "empty";
+  if (!f.limits) return "ok";
+  const [lo, hi] = f.limits; return n < lo || (hi !== null && n > hi) ? "warn" : "ok";
+}
+function pgYN(key, labels) {
+  const v = pend.page[key], [L1, L0] = labels || ["Yes", "No"];
+  return `<span class="pg-yn">${[[true, L1, "y"], [false, L0, "y"]].map(([val, L]) => `<button class="btn opt ${labels ? (val ? "p" : "f") : "y"} ${v === val ? "on" : ""}" type="button" data-pv="${val ? 1 : 0}" data-pkey="${esc(key)}" data-label="${L}" aria-pressed="${v === val}">${v === val ? "✓ " : ""}${L}</button>`).join("")}</span>`;
+}
+function pgField(f) {
+  if (f.kind === "yesno") return pgYN(f.key);
+  const prev = (S.ask.previous || {})[f.key];
+  const val = prev === undefined ? "" : f.kind === "judged" ? prev.value : prev;
+  const box = `<span class="pg-cell"><input class="field pg-in ${f.kind === "text" ? "wide" : ""}" data-pk="${esc(f.key)}" ${f.kind === "text" ? "" : 'inputmode="decimal"'} autocomplete="off" value="${esc(val)}" aria-label="${esc(f.label)}">${f.unit ? `<span class="unit">${esc(f.unit)}</span>` : ""}</span>`;
+  return f.kind === "judged" ? box + " " + pgYN(f.key + "#ok", ["Pass", "Fail"]) : box;
+}
+function progressHTML(page) {
+  return `<table class="pg-t"><tbody>${page.tests.map(t => `<tr><th>${esc(t.label)}</th><td>${
+    t.status === "WAIT" ? '<span class="pg-dim">Waiting</span>' : t.status === "RUN" ? '<span class="pg-run"><span class="spin"></span>Running…</span>'
+      : `${badge(t.status)} <span class="mono">${esc(t.value)}</span>`}</td></tr>`).join("")}</tbody></table>`;
+}
+function pageHTML(a) {
+  const F = Object.fromEntries(a.fields.map(f => [f.key, f])), L = a.layout;
+  const rows = (L.rows || []).map(k => { const f = F[k];
+    return `<tr><th>${esc(f.label)}${f.hint ? `<span>${esc(f.hint)}</span>` : ""}</th><td>${pgField(f)}</td><td class="pg-acc">${esc(f.acceptance || "")}</td></tr>`; }).join("");
+  const grid = L.grid ? `<table class="pg-t pg-grid"><thead><tr><th>Converter</th>${L.grid.columns.map(c => `<th>${esc(c.label)}<span>${esc(c.hint)}</span></th>`).join("")}</tr></thead>
+      <tbody>${L.grid.rows.map(r => `<tr><th>${esc(r.label)}<span>${esc(r.hint)}</span></th>${r.keys.map(k => `<td>${pgField(F[k])}</td>`).join("")}</tr>`).join("")}</tbody></table>` : "";
+  return stepHead(a.step, L.progress ? "autopage" : "page") + (a.note ? `<div class="warnbox">${esc(a.note)}</div>` : "")
+    + `<div class="pg">${L.progress && S.page ? progressHTML(S.page) : ""}${rows ? `<table class="pg-t"><tbody>${rows}</tbody></table>` : ""}${grid}</div>`;
+}
 function askHTML(a) {
   const st = a.step, u = st ? unitText(st.unit) : "";
   const unit = u ? `<span class="unit">${esc(u)}</span>` : "";
@@ -376,6 +434,7 @@ function askHTML(a) {
     case "photo": return stepHead(st, "photo") + photoHTML(a.side, a.optional);
     case "checklist": return stepHead(st, "checklist") + checklistHTML(a);
     case "inspect": return stepHead(st, "inspect") + inspectHTML(a);
+    case "page": return pageHTML(a);
     case "autodone": return stepHead(st, "auto") + `<div class="autores"><span>Result</span><b>${esc(a.value || "No value")}</b>${badge(a.result)}</div>`;
     case "retest": return retestHTML(a.board);
     case "repair": return repairHTML(a.form);
@@ -386,7 +445,7 @@ function askHTML(a) {
   return "";
 }
 // what the current page still needs before Next test unlocks
-const NEXT_KINDS = ["number", "yesno", "judged", "text", "counts", "photo", "checklist", "autodone", "notes", "inspect"];
+const NEXT_KINDS = ["number", "yesno", "judged", "text", "counts", "photo", "checklist", "autodone", "notes", "inspect", "page"];
 function fieldVal(id) { const el = document.getElementById(id); return el ? el.value.trim() : ""; }
 function ready(a) {
   const st = a.step || {};
@@ -430,6 +489,16 @@ function ready(a) {
       if (left) return { ok: false, hint: `${left} flagged ${left === 1 ? "part" : "parts"} to answer.` };
       return Object.values(pend.answers).includes("reversed") ? { ok: true, warn: true, hint: "Reversed parts are saved as FAIL." } : { ok: true };
     }
+    case "page": {
+      const states = a.fields.map(pageState), left = states.filter(x => x === "empty").length;
+      const bad = a.fields.filter((f, i) => states[i] === "warn" && f.kind !== "text").length;
+      const serial = a.fields.some((f, i) => states[i] === "warn" && f.kind === "text");
+      if (left) return { ok: false, hint: `${left} of ${a.fields.length} left to fill in.` };
+      const parts = [];
+      if (bad) parts.push(`${bad} ${bad === 1 ? "entry is" : "entries are"} outside the limits or No; saved as FAIL.`);
+      if (serial) parts.push("The SoM serial isn’t 10 digits; you’ll be asked to check it.");
+      return parts.length ? { ok: true, warn: true, hint: parts.join(" ") } : { ok: true };
+    }
     case "autodone": case "notes": return { ok: true };
   }
   return { ok: false, hint: "" };
@@ -445,6 +514,7 @@ function nextValue(a) {
     case "checklist": return { ticks: { ...pend.ticks }, voltage: +fieldVal("ck-v"), current: +fieldVal("ck-i") };
     case "autodone": return true;
     case "inspect": return { answers: { ...pend.answers } };
+    case "page": return Object.fromEntries(a.fields.map(f => { const v = pageValue(f); return [f.key, f.kind === "number" ? Number(v) : v]; }));
   }
 }
 function updateNext() {
@@ -453,7 +523,7 @@ function updateNext() {
   const a = S.ask;
   const hide = a && !NEXT_KINDS.includes(a.kind);
   bar.querySelector(".nextwrap").hidden = !!hide;
-  if (!a) { b.disabled = true; h.textContent = S.running ? "The test is running." : "Please wait."; h.className = "nexthint"; return; }
+  if (!a) { b.disabled = true; h.textContent = S.page ? "The tests are running." : S.running ? "The test is running." : "Please wait."; h.className = "nexthint"; return; }
   if (hide) return;
   const r = ready(a);
   b.disabled = !r.ok || sentId === a.id;
@@ -515,6 +585,7 @@ function lastHTML() {
 }
 function mainHTML() {
   if (S.ask) return askHTML(S.ask);
+  if (S.page) return stepHead(S.page.step, "autopage") + `<div class="pg">${progressHTML(S.page)}</div>` + (S.status ? `<div class="msg run"><span class="spin"></span>${esc(S.status)}</div>` : "");
   if (S.running) return stepHead(S.running, "auto") + `<div class="msg run"><span class="spin"></span>Running on the PTC…</div>`;
   if (S.status) return `<div class="sec"></div><h1 class="name">Please wait</h1><div class="msg run"><span class="spin"></span>${esc(S.status)}</div>`;
   return `<div class="msg run"><span class="spin"></span>Working…</div>`;
@@ -522,13 +593,16 @@ function mainHTML() {
 
 function renderRun() {
   const plan = S.plan.filter(p => !p.hidden), done = plan.filter(p => S.results[p.key]).length;
-  const key = JSON.stringify(["run", S.ask && S.ask.id, S.running && S.running.key, S.status]);
+  const key = JSON.stringify(["run", S.ask && S.ask.id, S.running && S.running.key, S.status, !S.ask && S.page ? S.page.tests.map(t => t.status) : null]);
   if (key !== viewKey || !screen.querySelector(".body")) {
     viewKey = key; pendingWarn = null;
     const keep = S.ask && S.ask.previous && S.ask.previous.ticks ? { ...S.ask.previous.ticks } : {};
-    pend = { choice: null, ticks: keep, answers: {} };
+    const prevPage = {};
+    if (S.ask && S.ask.kind === "page") Object.entries(S.ask.previous || {}).forEach(([k, v]) => { if (typeof v === "boolean") prevPage[k] = v; else if (v && typeof v === "object") prevPage[k + "#ok"] = v.ok; });
+    pend = { choice: null, ticks: keep, answers: {}, page: prevPage };
     const st = (S.ask && S.ask.step) || S.running, how = st && st.how && st.how.length ? st.how : null;
-    const open = store.get("ptc-how-open", "1") === "1";
+    const howKey = st && st.kind === "page" ? "ptc-how-page-open" : "ptc-how-open";
+    const open = store.get(howKey, st && st.kind === "page" ? "0" : "1") === "1";
     screen.innerHTML = `<div class="body"><aside class="side" id="side"></aside><main class="main ${how && open ? "with-how" : ""}"><div class="stepcol"><div id="mainc" style="display:flex;flex-direction:column;gap:16px"></div><div class="msg" id="msg" role="status"></div>
         <div class="nextbar" id="nextbar"><div id="lastc" style="flex:1;min-width:0"></div><div class="nextwrap"><button class="btn pri next" id="next" type="button" disabled>Next test</button><span class="nexthint" id="nexthint" role="status"></span></div></div></div>
         ${how && open ? `<aside class="howcard" aria-label="How to run this test"><div class="howhd"><span>How to run this test</span><button class="howbtn" type="button" id="howhide">Hide</button></div><ol>${how.map(h => `<li>${esc(h)}</li>`).join("")}</ol></aside>` : ""}</main></div>
@@ -538,12 +612,12 @@ function renderRun() {
     document.getElementById("mainc").innerHTML = mainHTML();
     if (how && !open) { const sec = screen.querySelector("#mainc .sec"); if (sec) sec.insertAdjacentHTML("beforeend", '<button class="howbtn" type="button" id="howshow" style="margin-left:auto">How to run this test</button>'); }
     const hh = document.getElementById("howhide"), hs = document.getElementById("howshow");
-    if (hh) hh.onclick = () => { store.set("ptc-how-open", "0"); viewKey = ""; render(); };
-    if (hs) hs.onclick = () => { store.set("ptc-how-open", "1"); viewKey = ""; render(); };
+    if (hh) hh.onclick = () => { store.set(howKey, "0"); viewKey = ""; render(); };
+    if (hs) hs.onclick = () => { store.set(howKey, "1"); viewKey = ""; render(); };
     document.getElementById("next").onclick = pressNext;
     bindMain();
     if (S.ask && S.ask.kind === "photo") bindPhoto(S.ask.side);
-    const f = screen.querySelector("#v, #a"); if (f) f.focus();
+    const f = screen.querySelector("#v, #a") || [...screen.querySelectorAll("[data-pk]")].find(x => !x.value.trim()); if (f) f.focus();
   }
   document.getElementById("side").innerHTML = renderSide();
   document.getElementById("lastc").innerHTML = lastHTML();
@@ -583,6 +657,11 @@ function bindMain() {
   };
   screen.querySelectorAll("[data-a]").forEach(b => b.onclick = () => act(b.dataset.a, b));
   screen.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => pick(b.dataset.pick === "1"));
+  screen.querySelectorAll("[data-pkey]").forEach(b => b.onclick = () => {
+    const v = b.dataset.pv === "1"; pend.page[b.dataset.pkey] = v;
+    b.parentElement.querySelectorAll("[data-pkey]").forEach(o => { const on = (o.dataset.pv === "1") === v; o.classList.toggle("on", on); o.setAttribute("aria-pressed", on); o.textContent = (on ? "✓ " : "") + o.dataset.label; });
+    updateNext();
+  });
   screen.querySelectorAll("[data-ans]").forEach(b => b.onclick = () => {
     pend.answers[b.dataset.ref] = b.dataset.ans;
     b.closest(".flag-btns").querySelectorAll("[data-ans]").forEach(o => { const on = o === b; o.classList.toggle("on", on); o.setAttribute("aria-pressed", on); });
@@ -600,12 +679,21 @@ function bindMain() {
   const re = document.getElementById("recheck");
   if (re) re.onclick = () => { if (ws.readyState === 1) { sentId = a.id; ws.send(JSON.stringify({ type: "answer", id: a.id, value: { recheck: true, keep: nextValue(a) } })); updateNext(); } };
   screen.querySelectorAll("input.field, textarea.field").forEach(f => {
-    f.oninput = () => { if (document.getElementById("msg").className.includes("err")) say(""); updateNext(); };
+    f.oninput = () => {
+      if (document.getElementById("msg").className.includes("err")) say("");
+      if (f.dataset.pk && a.fields) { const fld = a.fields.find(x => x.key === f.dataset.pk); f.classList.remove("ok", "warn"); const st = pageState(fld); if (st !== "empty") f.classList.add(st); }
+      updateNext();
+    };
     f.onkeydown = e => {
       if (e.key !== "Enter" || f.tagName === "TEXTAREA") return;
       e.preventDefault();
       if (a.kind === "counts" && f.id === "a") { document.getElementById("b").focus(); return; }
       if (a.kind === "checklist" && f.id === "ck-v") { document.getElementById("ck-i").focus(); return; }
+      if (f.dataset.pk) {   // on a page, Enter moves to the next empty box
+        const boxes = [...screen.querySelectorAll("[data-pk]")], i = boxes.indexOf(f);
+        const next = boxes.slice(i + 1).concat(boxes.slice(0, i)).find(x => !x.value.trim());
+        if (next) { next.focus(); return; }
+      }
       pressNext();
     };
   });

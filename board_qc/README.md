@@ -87,6 +87,24 @@ and stays greyed out with a note saying what's missing until the page is complet
 - **The test stand checklist** unlocks Next test when every row is ticked and the voltage and
   current are entered. If the QC board isn't answering, Check again runs the network check again.
 
+Three groups are answered **all on one page** rather than one step at a time:
+
+- **Power checks, no SoM** (4.3.1): the 48 V current, VP12_LOCAL and the 12V LOCAL LED, then a table
+  with a row per DC-DC converter (set SWT1 to that converter's position only): output voltage at its
+  RIPPLE test point, switching period and WIB LED. 21 checks.
+- **SoM and boot** (4.3.2): the SoM serial, insertion, boot current (with its own Pass/Fail), the
+  LEDs after boot, the serial console login, the 5 repeat boots and the room temperature. If the SoM
+  serial isn't 10 digits, or is recorded on another board, the tester is asked and, if they scan
+  again, the page comes back with everything else still filled in.
+- **Automatic tests** (4.5.1): EEPROM, memory, the PTC and QC board sensors, the temperature sensors
+  and the sensor alerts run one after another, each showing its result on the page, then the tester
+  answers whether the OVER TEMP LED lit during the alert test.
+
+Each box turns green when its reading is in range and orange when it isn't, Enter moves to the next
+empty box, and Next test unlocks when the whole page is filled in. Every check is still recorded and
+uploaded on its own, exactly as before; the step list shows each page as one entry with its overall
+result. All other steps, including the DC-DC load test, are one step at a time.
+
 Steps can carry a **How to run this test** panel on the right with short instructions. Hide
 folds it away (remembered on the station) and a button brings it back. The instructions live
 on each step (`how=` on `Step`); the photo and checklist steps have them so far.

@@ -255,6 +255,21 @@ button.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accen
 .g-flag-crops { display: flex; gap: 10px; } .g-flag-crops figure { margin: 0; font-size: .78em; color: var(--g-dim); }
 .g-flag-crops img { display: block; width: 120px; border: 1px solid var(--g-line); border-radius: var(--g-r); margin-top: 3px; }
 .g-flag .g-btn.opt { min-width: 110px; height: 42px; }
+.pg { display: flex; flex-direction: column; gap: 10px; }
+.pg-t { border-collapse: collapse; width: 100%; font-size: .92em; }
+.pg-t th, .pg-t td { padding: 4px 8px 4px 0; text-align: left; vertical-align: middle; border-bottom: 1px solid color-mix(in srgb, var(--g-line) 60%, transparent); }
+.pg-t tbody th { font-weight: 500; width: 34%; }
+.pg-t th span { display: block; font-weight: 400; font-size: .8em; color: var(--g-dim); }
+.pg-t thead th { color: var(--g-dim); font-weight: 500; font-size: .85em; }
+.pg-grid tbody th { width: 16%; }
+.pg-cell { display: inline-flex; gap: 5px; align-items: center; }
+.pg-in { height: 36px; width: 96px; font-size: 1.05em; padding: 0 9px; }
+.pg-in.ok { border-color: color-mix(in srgb, var(--g-pass) 70%, var(--g-line)); }
+.pg-in.warn { border-color: var(--g-warn); box-shadow: 0 0 0 1px var(--g-warn); }
+.pg-acc { color: var(--g-dim); font-size: .85em; }
+.pg-yn { display: inline-flex; gap: 6px; }
+.pg-yn .g-btn.opt { min-width: 62px; height: 34px; padding: 0 10px; font-size: .92em; }
+.pg-dim { color: var(--g-dim); font-size: .9em; } .pg-run { color: var(--g-auto); }
 .g-check2 { gap: 10px; align-items: center; font-size: .92em; cursor: pointer; }
 .g-check2 input { width: 22px; height: 22px; accent-color: var(--g-accent); }
 </style>
@@ -364,6 +379,85 @@ const PHOTO_HOW = {
     "No back ghost yet? Leave “Save as the ghost” ticked on a good photo.",
   ],
 };
+const PAGES = {
+  power: { rows: [
+      { k:"bare_power", label:"48 V input current", where:"48 V supply display", type:"num", unit:"mA", lo:0, hi:100, acc:"0–100 mA", demo:"62" },
+      { k:"vp12_local", label:"VP12_LOCAL voltage", where:"Test point VP12 LOCAL", type:"num", unit:"V", lo:12.00, hi:12.35, acc:"12.00–12.35 V", demo:"12.18" },
+      { k:"local_led_12v", label:"12V LOCAL LED lit?", where:"Front panel", type:"yn" } ],
+    grid: [0, 1, 2, 3, 4, 5].map(n => [
+      { k:`ripple${n}`, type:"num", unit:"V", lo:12.00, hi:12.35, demo:(12.18 + n * 0.01).toFixed(2) },
+      { k:`ripple${n}_switch_period`, type:"num", unit:"µs", lo:1.0, hi:1.1, demo:"1.04" },
+      { k:`wib${n}_led`, type:"yn" }]) },
+  som: { rows: [
+      { k:"som_serial", label:"SoM serial", where:"Scan the Data Matrix code", type:"scan", acc:"10 digits", demo:"2503804780" },
+      { k:"som_insertion", label:"SoM seated, keying right?", type:"yn" },
+      { k:"amber_led_blinking", label:"Amber LED on the SoM blinking?", type:"yn" },
+      { k:"boot_current", label:"Boot current", where:"48 V supply display", type:"judged", unit:"mA", acc:"About 100–200 mA, you decide", demo:"148" },
+      { k:"12v_local_led_boot", label:"12V LOCAL LED lit?", type:"yn" },
+      { k:"pg_led_boot", label:"PG LED lit?", type:"yn" },
+      { k:"fpga_done_led_boot", label:"FPGA DONE LED lit?", type:"yn" },
+      { k:"serial_connection", label:"Logged in on the serial console?", where:"As root", type:"yn" },
+      { k:"repeat_boots", label:"Good boots out of 5", type:"num", unit:"of 5", lo:5, hi:5, acc:"5", demo:"5" },
+      { k:"ambient_temperature", label:"Room temperature", where:"Bench thermometer", type:"num", unit:"°C", acc:"For the temperature check", demo:"22.5" } ] },
+  auto: { tests: [
+      { k:"eeprom", label:"EEPROM read", demo:"0x4A21C93F07E1" }, { k:"memory", label:"Memory test", demo:"No errors" },
+      { k:"iv_sensors", label:"PTC voltage and current sensors", demo:"9 of 9 in range" },
+      { k:"qc_iv_sensors_25pct", label:"QC board sensors at 25% load", demo:"6 of 6 in range" },
+      { k:"temperature", label:"Temperature sensors", demo:"8 within 5 °C of the room" }, { k:"alert", label:"Sensor alerts", demo:"All 8 flagged" } ],
+    led: { k:"over_temp_led", label:"Did the OVER TEMP LED light during the sensor alert test?" } },
+};
+const pageFields = page => page === "power" ? [...PAGES.power.rows, ...PAGES.power.grid.flat()] : page === "som" ? PAGES.som.rows : [];
+function fieldState(f) {
+  const v = run.pg[f.k];
+  if (f.type === "yn") return v === undefined ? "empty" : v ? "ok" : "warn";
+  if (f.type === "judged") { const n = Number(v); if (v === undefined || v === "" || !isFinite(n) || run.pg[f.k + "_ok"] === undefined) return "empty"; return run.pg[f.k + "_ok"] ? "ok" : "warn"; }
+  if (f.type === "scan") return !v ? "empty" : /^\d{10}$/.test(v) ? "ok" : "warn";
+  const n = Number(v);
+  if (v === undefined || v === "" || !isFinite(n)) return "empty";
+  return f.lo === undefined || (n >= f.lo && n <= f.hi) ? "ok" : "warn";
+}
+function ynHTML(k, labels) {
+  const v = run.pg[k], [L1, L0] = labels || ["Yes", "No"];
+  return `<span class="pg-yn"><button class="g-btn opt y ${v === true ? "on" : ""}" data-act="pgyn" data-k="${k}" data-v="1">${v === true ? "✓ " : ""}${L1}</button><button class="g-btn opt y ${v === false ? "on" : ""}" data-act="pgyn" data-k="${k}" data-v="0">${v === false ? "✓ " : ""}${L0}</button></span>`;
+}
+function inHTML(f, wide) {
+  const st = fieldState(f);
+  return `<span class="pg-cell"><input class="g-field pg-in ${st}" data-pk="${f.k}" ${f.type === "scan" ? "" : 'inputmode="decimal"'} autocomplete="off" placeholder="${esc(f.demo)}" value="${esc(run.pg[f.k] ?? "")}" style="${wide ? "width:200px" : ""}" aria-label="${esc(f.label || f.k)}">${f.unit ? `<span class="g-unit">${esc(f.unit)}</span>` : ""}</span>`;
+}
+function pageHTML(s) {
+  if (s.page === "power") {
+    const P = PAGES.power;
+    const rows = P.rows.map(f => `<tr><th>${esc(f.label)}<span>${esc(f.where)}</span></th><td>${f.type === "yn" ? ynHTML(f.k) : inHTML(f)}</td><td class="pg-acc">${esc(f.acc || "Yes")}</td></tr>`).join("");
+    const grid = P.grid.map((r, n) => `<tr><th>DC-DC ${n}<span>SWT1 position ${n + 1} only</span></th><td>${inHTML(r[0])}</td><td>${inHTML(r[1])}</td><td>${ynHTML(r[2].k)}</td></tr>`).join("");
+    return `<div class="pg"><table class="pg-t"><tbody>${rows}</tbody></table>
+      <table class="pg-t pg-grid"><thead><tr><th>Converter</th><th>Output at RIPPLE n<span>12.00–12.35 V</span></th><th>Switching period<span>1.0–1.1 µs</span></th><th>WIB n LED lit?<span>Yes</span></th></tr></thead><tbody>${grid}</tbody></table></div>`;
+  }
+  if (s.page === "som") {
+    const rows = PAGES.som.rows.map(f => `<tr><th>${esc(f.label)}${f.where ? `<span>${esc(f.where)}</span>` : ""}</th><td>${f.type === "yn" ? ynHTML(f.k) : f.type === "judged" ? inHTML(f) + ynHTML(f.k + "_ok", ["Pass", "Fail"]) : inHTML(f, f.type === "scan")}</td><td class="pg-acc">${esc(f.acc || "Yes")}</td></tr>`).join("");
+    return `<div class="pg"><table class="pg-t"><tbody>${rows}</tbody></table></div>`;
+  }
+  const A = PAGES.auto, st = run.autoSt || {};
+  const rows = A.tests.map(t => {
+    const v = st[t.k] || "wait";
+    const cell = v === "wait" ? '<span class="pg-dim">Waiting</span>' : v === "run" ? '<span class="pg-run">Running…</span>'
+      : `<span class="g-badge ${v === "pass" ? "pass" : "fail"}">${v === "pass" ? "PASS" : "FAIL"}</span> <span class="mono">${esc(t.demo)}</span>`;
+    return `<tr><th>${esc(t.label)}</th><td>${cell}</td></tr>`;
+  }).join("");
+  const alertDone = ["pass", "fail"].includes(st.alert);
+  return `<div class="pg"><table class="pg-t"><tbody>${rows}
+      <tr><th>${esc(A.led.label)}<span>Front panel</span></th><td>${alertDone ? ynHTML(A.led.k) : '<span class="pg-dim">Watch the LED during the sensor alert test; answer when the tests finish</span>'}</td></tr></tbody></table></div>`;
+}
+function startAutoPage() {
+  if (run.autoSt) return;
+  run.autoSt = {};
+  const keys = PAGES.auto.tests.map(t => t.k);
+  const next = i => {
+    if (i >= keys.length || run.screen !== "run" || steps()[run.idx].page !== "auto") return;
+    run.autoSt[keys[i]] = "run"; render();
+    setTimeout(() => { run.autoSt[keys[i]] = "pass"; render(); next(i + 1); }, 450);
+  };
+  next(0);
+}
 const BOARD_STEPS = [
   { grp:"Board photos", sec:"4.1.3", key:"photo_front", name:"Front photo", side:"front", type:"photo", acc:"No pass or fail; saved with the results",
     prompt:"Put the board front side up under the camera, line it up with the ghost image and take the photo.", how:PHOTO_HOW.front },
@@ -381,27 +475,23 @@ const BOARD_STEPS = [
          "If the amber LED stays solid or doesn’t light, stop and call a Penn electronics engineer.",
          "The network check runs by itself once the QC board has booted.",
          "Every row and both readings go to the HWDB with the results."] },
-  { grp:"Power checks, no SoM", sec:"4.3.1a", key:"bare_power", name:"48 V input current", prompt:"With no SoM fitted, read the current on the 48 V supply.", type:"value", unit:"mA", lo:0, hi:100, acc:"0–100 mA", demo:"62" },
-  { grp:"Power checks, no SoM", sec:"4.3.1c", key:"vp12_local", name:"VP12_LOCAL voltage", prompt:"Measure the voltage at test point VP12 LOCAL.", type:"value", unit:"V", lo:12.00, hi:12.35, acc:"12.00–12.35 V", demo:"12.18" },
-  { grp:"Power checks, no SoM", sec:"4.3.1d", key:"local_led_12v", name:"12V LOCAL LED", prompt:"Is the 12V LOCAL LED on the front panel lit?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
-  { grp:"Power checks, no SoM", sec:"4.3.1", key:"ripple0", name:"DC-DC 0 output", prompt:"Measure the voltage at test point RIPPLE 0.", type:"value", unit:"V", lo:12.00, hi:12.35, acc:"12.00–12.35 V", demo:"12.21" },
-  { grp:"Power checks, no SoM", sec:"4.3.1", key:"ripple0_switch_period", name:"DC-DC 0 switching period", prompt:"Read the switching period at RIPPLE 0 on the scope.", type:"value", unit:"µs", lo:1.0, hi:1.1, acc:"1.0–1.1 µs", demo:"1.04" },
-  { grp:"Power checks, no SoM", sec:"4.3.1", key:"wib0_led", name:"WIB 0 LED", prompt:"Is the WIB 0 LED on the front panel lit?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
-  { grp:"Power checks, no SoM", sec:"4.3.1", key:"ripple1", name:"DC-DC 1 output", prompt:"Measure the voltage at test point RIPPLE 1.", type:"value", unit:"V", lo:12.00, hi:12.35, acc:"12.00–12.35 V", demo:"12.19" },
-  { grp:"Power checks, no SoM", sec:"4.3.1", key:"ripple1_switch_period", name:"DC-DC 1 switching period", prompt:"Read the switching period at RIPPLE 1 on the scope.", type:"value", unit:"µs", lo:1.0, hi:1.1, acc:"1.0–1.1 µs", demo:"1.05" },
-  { grp:"Power checks, no SoM", sec:"4.3.1", key:"wib1_led", name:"WIB 1 LED", prompt:"Is the WIB 1 LED on the front panel lit?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
-  { grp:"SoM and boot", sec:"4.3.2", key:"som_serial", name:"Scan SoM serial", prompt:"Scan the Data Matrix code on the Enclustra SoM.", type:"scan", acc:"10 digits", demo:"2503804780" },
-  { grp:"SoM and boot", sec:"4.3.2", key:"som_insertion", name:"SoM insertion", prompt:"Fit the SoM. Is it seated correctly? Check the connector keying.", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
-  { grp:"SoM and boot", sec:"4.3.2", key:"boot_current", name:"Boot current", prompt:"Power on and read the boot current. Is the amber LED blinking?", type:"value", judge:true, unit:"mA", acc:"About 100–200 mA, tester decides", demo:"148" },
-  { grp:"SoM and boot", sec:"4.3.2", key:"repeat_boots", name:"Repeat boot", prompt:"Power cycle 5 times. How many boots succeeded?", type:"value", unit:"of 5", lo:5, hi:5, acc:"5 of 5", demo:"5" },
-  { grp:"Automatic tests", sec:"4.5.2", key:"eeprom", name:"EEPROM read", prompt:"Reads the unique serial ID from the EEPROM.", type:"auto", acc:"Readable", demo:"0x4A21C93F07E1", ok:true },
-  { grp:"Automatic tests", sec:"4.5", key:"memory", name:"Memory", prompt:"Runs fillmem on the PTC to check its memory.", type:"auto", acc:"No errors", demo:"Passed", ok:true },
-  { grp:"Automatic tests", sec:"4.5.1", key:"iv_sensors", name:"PTC voltage and current sensors", prompt:"Reads the 9 LTC2945 sensors on the PTC over I2C.", type:"auto", acc:"All in range", demo:"9 of 9 in range", ok:true },
-  { grp:"Automatic tests", sec:"4.5.1", key:"temperature", name:"Temperature sensors", prompt:"Reads the board temperature sensors and compares with ambient.", type:"auto", acc:"Ambient ± 5 °C", demo:"Max 26.4 °C", ok:true },
-  { grp:"Automatic tests", sec:"4.4.1", key:"load0_25pct", name:"DC-DC 0 load at 25%", prompt:"Sets the QC board load to 25% on converter 0 and reads the current.", type:"auto", acc:"1.5 A ± 0.1 A", demo:"1.52 A", ok:true },
-  { grp:"Automatic tests", sec:"4.5.4", key:"timing", name:"Timing lock", prompt:"Reads the timing status register.", type:"auto", acc:"0x8, locked", demo:"0x8, locked", ok:true },
-  { grp:"Automatic tests", sec:"4.5.4", key:"qc_timing_lock", name:"QC board timing lock", prompt:"Resets the QC board timing endpoint (channel 0) and reads its status.", type:"auto", acc:"0x18000000", demo:"0x18000000", ok:true },
-  { grp:"Automatic tests", sec:"4.5.5", key:"gbe_throughput", name:"Ethernet throughput", prompt:"Sends 1000 MB to the PTC and measures the speed.", type:"auto", acc:"More than 12.5 MB/s", demo:"38.2 MB/s", ok:true },
+  { grp:"Power checks, no SoM", sec:"4.3.1", key:"page_power", name:"Power checks, no SoM", type:"page", page:"power",
+    prompt:"With no SoM fitted, take each reading and check each LED. Next test unlocks when all 21 are filled in.",
+    how:["Power the QC board with no SoM in the PTC.", "Read the 48 V current on the supply’s display and measure VP12_LOCAL with the multimeter.",
+         "For each DC-DC converter, measure the voltage at its RIPPLE test point, then read its switching period on the scope.",
+         "Check each LED on the front panel and answer Yes or No.", "Tab or Enter moves to the next box. A reading outside its limits turns orange; check it, as it will be saved as FAIL."] },
+  { grp:"SoM and boot", sec:"4.3.2", key:"page_som", name:"SoM and boot", type:"page", page:"som",
+    prompt:"Fit the SoM and boot the PTC. Fill in everything on this page; Next test unlocks when it’s complete.",
+    how:["Power off. Scan the Data Matrix code on the SoM, then fit it, checking the connector keying.", "Power on and read the boot current; watch the amber LED on the SoM.",
+         "Check the front panel LEDs once it has booted, then log in on the serial console as root.", "Power cycle 5 times and count the good boots.", "Enter the room temperature from the thermometer on the bench."] },
+  { grp:"Automatic tests", sec:"4.5.1–4.5.2", key:"page_auto", name:"Automatic tests", type:"page", page:"auto",
+    prompt:"These run on the PTC one after another. Watch the OVER TEMP LED while the sensor alert test runs.",
+    how:["The tests start by themselves and each shows its result as it finishes.", "While the sensor alert test runs, watch the OVER TEMP LED on the front panel: it should light red.",
+         "When every test has finished, answer the OVER TEMP LED question. Next test then unlocks."] },
+  { grp:"DC-DC load test", sec:"4.4.1", key:"load0_25pct", name:"DC-DC 0 load at 25%", prompt:"Sets the QC board load to 25% on converter 0 and reads the current.", type:"auto", acc:"1.5 A ± 0.1 A", demo:"1.52 A", ok:true },
+  { grp:"Crate address and timing", sec:"4.5.4", key:"timing", name:"Timing lock", prompt:"Reads the timing status register.", type:"auto", acc:"0x8, locked", demo:"0x8, locked", ok:true },
+  { grp:"Crate address and timing", sec:"4.5.4", key:"qc_timing_lock", name:"QC board timing lock", prompt:"Resets the QC board timing endpoint (channel 0) and reads its status.", type:"auto", acc:"0x18000000", demo:"0x18000000", ok:true },
+  { grp:"Ethernet", sec:"4.5.5", key:"gbe_throughput", name:"Ethernet throughput", prompt:"Sends 1000 MB to the PTC and measures the speed.", type:"auto", acc:"More than 12.5 MB/s", demo:"38.2 MB/s", ok:true },
   { grp:"Front panel and address", sec:"4.5.2", key:"crate_addr_0", name:"Crate address switch 1", prompt:"Set DIP switch 1. Did the address change as expected?", type:"yn", ask:"yesno", expect:true, acc:"Yes" },
   { grp:"Finish", sec:"End", key:"overall_result", name:"Notes and finish", prompt:"Add any notes for this board, then finish the test.", type:"notes", acc:"Pass if every step passed" },
 ];
@@ -428,7 +518,7 @@ const onColor = h => lum(h) > 0.35 ? "#0B0D0E" : "#FFFFFF";
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
 
 // ---- GUI run state ----
-const run = { screen:"start", mode:"board", tester:"Mike Reilly", serial:"PTC-0042", po:"", batch:"", idx:0, results:{}, notes:"", msg:"", msgKind:"", scanWarned:false, running:false, review:null, ticks:{}, qccur:"", qcvolt:"", runLabel:null, sel:0, chips:{}, closeups:0, mockSom:false, howOpen:true, choice:null, autoDone:false, photoReview:false, photoSrc:"camera", ghostOp:40, hasGhost:{ front:true, back:true }, off:{ x:9, y:-6, r:1.4 } };
+const run = { screen:"start", mode:"board", tester:"Mike Reilly", serial:"PTC-0042", po:"", batch:"", idx:0, results:{}, notes:"", msg:"", msgKind:"", scanWarned:false, running:false, review:null, ticks:{}, qccur:"", qcvolt:"", runLabel:null, sel:0, chips:{}, closeups:0, mockSom:false, howOpen:true, howPageOpen:false, pg:{}, autoSt:null, choice:null, autoDone:false, photoReview:false, photoSrc:"camera", ghostOp:40, hasGhost:{ front:true, back:true }, off:{ x:9, y:-6, r:1.4 } };
 const steps = () => run.mode === "board" ? BOARD_STEPS : SHIP_STEPS;
 const gui = document.getElementById("gui"), frame = document.getElementById("frame");
 
@@ -505,6 +595,7 @@ function entryHTML(s) {
         <div><button class="g-btn" data-act="retakephoto" style="height:38px;padding:0 12px;font-size:.88em">Retake photo</button></div></div></div>`;
     }
     case "checklist": return checklistHTML();
+    case "page": if (s.page === "auto") setTimeout(startAutoPage, 0); return pageHTML(s);
     case "notes": return `<div class="g-entry" style="flex-direction:column;align-items:stretch;max-width:640px"><textarea class="g-field" data-in="notes" style="height:110px;width:100%;padding:10px 14px;font-size:1.05em;font-family:var(--g-font)" placeholder="Anything unusual about this board">${esc(run.notes)}</textarea></div>`;
   }
   return "";
@@ -546,6 +637,18 @@ function stepReady(s) {
     }
     case "auto": return run.autoDone ? { ok:true } : { ok:false, hint: run.running ? "The test is running." : "Run the test first." };
     case "photo": return run.photoReview ? { ok:true } : { ok:false, hint:"Take the photo or choose a file." };
+    case "page": {
+      if (s.page === "auto") {
+        const st = run.autoSt || {}, keys = PAGES.auto.tests.map(t => t.k);
+        if (keys.some(k => !["pass", "fail"].includes(st[k]))) return { ok:false, hint:"The tests are running." };
+        if (run.pg.over_temp_led === undefined) return { ok:false, hint:"Answer the OVER TEMP LED question." };
+        return run.pg.over_temp_led ? { ok:true } : { ok:true, warn:true, hint:"No OVER TEMP LED is saved as FAIL." };
+      }
+      const fields = pageFields(s.page), states = fields.map(fieldState);
+      const left = states.filter(x => x === "empty").length, bad = states.filter(x => x === "warn").length;
+      if (left) return { ok:false, hint:`${left} of ${fields.length} left to fill in.` };
+      return bad ? { ok:true, warn:true, hint:`${bad} ${bad === 1 ? "entry is" : "entries are"} outside the limits or No, saved as FAIL.` } : { ok:true };
+    }
     case "inspect":
       if (s.side === "front" && !run.ans) return { ok:false, hint:"1 flagged part to answer." };
       return run.ans === "reversed" ? { ok:true, warn:true, hint:"Reversed parts are saved as FAIL." } : { ok:true };
@@ -615,10 +718,10 @@ function runHTML() {
   const O = state.opts, st = steps(), s = st[run.idx];
   const done = Object.keys(run.results).length, pct = Math.round(done / st.length * 100);
   const kind = s.type === "auto" ? '<span class="g-kind auto">Automatic</span>' : s.type === "notes" ? "" : s.type === "photo" ? '<span class="g-kind manual">Photo</span>' : '<span class="g-kind manual">Manual check</span>';
-  const how = s.how && run.howOpen;
+  const how = s.how && (s.type === "page" ? run.howPageOpen : run.howOpen);
   return `<div class="g-body ${O.side === "right" ? "right" : ""}">${sideHTML()}
     <main class="g-main ${how ? "with-how" : ""}"><div class="g-stepcol">
-      <div class="g-sec"><span>Section ${esc(s.sec)}</span>${kind}${s.how && !run.howOpen ? '<button class="g-howopen" data-act="howtoggle" style="margin-left:auto">How to run this test</button>' : ""}</div>
+      <div class="g-sec"><span>Section ${esc(s.sec)}</span>${kind}${s.how && !(s.type === "page" ? run.howPageOpen : run.howOpen) ? '<button class="g-howopen" data-act="howtoggle" style="margin-left:auto">How to run this test</button>' : ""}</div>
       <h3 class="g-name">${esc(s.name)}</h3>
       <p class="g-prompt">${esc(s.prompt)}</p>
       ${O.limits ? `<div class="g-limits"><span>Accept<b>${esc(s.acc)}</b></span></div>` : ""}
@@ -680,6 +783,12 @@ const MOCKS = [
     note:"The photo step with the “How to run this test” panel on the right (Hide folds it away and the camera view widens). The ghost outline sits over the live view; the board is slightly out of line. Try the Ghost slider, and the arrow keys to line the board up, then Take photo, Retake and Use this photo." },
   { id:"t2o", label:"Test 2: front orientation check (one part flagged)",
     note:"After the front photo the program lines it up with a reference photo of a known-good board and checks every marked polarised part. Here CT29 looks reversed: the closeups show the reference beside this board. Next test unlocks once every flagged part is answered Correct or Reversed; Reversed is saved as FAIL. These images come from the feasibility test on your preproduction photo." },
+  { id:"pw", label:"Power checks, no SoM (one page)",
+    note:"All 21 power checks on one page: the board readings and LED at the top, then a row per DC-DC converter. Each box turns green when its reading is in range and orange when it isn’t. Each converter row says which SWT1 position to set first. Enter moves to the next empty box. Next test unlocks when all 21 are filled in; anything out of range is saved as FAIL. Try Fill this step with an example." },
+  { id:"sb", label:"SoM and boot (one page)",
+    note:"All 10 SoM and boot entries on one page, top to bottom in the order they’re done. The boot current has its own Pass and Fail, as there’s no fixed limit. Next test unlocks when every entry is filled in." },
+  { id:"at", label:"Automatic tests (one page)",
+    note:"The automatic tests run one after another on one page, each showing its result as it finishes. The OVER TEMP LED question is answered once the tests finish; watch the LED while the sensor alert test runs. Next test unlocks when every test has finished and the LED question is answered." },
   { id:"t2n", label:"Test 2: front photo, first board (no ghost yet)",
     note:"The very first board: no ghost exists, so the slider is off and “Save as the ghost for the next boards” is ticked after the photo is taken. Use this photo and the back step shows how the next boards would look." },
   { id:"t4", label:"Test 4: prepare the test stand (checklist)",
@@ -870,13 +979,18 @@ function act(a, el) {
       else if (s.type === "po") { const a1 = +val("a"), b1 = +val("b"); record(a1 === b1, `${b1} of ${a1}`); }
       else if (s.type === "auto") record(s.ok, s.demo);
       else if (s.type === "photo") act("usephoto");
+      else if (s.type === "page") {
+        const r = stepReady(s), n = s.page === "auto" ? 7 : pageFields(s.page).length;
+        record(!r.warn, r.warn ? r.hint.replace(", saved as FAIL.", "") : `${n} checks, all fine`);
+      }
       else if (s.type === "inspect") record(run.ans !== "reversed", s.side === "front" ? (run.ans === "reversed" ? "18 checked, CT29 reversed" : "18 checked, CT29 confirmed correct") : "6 checked, none flagged");
       else if (s.type === "checklist") { const V = +run.qcvolt, I = +run.qccur; record(V >= 23.5 && V <= 24.5 && I >= 350 && I <= 450, `${run.qcvolt} V, ${run.qccur} mA`); }
       else if (s.type === "notes") act("finish");
       break; }
     case "ans": run.ans = el.dataset.v; render(); break;
     case "retakephoto": run.idx = Math.max(0, run.idx - 1); delete run.results[st[run.idx].key]; run.photoReview = false; run.ans = null; say(""); render(); break;
-    case "howtoggle": run.howOpen = !run.howOpen; render(); break;
+    case "howtoggle": if (s.type === "page") run.howPageOpen = !run.howPageOpen; else run.howOpen = !run.howOpen; render(); break;
+    case "pgyn": run.pg[el.dataset.k] = el.dataset.v === "1"; render(); { const b = gui.querySelector(`[data-act="pgyn"][data-k="${el.dataset.k}"][data-v="${el.dataset.v}"]`); if (b) b.focus({ preventScroll:true }); } break;
     case "take": run.photoReview = true; run.photoSrc = "camera"; render(); break;
     case "pfile": run.photoReview = true; run.photoSrc = "file"; render(); break;
     case "retake": run.photoReview = false; render(); break;
@@ -944,6 +1058,12 @@ function act(a, el) {
 gui.addEventListener("click", e => { if (e.target.closest("input, textarea")) return; const b = e.target.closest("[data-act]"); if (b && !b.disabled) act(b.dataset.act, b); });
 gui.addEventListener("input", e => {
   if ("op" in e.target.dataset) { run.ghostOp = +e.target.value; const g = gui.querySelector(".g-cambox .ghost"); if (g) g.style.opacity = run.ghostOp / 100; gui.querySelector("[data-opout]").textContent = run.ghostOp + " %"; return; }
+  if ("pk" in e.target.dataset) {
+    run.pg[e.target.dataset.pk] = e.target.value.trim();
+    const f = pageFields(steps()[run.idx].page).find(x => x.k === e.target.dataset.pk);
+    if (f) e.target.className = "g-field pg-in " + fieldState(f);
+    updateNext(); return;
+  }
   if ("in" in e.target.dataset) { updateNext(); return; }
   const f = e.target.dataset.f; if ((f === "qccur" || f === "qcvolt") && run.screen === "run") { run[f] = e.target.value; updateNext(); return; }
   if (f === "qccur" || f === "qcvolt") { run[f] = e.target.value; const was = gui.querySelector('[data-f="serial"]').disabled; if (was === prepDone()) { render(); const q = gui.querySelector(`[data-f="${f}"]`); q.focus(); q.setSelectionRange(q.value.length, q.value.length); } return; }
@@ -957,6 +1077,13 @@ document.addEventListener("keydown", e => {
   else if (e.key === "Enter" && run.photoReview && !(e.target instanceof Element && e.target.closest("button"))) { e.preventDefault(); act("nextstep"); }
 });
 gui.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.dataset && "pk" in e.target.dataset) {
+    e.preventDefault();
+    const boxes = [...gui.querySelectorAll("[data-pk]")], i = boxes.indexOf(e.target);
+    const nextEmpty = boxes.slice(i + 1).concat(boxes.slice(0, i)).find(b => !b.value.trim());
+    if (nextEmpty) nextEmpty.focus(); else act("nextstep");
+    return;
+  }
   if ((e.key === " " || e.key === "Enter") && e.target.dataset && e.target.dataset.act === "tick") { e.preventDefault(); act("tick", e.target); return; }
   if (e.key !== "Enter" || e.target.tagName === "TEXTAREA") return;
   if (run.screen === "start") { e.preventDefault(); act("begin"); }
@@ -984,6 +1111,7 @@ function fillDemo(n) {
     else if (s.type === "auto") run.results[s.key] = { v:s.demo, ok:s.ok };
     else if (s.type === "notes") run.results[s.key] = { v:"No notes", ok:null };
     else if (s.type === "photo") run.results[s.key] = { v:`PTC-0042-${s.side}.jpg`, ok:null };
+    else if (s.type === "page") run.results[s.key] = { v:"All checks fine", ok:true };
     else if (s.type === "inspect") run.results[s.key] = { v:"Checked, none reversed", ok:true };
     else if (s.type === "checklist") run.results[s.key] = { v:"24.1 V, 410 mA", ok:true };
   });
@@ -998,6 +1126,11 @@ document.getElementById("fillex").addEventListener("click", () => {
   else if (s.type === "checklist") { PREP.forEach((p, i) => { if (!p.auto) run.ticks[i] = true; }); run.qcvolt = "24.1"; run.qccur = "410"; render(); }
   else if (s.type === "photo") { act("take"); return; }
   else if (s.type === "inspect") { act("ans", { dataset:{ v:"correct" } }); return; }
+  else if (s.type === "page") {
+    if (s.page === "auto") { const keys = PAGES.auto.tests.map(t => t.k); run.autoSt = Object.fromEntries(keys.map(k => [k, "pass"])); run.pg.over_temp_led = true; }
+    else pageFields(s.page).forEach(f => { run.pg[f.k] = f.type === "yn" ? true : f.demo; if (f.type === "judged") run.pg[f.k + "_ok"] = true; });
+    render(); return;
+  }
   else if (s.type === "auto") { act("auto"); return; }
   updateNext();
 });
@@ -1008,6 +1141,12 @@ mockSel.addEventListener("change", () => {
   frameFocus = false; run.running = false; say(""); run.mode = "board";
   run.ticks = {}; run.qccur = ""; run.qcvolt = ""; run.runLabel = null; run.mockSom = false; run.sel = 0; run.chips = {}; run.closeups = 0;
   if (!run.serial) run.serial = "PTC-0042";
+  if (["pw", "sb", "at"].includes(mockSel.value)) {
+    const v = mockSel.value, key = { pw:"page_power", sb:"page_som", at:"page_auto" }[v];
+    run.screen = "run"; run.review = null; run.mode = "board"; run.idx = BOARD_STEPS.findIndex(s => s.key === key); fillDemo(run.idx);
+    run.pg = {}; run.autoSt = null; render();
+    const mn = document.getElementById("mockNote"); mn.hidden = false; mn.textContent = MOCKS.find(m => m.id === v).note; mockSel.value = v; return;
+  }
   if (mockSel.value === "t2o") {
     run.screen = "run"; run.review = null; run.mode = "board"; run.idx = BOARD_STEPS.findIndex(s => s.key === "orientation_front"); fillDemo(run.idx); run.ans = null; run.howOpen = true;
     render(); const mn = document.getElementById("mockNote"); mn.hidden = false; mn.textContent = MOCKS.find(m => m.id === "t2o").note; mockSel.value = "t2o"; return;

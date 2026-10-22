@@ -57,6 +57,7 @@ class GuiUI(TesterUI):
             "ghosts": {side: photos.ghost_version(side) for side in photos.SIDES},
             "photos": {},
             "run_label": None,
+            "page": None,          # automatic tests shown together: {"step", "tests": [{key, label, status, value}]}
         }
 
     # ---- server ---------------------------------------------------------------
@@ -434,8 +435,55 @@ class GuiUI(TesterUI):
                             checked=len(result.results), flagged=flagged, overlay_id=self._ask_id + 1)
         return v
 
+    def _page_test(self, key):
+        page = self.state.get("page")
+        return next((t for t in page["tests"] if t["key"] == key), None) if page else None
+
     async def after_auto(self, step, result, value_text):
+        if self._page_test(step.key):
+            return   # shown on its page; the page as a whole waits for Next test
         await self._ask("autodone", step, result=result.name, value=value_text)
+
+    def begin_page(self, step, tests):
+        self.state["page"] = {"step": step.to_dict(),
+                              "tests": [{"key": t["key"], "label": t["label"], "status": "WAIT", "value": ""} for t in tests]}
+        self.state.update(running=step.to_dict(), status=None)
+        self._push()
+
+    def end_page(self):
+        self.state["page"] = None
+        self._push()
+
+    async def ask_page(self, step, fields, layout, previous=None, note=None):
+        by_key = {f["key"]: f for f in fields}
+        out = {}
+
+        def check(v):
+            if not isinstance(v, dict):
+                return "Fill in the page first."
+            missing = []
+            for k, f in by_key.items():
+                x = v.get(k)
+                if f["kind"] == "number":
+                    if not _is_number(x):
+                        missing.append(k); continue
+                    out[k] = float(x)
+                elif f["kind"] == "yesno":
+                    if not isinstance(x, bool):
+                        missing.append(k); continue
+                    out[k] = x
+                elif f["kind"] == "judged":
+                    if not (isinstance(x, dict) and isinstance(x.get("ok"), bool) and str(x.get("value", "")).strip()):
+                        missing.append(k); continue
+                    out[k] = {"ok": x["ok"], "value": str(x["value"]).strip()}
+                else:
+                    if not str(x or "").strip():
+                        missing.append(k); continue
+                    out[k] = str(x).strip()
+            return f"{len(missing)} still to fill in." if missing else None
+
+        await self._ask("page", step, check, fields=fields, layout=layout, previous=previous, note=note)
+        return out
 
     async def ask_photo(self, step, side, optional=False):
         got = {}
@@ -481,7 +529,12 @@ class GuiUI(TesterUI):
 
     # ---- progress -------------------------------------------------------------
     def running(self, step):
-        self.state.update(running=step.to_dict(), status=None)
+        t = self._page_test(step.key)
+        if t:
+            t["status"] = "RUN"
+            self.state.update(running=self.state["page"]["step"], status=None)
+        else:
+            self.state.update(running=step.to_dict(), status=None)
         self._push()
 
     def _set(self, key, result: str, value: str):
@@ -490,6 +543,12 @@ class GuiUI(TesterUI):
         self._push()
 
     def result(self, key, result, value=None, unit=None, limits=None):
+        t = self._page_test(key)
+        if t:
+            t["status"], t["value"] = result.name, format_value(value, unit)
+            self.state["results"][key] = {"result": result.name, "value": t["value"]}
+            self._push()
+            return
         self.state["running"] = None
         self._set(key, result.name, format_value(value, unit))
 
