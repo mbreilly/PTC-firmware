@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Part-DB Label Station</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/station.css">
+</head>
+<body>
+<div class="panel">
+  <header>
+    <h1>PART-DB LABEL STATION</h1>
+    <div class="sub" id="sub">scan  ·  look up  ·  stock</div>
+    <i class="screw tl"></i><i class="screw tr"></i>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="scan" class="on">SCAN A LABEL</button>
+    <button data-tab="recent">RECENT</button>
+    <button data-tab="settings">SETTINGS</button>
+    <span class="grow"></span>
+    <span class="conn" id="conn">…</span>
+  </nav>
+
+  <div id="msg" class="msg" hidden></div>
+
+  <!-- SCAN -->
+  <section id="tab-scan" class="tab">
+    <div class="cols">
+      <div class="col">
+        <h2>SHOW THE LABEL</h2>
+        <div class="scanwrap" id="scanwrap">
+          <input id="scanbox" autocomplete="off" spellcheck="false"
+                 placeholder="Scan a label, or type a part no. + Enter">
+          <span class="lamp" id="lamp"></span>
+        </div>
+        <p class="dim" id="scanhint">A USB scanner types into this box. Click here first if it isn't lit.</p>
+
+        <h3>OR THE CAMERA</h3>
+        <div class="row">
+          <button id="cam-start">START CAMERA</button>
+          <button id="cam-snap" disabled>READ LABEL</button>
+          <label class="check"><input type="checkbox" id="cam-auto" checked> keep looking until it reads one</label>
+        </div>
+        <div class="viewer cam" id="cam-view" hidden><video id="cam-video" autoplay muted playsinline></video></div>
+        <p class="dim" id="cam-note" hidden></p>
+        <label class="drop" id="drop-photo">
+          <input type="file" id="file-photo" accept="image/*" capture="environment">
+          <b>PHOTO</b><span>a picture of the label (phone, Canon, file)</span><em id="photo-state">Drop or click</em>
+        </label>
+        <div id="codes" class="list" hidden></div>
+
+        <div id="label-box" hidden>
+          <h3>WHAT THE LABEL SAYS <span class="badge" id="label-kind"></span></h3>
+          <div class="kv" id="label-fields"></div>
+          <details class="raw"><summary class="dim">raw text</summary><div class="mono" id="label-raw"></div></details>
+        </div>
+      </div>
+
+      <div class="col wide">
+        <h2>THE PART</h2>
+        <div id="match-box" hidden>
+          <h3>ALREADY IN PART-DB</h3>
+          <div id="matches" class="list"></div>
+        </div>
+        <div class="row" id="lookup-row" hidden>
+          <span class="dim" id="lookup-state"></span>
+          <select id="candidates" hidden></select>
+          <button id="lookup-again">LOOK UP AGAIN</button>
+        </div>
+
+        <div class="partgrid">
+          <div>
+            <div class="grid2" id="part-fields">
+              <span class="lab">NAME</span><input id="f-name" placeholder="Usually the manufacturer part number">
+              <span class="lab">MFR PART NO.</span><input id="f-mpn">
+              <span class="lab">MANUFACTURER</span><input id="f-manufacturer" list="dl-manufacturers">
+              <span class="lab">DESCRIPTION</span><input id="f-description">
+              <span class="lab">CATEGORY</span><input id="f-category" list="dl-categories" placeholder="Pick one, or type a new one">
+              <span class="lab">FOOTPRINT</span><input id="f-footprint" list="dl-footprints">
+              <span class="lab">DATASHEET</span><input id="f-datasheet" placeholder="https://…">
+              <span class="lab">COMMENT</span><input id="f-comment">
+            </div>
+          </div>
+          <figure class="pic" id="pic" hidden><img id="pic-img" alt="" onerror="this.parentNode.hidden=true"><figcaption id="pic-cap"></figcaption></figure>
+        </div>
+
+        <h3>STOCK</h3>
+        <div class="grid2">
+          <span class="lab">QUANTITY</span><div class="row tight"><input id="f-qty" type="number" min="0" step="1" class="qty">
+            <button id="qty-minus">−</button><button id="qty-plus">+</button></div>
+          <span class="lab">LOCATION</span><div class="row tight"><input id="f-location" list="dl-storage_locations" class="grow" placeholder="Drawer, bin or shelf">
+            <label class="check"><input type="checkbox" id="keep-loc"> keep for the next label</label></div>
+          <span class="lab" id="lot-lab" hidden>ADD TO</span><select id="f-lot" hidden></select>
+          <span class="lab">LOT NOTE</span><input id="f-lot_description" placeholder="Date code, lot">
+          <span class="lab">ORDER</span><input id="f-lot_comment" placeholder="PO, sales order">
+        </div>
+
+        <h3>BOUGHT FROM</h3>
+        <div class="grid2">
+          <span class="lab">SUPPLIER</span><input id="f-supplier" list="dl-suppliers">
+          <span class="lab">SUPPLIER NO.</span><input id="f-spn">
+          <span class="lab">LINK</span><input id="f-supplier_url">
+          <span class="lab">PRICE EACH</span><div class="row tight"><input id="f-price" class="qty"><input id="f-currency" class="cur" placeholder="USD"></div>
+        </div>
+
+        <details id="params-box" hidden><summary class="lab">PARAMETERS FROM THE LOOKUP</summary><div class="kv" id="params"></div></details>
+
+        <div class="row save">
+          <button class="accent big" id="save">SAVE TO PART-DB</button>
+          <button id="clear">CLEAR</button>
+          <span class="dim" id="save-what"></span>
+        </div>
+        <div id="result" class="result" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RECENT -->
+  <section id="tab-recent" class="tab" hidden>
+    <h2>SAVED FROM THIS STATION</h2>
+    <div class="tablewrap"><table><thead><tr><th>WHEN</th><th>PART</th><th>QTY</th><th>LOCATION</th><th>SUPPLIER</th><th>WHAT HAPPENED</th></tr></thead>
+      <tbody id="recent"></tbody></table></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="tab-settings" class="tab" hidden>
+    <div class="cols">
+      <div class="col">
+        <h2>PART-DB</h2>
+        <div class="grid2">
+          <span class="lab">ADDRESS</span><input id="s-url" placeholder="http://128.91.45.130">
+          <span class="lab">API TOKEN</span><input id="s-token" type="password" autocomplete="off" placeholder="tcp_…  (leave blank to keep the saved one)">
+        </div>
+        <div class="row"><button class="accent" id="s-save">SAVE AND TEST</button></div>
+        <div class="kv" id="s-status"></div>
+      </div>
+      <div class="col">
+        <h2>MAKING AN API TOKEN</h2>
+        <ol class="steps">
+          <li>Open Part-DB and log in.</li>
+          <li>Click your user name at the top right, then <b>User settings</b>.</li>
+          <li>Under <b>API tokens</b>, add a token. Give it a name like "label station", access level <b>Edit</b>
+            (or <b>Admin</b> if the supplier lookups say they aren't allowed), and no end date.</li>
+          <li>Copy the token (it starts with <span class="mono">tcp_</span>) and paste it here.</li>
+        </ol>
+        <h2>SUPPLIER LOOKUPS</h2>
+        <p class="dim">Descriptions, categories, footprints, datasheets and prices come from the info providers
+          switched on in Part-DB under Tools → Info providers. LCSC needs no key; DigiKey and Mouser need their own API keys there.
+          Without any, the station still fills in what the label itself says.</p>
+        <h2>SCANNERS</h2>
+        <p class="dim">Any USB scanner that reads 2D codes and acts as a keyboard works. DigiKey and Mouser labels use DataMatrix codes
+          with hidden separators; if a scan comes out as one long run of text, set the scanner to send the separator (GS) as Ctrl+],
+          or as the text &lt;GS&gt;.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<datalist id="dl-categories"></datalist><datalist id="dl-footprints"></datalist><datalist id="dl-manufacturers"></datalist>
+<datalist id="dl-suppliers"></datalist><datalist id="dl-storage_locations"></datalist>
+<canvas id="cam-canvas" hidden></canvas>
+<script src="/static/app.js"></script>
+</body>
+</html>

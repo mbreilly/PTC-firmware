@@ -1,0 +1,47 @@
+/* Label station additions to the shared hardware-panel stylesheet (app.css is the AOI mapper's, unchanged). */
+.grow { flex: 1; }
+.tabs { align-items: center; }
+.conn { font-size: 12px; color: var(--dimInk); opacity: .8; padding-right: 8px; }
+.conn.ok::before, .conn.bad::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+.conn.ok::before { background: #6FCF73; } .conn.bad::before { background: #FF6B5B; }
+
+.scanwrap { position: relative; }
+#scanbox { width: 100%; height: 56px; font-size: 17px; padding: 0 44px 0 14px; border: 2px solid var(--panelEdge); }
+#scanbox:focus { outline: none; border-color: var(--accent); }
+.lamp { position: absolute; right: 16px; top: 22px; width: 12px; height: 12px; border-radius: 50%; background: var(--buttonOff);
+  box-shadow: inset 0 0 0 1px var(--panelEdge); }
+.scanwrap.ready .lamp { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+.scanwrap.busy .lamp { background: var(--ink); animation: blink .6s infinite alternate; }
+@keyframes blink { to { opacity: .2; } }
+
+.viewer.cam { min-height: 0; margin-top: 8px; }
+.raw { margin-top: 8px; }
+.raw .mono { white-space: pre-wrap; padding: 6px 0; }
+h3 .badge { margin-left: 8px; font-size: 10px; padding: 1px 6px; vertical-align: 1px; }
+
+.partgrid { display: grid; grid-template-columns: 1fr 170px; gap: 14px; align-items: start; }
+.pic { margin: 0; text-align: center; font-size: 11px; color: var(--dimInk); }
+.pic img { width: 170px; height: 170px; object-fit: contain; background: #fff; border-radius: 3px; display: block; margin-bottom: 4px; }
+.grid2 input:disabled { opacity: .55; }
+.row.tight { margin: 0; gap: 6px; flex-wrap: nowrap; }
+.row.tight button { height: 30px; min-width: 34px; padding: 0 8px; justify-content: center; }
+.row.tight .check { white-space: nowrap; }
+input.qty { width: 110px !important; }
+input.cur { width: 70px !important; }
+.grid2 select { width: 100%; }
+
+.list > div.pick { cursor: pointer; }
+.list > div.pick:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.list a { color: var(--accent); text-decoration: none; }
+.radio { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--screw); flex: none; }
+.cur .radio { border-color: var(--accent); background: radial-gradient(var(--accent) 40%, transparent 45%); }
+
+button.big { height: 44px; padding: 0 26px; font-size: 15px; }
+.row.save { margin-top: 22px; }
+.result { margin-top: 10px; padding: 10px 12px; border-left: 3px solid #6FCF73; background: color-mix(in srgb, var(--panelEdge) 50%, transparent); }
+.result a { color: var(--accent); font-weight: 700; }
+.result ul { margin: 6px 0 0; padding-left: 18px; font-size: 12px; }
+.result .warn { margin-top: 8px; }
+.steps { padding-left: 18px; font-size: 13px; } .steps li { margin: 6px 0; }
+details summary { cursor: pointer; margin: 14px 0 6px; }
+@media (max-width: 900px) { .partgrid { grid-template-columns: 1fr; } }
