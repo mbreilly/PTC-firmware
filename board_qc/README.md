@@ -39,7 +39,9 @@ client over ssh with `python3 -m ptctestclient`, so the QC image on the PTC must
 ## The two kinds of entry
 
 Each run starts by asking which kind of entry this is: a production board, a production
-shipment, or **Look up a board** (see Board history, retests and repairs below).
+shipment, or **Look up a board** (see Board history, retests and repairs below). Below the start
+button, **Board history** searches for a serial straight away (`*` matches any part), or **Browse**
+lists the boards waiting for a retest and those recently tested.
 
 ### Production board entry
 

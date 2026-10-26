@@ -810,6 +810,12 @@ function renderStart() {
           : `<div class="two"><label><span class="lbl">Purchase order</span><input class="field" id="f-po" autocomplete="off"></label><label><span class="lbl">Batch number, if any</span><input class="field" id="f-batch" autocomplete="off"></label></div>`}
       <div class="msg" id="msg" role="status"></div>
       <button class="btn pri" id="go" type="button">${b ? "Start board test" : "Start shipment entry"}</button>
+      <div style="border-top:1px solid var(--g-line);padding-top:14px;display:flex;flex-direction:column;gap:8px">
+        <span class="lbl">Board history</span>
+        <div style="display:flex;gap:8px"><input class="field" id="f-hq" autocomplete="off" placeholder="PTC serial, * matches any part" style="flex:1;min-width:0">
+          <button class="btn" id="hgo" type="button">Search</button></div>
+        <button class="btn" id="hbrowse" type="button">Browse: waiting for a retest, recently tested</button>
+      </div>
     </div></div>`;
     screen.querySelectorAll("[data-m]").forEach(x => x.onclick = () => { startMode = x.dataset.m; draw(); });
     const go = () => {
@@ -822,6 +828,12 @@ function renderStart() {
     };
     document.getElementById("go").onclick = go;
     screen.querySelectorAll("input.field").forEach(f => f.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); go(); } });
+    // board history straight from the start page
+    const hq = document.getElementById("f-hq");
+    const search = () => { const q = hq.value.trim(); if (!q) { startMode = "lookup"; draw(); return; } answer({ mode: "lookup", query: q, tester: (document.getElementById("f-tester") || { value: "" }).value.trim() }); };
+    document.getElementById("hgo").onclick = search;
+    hq.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); search(); } };
+    document.getElementById("hbrowse").onclick = () => { startMode = "lookup"; draw(); };
     const first = tester ? document.getElementById(b ? "f-serial" : "f-po") : document.getElementById("f-tester");
     if (first) first.focus();
   };
