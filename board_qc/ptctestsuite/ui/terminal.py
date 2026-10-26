@@ -1,5 +1,6 @@
 """The original prompt_toolkit terminal interface, behind the TesterUI interface."""
 
+import asyncio
 import prompt_toolkit as ptk
 from prompt_toolkit.shortcuts import input_dialog
 
@@ -243,6 +244,15 @@ class TerminalUI(TesterUI):
                 try:
                     return from_file(side, path)
                 except PhotoError as e:
+                    print(e)
+                    continue
+            from ptctestsuite.utils import canon
+            cam = canon.shared()
+            if cam.detect()["available"]:   # a Canon on USB takes it at full resolution
+                print("Taking the photo on the Canon...")
+                try:
+                    return Photo(side, await asyncio.to_thread(cam.capture), "image/jpeg", "camera")
+                except canon.CameraError as e:
                     print(e)
                     continue
             from ptctestsuite.utils.image_capture import get_board_image

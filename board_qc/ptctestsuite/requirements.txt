@@ -10,3 +10,5 @@ httpx
 aiofiles
 opencv-python
 htgettoken
+# optional: a Canon EOS (or other gphoto2 camera) on USB as the station camera; needs libgphoto2 (apt install gphoto2 libgphoto2-dev)
+gphoto2

@@ -301,7 +301,7 @@ const unitText = u => u === "us" ? "µs" : (u || "");
 const accText = s => s && s.acceptance ? s.acceptance.replace(/ us$/, " µs") : null;
 
 let ws, S = null, sentId = null, viewKey = "", pendingWarn = null, startMode = "board";
-const top = document.getElementById("top"), screen = document.getElementById("screen"), conn = document.getElementById("conn");
+const topBar = document.getElementById("top"), screen = document.getElementById("screen"), conn = document.getElementById("conn");
 
 function connect() {
   ws = new WebSocket(`ws://${location.host}/ws`);
@@ -323,8 +323,8 @@ function renderTop() {
   const meta = S.screen === "start" ? "" : `<div class="meta"><div>Tester<b>${esc(S.tester)}</b></div>
     <div>${S.mode === "ship" ? "Purchase order" : "PTC serial"}<b>${esc(S.ident)}</b></div>
     ${isRun && S.run_label ? `<div>Run<b>${esc(S.run_label)}</b></div>` : ""}${isRun ? `<div>Step<b>${Math.min(done + 1, plan.length)} of ${plan.length}</b></div>` : ""}</div>`;
-  top.className = "top" + (isRun ? " run" : "");
-  top.innerHTML = `<div><div class="title">${esc(S.title)}</div><div class="sub">${esc(S.station)}</div></div>${meta}
+  topBar.className = "top" + (isRun ? " run" : "");
+  topBar.innerHTML = `<div><div class="title">${esc(S.title)}</div><div class="sub">${esc(S.station)}</div></div>${meta}
     <div class="pill ${S.hwdb.on ? "on" : ""} ${meta ? "" : "first"}"><i></i>${esc(S.hwdb.label)}</div>
     <button class="btn stop only-run" id="stop" type="button">Stop test</button>`;
   const stop = document.getElementById("stop");
@@ -866,7 +866,8 @@ function renderStopped() {
 }
 
 // ---- board photo step ----
-const cam = { stream: null, deviceId: null, shot: null, source: null };
+const cam = { stream: null, deviceId: null, shot: null, source: null };   // stream is {canon: true} for a Canon on USB
+const CANON = "canon";
 const $ = id => document.getElementById(id);
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
                 set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
@@ -876,6 +877,7 @@ function photoHTML(side, optional) {
   return `<div class="cam">
     <div class="cam-box" id="camBox">
       <video id="video" autoplay playsinline muted></video>
+      <img id="live" alt="Canon live view" hidden>
       <img id="shot" alt="The photo just taken" hidden>
       <img id="ghost" class="ghost" alt="" hidden>
       <span class="cam-badge" id="camBadge">Live</span>
@@ -898,7 +900,46 @@ function photoHTML(side, optional) {
 }
 
 function stopCamera() {
-  if (cam.stream) { cam.stream.getTracks().forEach(t => t.stop()); cam.stream = null; }
+  if (cam.stream && !cam.stream.canon) cam.stream.getTracks().forEach(t => t.stop());
+  cam.stream = null;
+  if ($("live")) { $("live").hidden = true; $("live").removeAttribute("src"); }
+}
+
+// A Canon EOS on USB is driven by the station with gphoto2: live view arrives as a stream of
+// frames shown in an <img>, and the photo is taken at full resolution by the camera.
+async function canonInfo() {
+  try { const r = await fetch("/canon", { cache: "no-store" }); return r.ok ? await r.json() : { available: false }; }
+  catch (e) { return { available: false }; }
+}
+function canonFrames() {
+  const tick = () => {
+    if (!cam.stream || !cam.stream.canon) return;
+    const el = $("live");
+    if (!el || cam.shot) { setTimeout(tick, 300); return; }   // nothing to show it in, or reviewing a photo
+    el.onload = () => { setAspect(el.naturalWidth, el.naturalHeight); setTimeout(tick, 150); };   // about 5 a second keeps CPU low
+    el.onerror = async () => {
+      try { const r = await fetch("/canon/preview.jpg", { cache: "no-store" }); const j = await r.json(); if ($("camEmpty")) camMessage(`Canon live view: ${j.error}`, true); }
+      catch (e) { }
+      if (cam.stream && cam.stream.canon) cam.stream = null;
+    };
+    el.src = `/canon/preview.jpg?t=${Date.now()}`;
+  };
+  tick();
+}
+async function canonPhoto() {
+  const r = await fetch(`/canon/capture?t=${Date.now()}`, { cache: "no-store" });
+  if (!r.ok) { let m = `error ${r.status}`; try { m = (await r.json()).error; } catch (e) { } throw new Error(m); }
+  const blob = await r.blob();
+  return await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(blob); });
+}
+async function fillCameraList(canon) {
+  const sel = $("camSel"); if (!sel) return;
+  let cams = [];
+  try { cams = navigator.mediaDevices ? (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput" && d.deviceId) : []; } catch (e) { }
+  sel.innerHTML = (canon.available ? `<option value="${CANON}">${esc(canon.name || "Canon EOS")} (USB, full resolution)</option>` : "") +
+    cams.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || "Camera " + (i + 1))}</option>`).join("");
+  sel.value = cam.deviceId || "";
+  sel.disabled = sel.options.length < 2;
 }
 function setAspect(w, h) { const box = $("camBox"); if (box && w && h) box.style.setProperty("--ar", (w / h).toFixed(4)); }
 function camMessage(text, retry) {
@@ -910,6 +951,21 @@ function camMessage(text, retry) {
 async function startCamera(deviceId) {
   const askId = S.ask && S.ask.id;
   const stillHere = () => S.ask && S.ask.id === askId && S.ask.kind === "photo" && $("video");
+  const canon = await canonInfo();
+  if (!stillHere()) return;
+  const want = deviceId || store.get("ptc-camera", null);
+  if (canon.available && (want === CANON || !want || !window.isSecureContext || !navigator.mediaDevices)) {
+    // the Canon, unless a webcam was chosen
+    if (cam.stream && !cam.stream.canon) stopCamera();
+    const running = cam.stream && cam.stream.canon;
+    cam.stream = { canon: true }; cam.deviceId = CANON; store.set("ptc-camera", CANON);
+    $("video").hidden = true; $("live").hidden = !!cam.shot;
+    $("camEmpty").hidden = true; $("takeBtn").disabled = !!cam.shot;
+    if (!running) canonFrames(); else { const el = $("live"); el.src = `/canon/preview.jpg?t=${Date.now()}`; }
+    await fillCameraList(canon);
+    return;
+  }
+  if (cam.stream && cam.stream.canon) stopCamera();
   if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     camMessage("The camera only works when this page is opened at http://localhost on the test station. You can still choose a photo file.", false);
     return;
@@ -917,10 +973,9 @@ async function startCamera(deviceId) {
   if (cam.stream && deviceId && deviceId !== cam.deviceId) stopCamera();
   try {
     if (!cam.stream) {
-      const want = deviceId || store.get("ptc-camera", null);
       const size = { width: { ideal: S.camera.width }, height: { ideal: S.camera.height } };
       try {
-        cam.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: want ? { ...size, deviceId: { exact: want } } : size });
+        cam.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: want && want !== CANON ? { ...size, deviceId: { exact: want } } : size });
       } catch (e) {
         if (!want || !["NotFoundError", "OverconstrainedError"].includes(e.name)) throw e;
         cam.stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: size });  // saved camera is gone
@@ -935,11 +990,9 @@ async function startCamera(deviceId) {
     await v.play().catch(() => {});
     if (!stillHere()) return;
     if (v.videoWidth) setAspect(v.videoWidth, v.videoHeight);
+    $("video").hidden = !!cam.shot; $("live").hidden = true;
     $("camEmpty").hidden = true; $("takeBtn").disabled = !!cam.shot;
-    const sel = $("camSel"), cams = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "videoinput");
-    sel.innerHTML = cams.map((d, i) => `<option value="${esc(d.deviceId)}">${esc(d.label || "Camera " + (i + 1))}</option>`).join("");
-    sel.value = cam.deviceId || "";
-    sel.disabled = cams.length < 2;
+    await fillCameraList(canon);
   } catch (e) {
     stopCamera();
     if (!stillHere()) return;
@@ -975,7 +1028,7 @@ function showReview(dataUrl, source, side) {
   cam.shot = dataUrl; cam.source = source;
   const shot = $("shot");
   shot.onload = () => setAspect(shot.naturalWidth, shot.naturalHeight);
-  shot.src = dataUrl; shot.hidden = false; $("video").hidden = true; $("camEmpty").hidden = true;
+  shot.src = dataUrl; shot.hidden = false; $("video").hidden = true; $("live").hidden = true; $("camEmpty").hidden = true;
   $("camBadge").textContent = source === "file" ? "Chosen file" : "Photo";
   $("liveBtns").hidden = true; $("reviewBtns").hidden = false;
   const hasGhost = !!S.ghosts[side];
@@ -990,7 +1043,9 @@ function showReview(dataUrl, source, side) {
 }
 function showLive() {
   cam.shot = null; cam.source = null;
-  $("shot").hidden = true; $("shot").removeAttribute("src"); $("video").hidden = false;
+  $("shot").hidden = true; $("shot").removeAttribute("src");
+  const canonLive = !!(cam.stream && cam.stream.canon);
+  $("video").hidden = canonLive; $("live").hidden = !canonLive;
   $("camBadge").textContent = "Live";
   $("liveBtns").hidden = false; $("reviewBtns").hidden = true;
   $("takeBtn").disabled = !cam.stream;
@@ -1023,7 +1078,13 @@ function bindPhoto(side) {
     e.target.value = "";
   };
   const act = {
-    take() {
+    async take() {
+      if (cam.stream && cam.stream.canon) {
+        $("takeBtn").disabled = true; say("Taking the photo on the Canon…", "");
+        try { const url = await canonPhoto(); showReview(url, "camera", side); }
+        catch (e) { say(`The Canon couldn’t take the photo: ${e.message}`, "err"); $("takeBtn").disabled = false; }
+        return;
+      }
       const v = $("video");
       if (!cam.stream || !v.videoWidth) { say("The camera isn’t ready yet.", "err"); return; }
       const c = document.createElement("canvas");

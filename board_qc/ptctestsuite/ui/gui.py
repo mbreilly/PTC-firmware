@@ -21,7 +21,7 @@ from websockets.http11 import Response
 
 from ptctestsuite.config import parameters
 from ptctestsuite.ui.base import TesterUI, Step, TestAborted, format_value
-from ptctestsuite.utils import photos, inspection
+from ptctestsuite.utils import canon, photos, inspection
 
 PAGE = Path(__file__).with_name("static") / "index.html"
 FONTS = PAGE.with_name("fonts")
@@ -74,10 +74,12 @@ class GuiUI(TesterUI):
         if self.open_browser:
             webbrowser.open(self.url)
 
-    def _http(self, connection, request):
+    async def _http(self, connection, request):
         path = request.path.split("?")[0]
         if path in ("/ws", "/setup"):
             return None
+        if path.startswith("/canon"):
+            return await self._canon(path)
         if path == "/inspection":
             body = SETUP_PAGE.read_bytes()
             return Response(200, "OK", Headers([("Content-Type", "text/html; charset=utf-8"),
@@ -116,6 +118,24 @@ class GuiUI(TesterUI):
             if p:
                 return self._file_response(p.data, p.mime)
         return connection.respond(404, "Not found\n")
+
+    async def _canon(self, path: str):
+        """A Canon EOS on USB (utils/canon.py): /canon says whether one is plugged in,
+        /canon/preview.jpg is a live view frame and /canon/capture takes a full-resolution photo."""
+        cam = canon.shared()
+        try:
+            if path == "/canon":
+                body = json.dumps(await asyncio.to_thread(cam.detect)).encode()
+                return self._file_response(body, "application/json")
+            if path == "/canon/preview.jpg":
+                return self._file_response(await asyncio.to_thread(cam.preview), "image/jpeg")
+            if path == "/canon/capture":
+                return self._file_response(await asyncio.to_thread(cam.capture), "image/jpeg")
+        except canon.CameraError as e:
+            body = json.dumps({"error": str(e)}).encode()
+            return Response(503, "Camera error", Headers([("Content-Type", "application/json"),
+                                                          ("Content-Length", str(len(body))), ("Cache-Control", "no-store")]), body)
+        return Response(404, "Not Found", Headers([("Content-Length", "0")]), b"")
 
     @staticmethod
     def _file_response(body: bytes, mime: str):

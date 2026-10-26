@@ -141,6 +141,24 @@ remembered. Keys: Space takes the photo, Enter uses it.
 In `--terminal` mode the tester types the path of an image file, or presses Enter to use the
 older OpenCV camera window (Space takes the photo). There is no ghost image there.
 
+**A Canon EOS on USB.** Besides a USB webcam (or a photo file), the station can use a Canon EOS
+DSLR (or another camera [gphoto2](http://gphoto.org/proj/libgphoto2/support.php) supports) on USB
+for full-resolution photos. When one is plugged in and switched on it is listed first in the
+**Camera** menu and chosen unless a webcam was picked. Its live view (about 1024 px, about 5 frames a
+second) shows behind the ghost, and **Take photo** has the camera take the full-resolution photo,
+which comes straight from the camera's memory (nothing is saved on its card). It works from a page
+opened over the network too, unlike a webcam. In terminal mode, pressing Enter at a photo step takes
+it on the Canon. Setup, once:
+
+    sudo apt install gphoto2 libgphoto2-dev
+    .venv/bin/pip install gphoto2
+    .venv/bin/python -m ptctestsuite.utils.canon test.jpg   # checks the camera answers
+
+Set the camera to M (manual) with the aperture at about f/8, the image quality to JPEG (L, fine)
+and auto power off to Disable, and power it from a dummy-battery AC adapter. The code
+(`utils/canon.py`) is shared with the AOI parts mapper. `CANON_FAKE_IMAGE=photo.jpg` stands in for
+a camera when trying it without one.
+
 ### Orientation check
 
 After each board photo the program checks that the polarised parts (ICs, tantalum and electrolytic
