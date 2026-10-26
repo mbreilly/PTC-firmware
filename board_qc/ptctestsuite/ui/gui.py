@@ -26,6 +26,7 @@ from ptctestsuite.utils import photos, inspection
 PAGE = Path(__file__).with_name("static") / "index.html"
 FONTS = PAGE.with_name("fonts")
 SETUP_PAGE = PAGE.with_name("inspection.html")
+DESIGNER = Path(__file__).with_name("designer") / "ptc-gui-designer.html"
 
 
 def _is_number(v) -> bool:
@@ -85,6 +86,8 @@ class GuiUI(TesterUI):
             ref = inspection.reference_path(path.rsplit("/", 1)[1])
             if ref.is_file():
                 return self._file_response(ref.read_bytes(), "image/jpeg")
+        if path == "/designer":
+            return self._file_response(DESIGNER.read_bytes(), "text/html; charset=utf-8")
         if path in ("/", "/index.html"):
             body = PAGE.read_bytes()
             return Response(200, "OK", Headers([("Content-Type", "text/html; charset=utf-8"),
