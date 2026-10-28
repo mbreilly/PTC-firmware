@@ -21,7 +21,7 @@ from websockets.http11 import Response
 
 from ptctestsuite.config import parameters
 from ptctestsuite.ui.base import TesterUI, Step, TestAborted, format_value
-from ptctestsuite.utils import canon, photos, inspection
+from ptctestsuite.utils import canon, photos, inspection, labels
 
 PAGE = Path(__file__).with_name("static") / "index.html"
 FONTS = PAGE.with_name("fonts")
@@ -80,6 +80,8 @@ class GuiUI(TesterUI):
             return None
         if path.startswith("/canon"):
             return await self._canon(path)
+        if path.startswith("/labels/"):
+            return await self._labels(path, request.path)
         if path == "/inspection":
             body = SETUP_PAGE.read_bytes()
             return Response(200, "OK", Headers([("Content-Type", "text/html; charset=utf-8"),
@@ -136,6 +138,31 @@ class GuiUI(TesterUI):
             return Response(503, "Camera error", Headers([("Content-Type", "application/json"),
                                                           ("Content-Length", str(len(body))), ("Cache-Control", "no-store")]), body)
         return Response(404, "Not Found", Headers([("Content-Length", "0")]), b"")
+
+    async def _labels(self, path: str, full: str):
+        """Serial labels for boards not in the database yet (utils/labels.py), printed by the QL label app:
+        /labels/next?start=&count=&reprint=  the serials it would print, /labels/preview.png?num=  one label,
+        /labels/print?serials=PTC001,PTC002  prints them as one strip, /labels/status  the printer."""
+        from urllib.parse import parse_qs, urlsplit
+        q = {k: v[0] for k, v in parse_qs(urlsplit(full).query).items()}
+        try:
+            if path == "/labels/next":
+                start = int(q["start"]) if q.get("start", "").strip() else None
+                r = await labels.propose(start, int(q.get("count") or 10), q.get("reprint") == "1",
+                                         self.state["hwdb"]["on"])
+            elif path == "/labels/preview.png":
+                return self._file_response(await labels.preview_png(re.sub(r"\D", "", q.get("num", "1")) or "1"), "image/png")
+            elif path == "/labels/print":
+                r = await labels.print_serials([s for s in q.get("serials", "").split(",") if s])
+            elif path == "/labels/status":
+                r = await labels.status()
+            else:
+                return Response(404, "Not Found", Headers([("Content-Length", "0")]), b"")
+            return self._file_response(json.dumps(r).encode(), "application/json")
+        except (labels.LabelError, ValueError) as e:
+            body = json.dumps({"error": str(e)}).encode()
+            return Response(400, "Label error", Headers([("Content-Type", "application/json"),
+                                                         ("Content-Length", str(len(body))), ("Cache-Control", "no-store")]), body)
 
     @staticmethod
     def _file_response(body: bytes, mime: str):

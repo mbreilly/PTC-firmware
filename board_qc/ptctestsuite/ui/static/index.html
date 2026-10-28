@@ -280,6 +280,20 @@ table.mini { width: 100%; border-collapse: collapse; font-size: .9em; }
 .cam-tools select { background: var(--g-field); color: var(--g-ink); border: 1px solid var(--g-line); border-radius: var(--g-r); height: 40px; padding: 0 8px; font: .95em var(--g-font); max-width: 260px; }
 .cam-tools input[type=range] { width: 170px; accent-color: var(--g-accent); }
 .btn.small { height: 40px; padding: 0 14px; font-size: .9em; }
+/* serial labels for new boards (utils/labels.py) */
+.lbl-back { position: fixed; inset: 0; background: #000a; display: flex; align-items: center; justify-content: center; z-index: 50; }
+.lbl-box { background: var(--g-panel); border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 24px 28px; width: min(760px, 94vw);
+  max-height: 92vh; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
+.lbl-box h1 { margin: 0; }
+.lbl-box .two .field { width: 100%; height: 46px; font-size: 1.1em; }
+.lbl-box .chk { display: flex; gap: 8px; align-items: center; color: var(--g-dim); font-size: .95em; }
+.lbl-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.lbl-list span { font: 500 .95em var(--g-mono); padding: 4px 8px; border: 1px solid var(--g-line); border-radius: var(--g-r); }
+.lbl-list span.again { border-color: var(--g-warn); color: var(--g-warn); }
+.lbl-prev { background: #fff; border-radius: var(--g-r); padding: 10px; align-self: flex-start; }
+.lbl-prev img { display: block; image-rendering: pixelated; width: 330px; }
+.lbl-note { color: var(--g-dim); font-size: .92em; }
+.lbl-acts { display: flex; gap: 10px; justify-content: flex-end; }
 .check { display: flex; gap: 10px; align-items: center; font-size: .95em; cursor: pointer; }
 .check input { width: 22px; height: 22px; accent-color: var(--g-accent); }
 .thumbs { display: flex; gap: 14px; align-items: flex-end; }
@@ -816,6 +830,10 @@ function renderStart() {
           <button class="btn" id="hgo" type="button">Search</button></div>
         <button class="btn" id="hbrowse" type="button">Browse: waiting for a retest, recently tested</button>
       </div>
+      <div style="border-top:1px solid var(--g-line);padding-top:14px;display:flex;flex-direction:column;gap:8px">
+        <span class="lbl">Serial labels</span>
+        <button class="btn" id="labels" type="button">Print labels for new boards</button>
+      </div>
     </div></div>`;
     screen.querySelectorAll("[data-m]").forEach(x => x.onclick = () => { startMode = x.dataset.m; draw(); });
     const go = () => {
@@ -834,11 +852,77 @@ function renderStart() {
     document.getElementById("hgo").onclick = search;
     hq.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); search(); } };
     document.getElementById("hbrowse").onclick = () => { startMode = "lookup"; draw(); };
+    document.getElementById("labels").onclick = openLabels;
     const first = tester ? document.getElementById(b ? "f-serial" : "f-po") : document.getElementById("f-tester");
     if (first) first.focus();
   };
   draw();
   showStartError();
+}
+// ---- serial labels for boards not in the database yet (printed by the QL label app) ----
+async function labelsGet(path) {
+  const r = await fetch(path, { cache: "no-store" });
+  const j = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
+  if (!r.ok || j.error) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+function openLabels() {
+  const back = document.createElement("div");
+  back.className = "lbl-back";
+  back.innerHTML = `<div class="lbl-box" role="dialog" aria-label="Print labels for new boards">
+    <h1>Labels for new boards</h1>
+    <div class="lbl-note">Serials with no HWDB entry, no record on this station and not printed before. Printing only makes
+      the labels; a board is added to the HWDB when it is first tested.</div>
+    <div class="two"><label><span class="lbl">First number</span><input class="field" id="lb-start" inputmode="numeric" placeholder="next free"></label>
+      <label><span class="lbl">How many</span><input class="field" id="lb-count" inputmode="numeric" value="10"></label></div>
+    <label class="chk"><input type="checkbox" id="lb-again"> allow serials that were printed before (reprint)</label>
+    <div class="lbl-note" id="lb-info">Looking for free serials…</div>
+    <div class="lbl-list" id="lb-list"></div>
+    <div class="lbl-prev" id="lb-prevwrap" hidden><img id="lb-prev" alt="label preview"></div>
+    <div class="lbl-note" id="lb-printer"></div>
+    <div class="msg" id="lb-msg" role="status"></div>
+    <div class="lbl-acts"><button class="btn" id="lb-close" type="button">Close</button>
+      <button class="btn pri" id="lb-print" type="button" disabled>Print</button></div></div>`;
+  document.body.appendChild(back);
+  const $ = id => document.getElementById(id);
+  const msg = (t, k) => { $("lb-msg").textContent = t; $("lb-msg").className = "msg " + (k || ""); };
+  let serials = [], timer;
+  const close = () => back.remove();
+  $("lb-close").onclick = close;
+  back.onclick = e => { if (e.target === back) close(); };
+  const load = async keep => {
+    $("lb-print").disabled = true; if (!keep) msg("");
+    const qs = new URLSearchParams({ start: $("lb-start").value.trim(), count: $("lb-count").value.trim() || "10",
+      reprint: $("lb-again").checked ? "1" : "0" });
+    try {
+      const r = await labelsGet("/labels/next?" + qs);
+      serials = r.serials.map(x => x.serial);
+      $("lb-info").textContent = (r.highest_serial ? `Highest serial used or printed so far: ${r.highest_serial}. ` : "No PTC### serials used or printed yet. ")
+        + (r.skipped_count ? `Skipped ${r.skipped_count}: ` + r.skipped.slice(-6).map(x => `${x.serial} (${x.why})`).join(", ") + ". " : "")
+        + (r.hwdb_checked ? "Checked against the HWDB." : r.hwdb_error || "The HWDB is off, so only this station's records were checked.");
+      $("lb-list").innerHTML = r.serials.map(x => `<span class="${x.printed_before ? "again" : ""}" title="${x.printed_before ? "printed before" : ""}">${esc(x.serial)}</span>`).join("");
+      $("lb-print").textContent = serials.length ? `Print ${serials.length} label${serials.length === 1 ? "" : "s"}: ${serials[0]}${serials.length > 1 ? " – " + serials[serials.length - 1] : ""}` : "Print";
+      $("lb-print").disabled = !serials.length;
+      if (serials.length) { $("lb-prev").src = "/labels/preview.png?num=" + r.serials[0].num; $("lb-prevwrap").hidden = false; }
+    } catch (e) { $("lb-info").textContent = ""; msg(e.message, "err"); }
+  };
+  const soon = () => { clearTimeout(timer); timer = setTimeout(load, 400); };
+  $("lb-start").oninput = soon; $("lb-count").oninput = soon; $("lb-again").onchange = () => load();
+  $("lb-prev").onerror = () => { $("lb-prevwrap").hidden = true; };
+  labelsGet("/labels/status").then(s => {
+    $("lb-printer").textContent = s.error ? s.error : s.ok ? `Printer ready: ${s.media_name}. Labels print as one strip, 10 mm each; cut on the marks.`
+      : `Printer: ${(s.errors || []).join(", ") || "not ready"}`;
+  }).catch(() => {});
+  $("lb-print").onclick = async () => {
+    if (!serials.length) return;
+    $("lb-print").disabled = true; msg(`Printing ${serials.length} labels…`, "run");
+    try {
+      const r = await labelsGet("/labels/print?serials=" + encodeURIComponent(serials.join(",")));
+      msg(`Printed ${r.labels} labels (${r.serials[0]} – ${r.serials[r.serials.length - 1]})${r.dry_run ? " [dry run]" : ""}.`);
+      $("lb-start").value = ""; setTimeout(() => load(true), 300);
+    } catch (e) { msg(e.message, "err"); $("lb-print").disabled = false; }
+  };
+  load();
 }
 function showStartError() { if (S.ask && S.ask.error) { say(S.ask.error, "err"); sentId = null; screen.querySelectorAll("button").forEach(b => b.disabled = false); } }
 
