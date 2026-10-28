@@ -14,7 +14,7 @@ import numpy as np
 import zxingcpp
 from PIL import Image, ImageDraw, ImageFont
 
-from .printer import MEDIA, Media, PrinterError, dots_to_mm, media, mm_to_dots
+from .printer import BLEED, MEDIA, Media, PrinterError, dots_to_mm, media, mm_to_dots, wide
 
 FONTS = {
     "sans": "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -193,7 +193,7 @@ def tpl_media(tpl: dict) -> Media:
 def size(tpl: dict) -> tuple[int, int]:
     m = tpl_media(tpl)
     length = m.printable_len if m.die_cut else max(8, min(mm_to_dots(1000), mm_to_dots(float(tpl.get("length_mm", 20)))))
-    width = m.printable
+    width = wide(m)[0] if tpl.get("wide") and not m.die_cut else m.printable
     return (width, length) if tpl.get("across") else (length, width)
 
 
@@ -326,4 +326,5 @@ def media_list() -> dict:
     """For the page: every roll, plus the whole tape width in dots (printable + unprintable edges)."""
     return {"media": [{"id": m.id, "name": m.name(), "kind": m.kind, "width": m.width, "length": m.length,
                        "printable": m.printable, "printable_len": m.printable_len,
+                       "wide": wide(m)[0] if not m.die_cut else m.printable, "bleed": BLEED.get(m.id, (0, 0)),
                        "total": round(m.width * 300 / 25.4)} for m in MEDIA.values()]}

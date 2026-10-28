@@ -66,3 +66,12 @@ def test_strips():
     assert s[0].getpixel((0, 0)) == 0 and s[0].getpixel((0, 235)) == 0      # start and end marks (ends=True)
     assert s[0].getpixel((0, 118)) == 0 and s[0].getpixel((150, 118)) == 255   # tick at the edge only
     assert len(R.strips(pages, per=0)) == 1
+
+def test_wide():
+    t = {"media": "29", "wide": True, "length_mm": 10, "across": True,
+         "elements": [{"id": "a", "type": "box", "x": 0, "y": 0, "w": 330, "h": 118, "filled": True}]}
+    img, _, w = R.render(t)
+    assert img.size == (330, 118) and not w
+    line = raster_lines(R.page(img, across=True), "29")[3:93]
+    bit = [i for i in range(720) if line[i // 8] >> (7 - i % 8) & 1]
+    assert bit[0] == 0 and bit[-1] == 329                  # pins 0..329: 6 + 306 + 18

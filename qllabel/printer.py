@@ -53,6 +53,18 @@ MEDIA = {m.id: m for m in [
 ]}
 TAPES = {int(k): (m.printable, m.right) for k, m in MEDIA.items() if not m.die_cut}   # continuous widths
 
+# Extra dots beyond Brother's window that still land on the tape: (toward the end of the head, toward the open
+# side). 29 mm measured 2026-10-28 with an edge test: the head ends 6 dots past the window, the tape edge ~25
+# dots past it on the other side (18 used, for tape wander). Stored per roll in <data>/media.json.
+BLEED = {"29": (6, 18)}
+
+
+def wide(m: Media) -> tuple[int, int]:
+    """(printable dots, right offset) when a label uses the bleed."""
+    head, open_ = BLEED.get(m.id, (0, 0))
+    head = min(head, m.right)
+    return m.printable + head + open_, m.right - head
+
 
 def media(mid) -> Media:
     m = MEDIA.get(str(mid))
@@ -149,6 +161,8 @@ def raster_lines(img: Image.Image, tape) -> bytes:
     same as brother_ql produces; mirroring it onto the far end of the head printed nothing on 29 mm tape)."""
     m = media(tape)
     printable, right = m.printable, m.right
+    if img.width != printable and not m.die_cut and img.width == wide(m)[0]:
+        printable, right = wide(m)                      # a label using the bleed
     if img.width != printable:
         raise PrinterError(f"Image is {img.width} dots wide; {m.name()} takes {printable}.")
     g = img.convert("L")

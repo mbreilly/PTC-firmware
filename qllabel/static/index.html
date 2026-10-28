@@ -48,6 +48,7 @@
           <button id="use-loaded" title="Switch to the roll that is in the printer">LOADED</button>
         </div>
         <p class="dim" id="media-note"></p>
+        <label class="check" id="wide-wrap"><input type="checkbox" id="wide"> <span id="wide-label">use the full width</span></label>
         <p class="dim">END FEED is the blank tape the printer adds before and after every piece. It won't go below about
           3 mm (35 dots); to get labels with no gap, print them as a STRIP (under PRINT).</p>
         <div class="knobrow" id="knobs">
@@ -229,6 +230,17 @@
         <h2>PRINTER</h2>
         <div class="kv" id="pstat"></div>
         <div class="row"><button id="p-refresh">ASK THE PRINTER</button></div>
+        <h2>FULL-WIDTH BLEED</h2>
+        <p class="dim">Extra dots a label may use beyond Brother's print window when "use the full width" is ticked.
+          Head end: pins left at that end of the print head (max 6 on 29 mm). Open side: towards the far tape edge; keep a
+          few dots short of the edge, the tape wanders a little and pins off the tape heat the bare roller.
+          29 mm was measured on 2026-10-28: 6 + 18 dots.</p>
+        <div class="grid2">
+          <span class="lab">ROLL</span><select id="b-media"></select>
+          <span class="lab">HEAD END</span><input type="number" id="b-head" min="0" max="60">
+          <span class="lab">OPEN SIDE</span><input type="number" id="b-open" min="0" max="60">
+        </div>
+        <div class="row"><button id="b-save">SAVE BLEED</button><span class="dim" id="b-width"></span></div>
       </div>
       <div class="col">
         <h2>COMMAND LINE (FOR PTC LATER)</h2>

@@ -37,6 +37,7 @@ class Station:
         for d in (self.tdir, self.idir, self.cdir):
             d.mkdir(parents=True, exist_ok=True)
         R.IMAGES = self.idir
+        self.load_bleed()
         for f in sorted((Path(__file__).parent.parent / "assets").glob("*.png")):   # built-in graphics
             try:
                 self.upload_image(f.stem.replace("_", " "), base64.b64encode(f.read_bytes()).decode())
@@ -79,6 +80,29 @@ class Station:
         f = self._tfile(name)
         f.unlink(missing_ok=True)
         return {"deleted": name}
+
+    # ---- per-roll bleed (extra printable dots past Brother's window)
+    def load_bleed(self):
+        f = self.data / "media.json"
+        try:
+            for k, v in json.loads(f.read_text()).get("bleed", {}).items():
+                R.BLEED[k] = (int(v[0]), int(v[1]))
+        except (OSError, ValueError):
+            pass
+
+    def set_bleed(self, mid: str, head: int, open_: int) -> dict:
+        m = R.media(mid)
+        if m.die_cut:
+            raise ValueError("Bleed is only for continuous rolls.")
+        R.BLEED[m.id] = (max(0, min(m.right, int(head))), max(0, min(60, int(open_))))
+        f = self.data / "media.json"
+        try:
+            cur = json.loads(f.read_text())
+        except (OSError, ValueError):
+            cur = {}
+        cur.setdefault("bleed", {})[m.id] = list(R.BLEED[m.id])
+        f.write_text(json.dumps(cur, indent=1))
+        return R.media_list()
 
     # ---- graphics and CSV files
     def upload_image(self, name: str, b64png: str) -> dict:

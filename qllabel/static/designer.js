@@ -675,12 +675,19 @@ async function loadMedia() {
   const r = await api("/api/media");
   MEDIA = Object.fromEntries(r.media.map(m => [m.id, m]));
   const groups = { continuous: "Continuous rolls (any length)", "die-cut": "Die-cut labels (fixed size)", round: "Round labels" };
+  $("#b-media").innerHTML = r.media.filter(m => m.kind === "continuous").map(m => `<option value="${m.id}">${m.name}</option>`).join("");
+  $("#b-media").value = loaded && MEDIA[loaded]?.kind === "continuous" ? loaded : "29";
+  bleedForm();
   $("#media").innerHTML = Object.entries(groups).map(([k, g]) => `<optgroup label="${g}">${r.media.filter(m => m.kind === k)
     .map(m => `<option value="${m.id}">${m.name}</option>`).join("")}</optgroup>`).join("");
 }
 function mediaNote() {
   const id = mediaOf(tpl), md = MEDIA[id];
   if (!md) return;
+  const canWide = md.kind === "continuous" && md.wide > md.printable;
+  $("#wide-wrap").hidden = !canWide;
+  $("#wide").checked = canWide && !!tpl.wide;
+  $("#wide-label").textContent = `use the full width: ${(md.wide / DPMM).toFixed(1)} mm instead of ${(md.printable / DPMM).toFixed(1)} mm`;
   $("#media").value = id;
   const fixed = md.kind !== "continuous";
   $("#knobs").classList.toggle("fixed", fixed);
@@ -690,6 +697,19 @@ function mediaNote() {
     (loaded ? (loaded === id ? "This roll is in the printer." : `The printer has ${MEDIA[loaded]?.name || "another roll"} in it.`) : "");
   $("#use-loaded").disabled = !loaded || loaded === id;
 }
+$("#wide").addEventListener("change", e => { tpl.wide = e.target.checked; changed(); });
+function bleedForm() {
+  const id = $("#b-media").value || mediaOf(tpl), md = MEDIA[id]; if (!md) return;
+  $("#b-head").value = md.bleed[0]; $("#b-open").value = md.bleed[1];
+  $("#b-width").textContent = `full width: ${md.wide} dots = ${(md.wide / DPMM).toFixed(1)} mm`;
+}
+$("#b-media").addEventListener("change", bleedForm);
+$("#b-save").addEventListener("click", async () => {
+  try {
+    const r = await api("/api/bleed", { media: $("#b-media").value, head: +$("#b-head").value, open: +$("#b-open").value });
+    MEDIA = Object.fromEntries(r.media.map(m => [m.id, m])); bleedForm(); mediaNote(); changed(); say("Bleed saved.");
+  } catch (e) { say(e.message, true); }
+});
 $("#media").addEventListener("change", e => { tpl.media = e.target.value; mediaNote(); stripUI(); changed(); printerStatus(); });
 $("#use-loaded").addEventListener("click", () => { if (loaded) { tpl.media = loaded; mediaNote(); changed(); printerStatus(); } });
 

@@ -88,6 +88,7 @@ def make_handler(st: Station):
                 "/api/batch": lambda b: st.batch_info(b["template"]),
                 "/api/image": lambda b: st.upload_image(b.get("name", ""), b["png"]),
                 "/api/upload_csv": lambda b: st.upload_csv(b.get("name", ""), b.get("text", "")),
+                "/api/bleed": lambda b: st.set_bleed(str(b.get("media", "")), b.get("head", 0), b.get("open", 0)),
                 "/api/calibrate": lambda b: st.calibrate(b.get("lengths", []), b.get("margin", 35),
                                                          b.get("cut", "each"), b.get("media") or b.get("tape"), b.get("flip")),
             }
