@@ -207,7 +207,7 @@ class Station:
             for c in R.verify(img, tpl, row):
                 if not c["ok"]:
                     bad.append(f"{c['type']} '{c['data']}' did not read back")
-            pages += [R.page(img, bool(tpl.get("flip", self.flip)))] * copies
+            pages += [R.page(img, bool(tpl.get("flip", self.flip)), bool(tpl.get("across")))] * copies
         if bad:
             raise ValueError("Not printing: " + "; ".join(bad[:5]))
         if len(pages) > 500:

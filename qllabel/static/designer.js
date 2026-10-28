@@ -121,6 +121,7 @@ function seg(host, value, onChange) {
   return set;
 }
 const setCut = seg($("#cut"), "each", v => { tpl.cut = v; changed(false); });
+const setAcross = seg($("#across"), "0", v => { tpl.across = v === "1"; changed(); });
 seg($("#zoom"), "fit", v => { zoomMode = v; layout(); });
 const setCCut = seg($("#c-cut"), "each", () => {});
 
@@ -157,15 +158,22 @@ function changed(rerender = true) {
 
 function layout() {
   if (!last) return;
-  const w = last.w, h = last.h, total = TAPE_TOTAL[tpl.tape] || h + 36, edge = (total - h) / 2, m = tpl.margin;
+  const w = last.w, h = last.h, m = tpl.margin;
+  const across = !!tpl.across;   // then the tape runs down the screen: edges left/right, feed above/below
+  const printable = across ? w : h, total = TAPE_TOTAL[tpl.tape] || printable + 36, edge = (total - printable) / 2;
   if (zoomMode === "fit") {
     const avail = $("#stage").clientWidth - 60;
-    zoom = Math.max(0.5, Math.min(6, avail / (w + 2 * m), 440 / total));
+    zoom = across ? Math.max(0.5, Math.min(6, avail / total, 440 / (h + 2 * m)))
+                  : Math.max(0.5, Math.min(6, avail / (w + 2 * m), 440 / total));
   } else zoom = +zoomMode;
   const tape = $("#tape");
-  tape.style.padding = `${edge * zoom}px 0`;
+  tape.classList.toggle("across", across);
+  tape.style.padding = across ? `0 ${edge * zoom}px` : `${edge * zoom}px 0`;
   tape.style.setProperty("--edge", `${edge * zoom}px`);
-  $("#feed-l").style.width = $("#feed-r").style.width = `${m * zoom}px`;
+  for (const f of [$("#feed-l"), $("#feed-r")]) {
+    f.style.width = across ? `${w * zoom}px` : `${m * zoom}px`;
+    f.style.height = across ? `${m * zoom}px` : "auto";
+  }
   const lab = $("#label");
   lab.style.width = `${w * zoom}px`; lab.style.height = `${h * zoom}px`;
   const img = $("#bitmap");
@@ -173,7 +181,7 @@ function layout() {
   $("#gridlay").classList.toggle("on", $("#grid").checked);
   $("#gridlay").style.setProperty("--mm", `${DPMM * zoom}px`);
   $("#dims").textContent = `${last.w_mm.toFixed(1)} × ${last.h_mm.toFixed(1)} mm printable  ·  ${w} × ${h} dots  ·  ` +
-    `piece ≈ ${((w + 2 * m) / DPMM).toFixed(1)} mm with margin`;
+    `piece ≈ ${(((across ? h : w) + 2 * m) / DPMM).toFixed(1)} mm with margin`;
   drawBoxes();
 }
 
@@ -378,8 +386,9 @@ function drawFields() {
 
 $("#fit").addEventListener("click", () => {
   if (!last || !last.boxes.length) return;
-  const lo = Math.max(0, Math.min(...last.boxes.map(b => b.x)));
-  const hi = Math.max(...last.boxes.map(b => b.x + b.w));
+  const a = tpl.across ? ["y", "h"] : ["x", "w"];   // the direction that runs along the tape
+  const lo = Math.max(0, Math.min(...last.boxes.map(b => b[a[0]])));
+  const hi = Math.max(...last.boxes.map(b => b[a[0]] + b[a[1]]));
   tpl.length_mm = Math.round((hi + lo) / DPMM * 10) / 10;
   kLength.set(tpl.length_mm);
   changed();
@@ -399,7 +408,7 @@ function use(t) {
   tpl = { ...blank(), ...t };
   nextId = 1; sel = null;
   $("#tpl-name").value = tpl.name;
-  kLength.set(tpl.length_mm); kMargin.set(tpl.margin); setCut(tpl.cut);
+  kLength.set(tpl.length_mm); kMargin.set(tpl.margin); setCut(tpl.cut); setAcross(tpl.across ? "1" : "0");
   $("#flip").checked = !!tpl.flip;
   $("#fields").dataset.key = "";
   tpl.batch = { ...BATCH, ...(tpl.batch || {}) };

@@ -1,7 +1,8 @@
 """Label templates -> 1-bit images at 300 dpi.
 
-A template is laid out the way you read the label: x runs along the tape (0 .. length), y runs
-across it (0 .. the printable width, 306 dots on 29 mm tape). All positions and sizes are in dots.
+A template is laid out the way you read the label. Normally x runs along the tape (0 .. length) and y
+across it (0 .. the printable width, 306 dots on 29 mm tape). With "across": true the text reads across
+the tape instead: x is across (0 .. 306) and y along (0 .. length), for short labels like 29 x 10 mm. All positions and sizes are in dots.
 Text and barcode data may contain {field} placeholders, filled from the values passed in."""
 
 import re
@@ -186,7 +187,8 @@ def size(tpl: dict) -> tuple[int, int]:
     tape = int(tpl.get("tape", 29))
     if tape not in TAPES:
         raise PrinterError(f"Unknown tape width {tape} mm.")
-    return max(8, mm_to_dots(float(tpl.get("length_mm", 20)))), TAPES[tape][0]
+    length, width = max(8, mm_to_dots(float(tpl.get("length_mm", 20)))), TAPES[tape][0]
+    return (width, length) if tpl.get("across") else (length, width)
 
 
 def render(tpl: dict, values: dict | None = None) -> tuple[Image.Image, list[dict], list[str]]:
@@ -212,9 +214,10 @@ def render(tpl: dict, values: dict | None = None) -> tuple[Image.Image, list[dic
     return img.point(lambda v: 0 if v < 128 else 255), boxes, warn
 
 
-def page(img: Image.Image, flip: bool = False) -> Image.Image:
+def page(img: Image.Image, flip: bool = False, across: bool = False) -> Image.Image:
     """Label as read -> page for the printer (width across the tape, height along it)."""
-    return img.rotate(180 if flip else 0).rotate(-90, expand=True)
+    img = img.rotate(180) if flip else img
+    return img if across else img.rotate(-90, expand=True)
 
 
 def verify(img: Image.Image, tpl: dict, values: dict | None = None) -> list[dict]:
@@ -262,5 +265,5 @@ def calibration(lengths_mm: list[float], tape: int = 29) -> list[Image.Image]:
 
 def info(tpl: dict) -> dict:
     w, h = size(tpl)
-    return {"w": w, "h": h, "w_mm": round(dots_to_mm(w), 2), "h_mm": round(dots_to_mm(h), 2),
+    return {"across": bool(tpl.get("across")), "w": w, "h": h, "w_mm": round(dots_to_mm(w), 2), "h_mm": round(dots_to_mm(h), 2),
             "fields": fields_in(tpl)}

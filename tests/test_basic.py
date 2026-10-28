@@ -40,3 +40,10 @@ def test_job_shape():
 def test_calibration():
     for p in R.calibration([25, 10, 5, 3]):
         assert p.height == 306
+
+def test_across():
+    t = {"tape": 29, "length_mm": 10, "across": True, "elements": [{"id": "a", "type": "datamatrix", "x": 200, "y": 20, "module": 6, "data": "PTC001"}]}
+    img, _, _ = R.render(t)
+    assert img.size == (306, R.mm_to_dots(10))          # read across: 306 wide, 10 mm tall
+    assert R.page(img, across=True).size == (306, R.mm_to_dots(10))
+    assert R.verify(img, t)[0]["ok"]

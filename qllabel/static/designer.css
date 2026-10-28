@@ -30,6 +30,10 @@ input.qty { width: 70px !important; }
 .tape::before, .tape::after { content: ""; position: absolute; left: 0; right: 0; height: var(--edge, 0px); pointer-events: none;
   background: repeating-linear-gradient(-45deg, transparent 0 5px, #DDD8C8 5px 7px); }
 .tape::before { top: 0; } .tape::after { bottom: 0; }
+.tape.across { flex-direction: column; }
+.tape.across::before, .tape.across::after { top: 0; bottom: 0; left: auto; right: auto; height: auto; width: var(--edge, 0px);
+  background: repeating-linear-gradient(45deg, transparent 0 5px, #DDD8C8 5px 7px); }
+.tape.across::before { left: 0; } .tape.across::after { right: 0; }
 .gridlay { position: absolute; inset: 0; pointer-events: none; }
 .gridlay.on { background-image:
   linear-gradient(to right, #E0A33A33 1px, transparent 1px), linear-gradient(to bottom, #E0A33A33 1px, transparent 1px);
