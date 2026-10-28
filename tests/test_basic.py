@@ -63,5 +63,6 @@ def test_strips():
     pages = [R.page(R.render(t, {"num": f"{i:03d}"})[0], across=True) for i in range(1, 6)]
     s = R.strips(pages, per=2, marks="edge")
     assert [p.height for p in s] == [236, 236, 118]           # 2 + 2 + 1 labels at exactly 118 dots each
+    assert s[0].getpixel((0, 0)) == 0 and s[0].getpixel((0, 235)) == 0      # start and end marks (ends=True)
     assert s[0].getpixel((0, 118)) == 0 and s[0].getpixel((150, 118)) == 255   # tick at the edge only
     assert len(R.strips(pages, per=0)) == 1

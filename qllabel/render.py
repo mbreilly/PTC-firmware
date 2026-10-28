@@ -246,15 +246,16 @@ def verify(img: Image.Image, tpl: dict, values: dict | None = None) -> list[dict
     return out
 
 
-STRIP_DEFAULT = {"on": False, "per": 0, "marks": "edge"}
+STRIP_DEFAULT = {"on": False, "per": 0, "marks": "edge", "ends": True}
 MAX_PAGE = mm_to_dots(1000)                      # the printer takes pages up to 1 m long
 
 
-def strips(pages: list[Image.Image], per: int = 0, marks: str = "edge") -> list[Image.Image]:
+def strips(pages: list[Image.Image], per: int = 0, marks: str = "edge", ends: bool = True) -> list[Image.Image]:
     """Join printer pages end to end, `per` labels to a piece (0 = as many as fit in 1 m), so labels sit at their
     exact pitch with no feed between them; the printer only adds its ~3 mm feed at each end of a piece.
     Cut marks go on the boundary between labels: "edge" = short ticks at both tape edges, "full" = dashed
-    line across, "none"."""
+    line across, "none". With `ends`, the same mark also goes before the first and after the last label, to trim
+    the printer's end feed off exactly."""
     out = []
     i = 0
     while i < len(pages):
@@ -268,16 +269,23 @@ def strips(pages: list[Image.Image], per: int = 0, marks: str = "edge") -> list[
         im = Image.new("L", (w, sum(p.height for p in group)), 255)
         y = 0
         d = ImageDraw.Draw(im)
-        for k, p in enumerate(group):
-            im.paste(p, (0, y))
-            if k and marks == "edge":
+
+        def mark(y):
+            if marks == "edge":
                 tick = max(6, w // 14)
                 d.line((0, y, tick, y), fill=0, width=1)
                 d.line((w - 1 - tick, y, w - 1, y), fill=0, width=1)
-            elif k and marks == "full":
+            elif marks == "full":
                 for x in range(0, w, 12):
                     d.line((x, y, min(w - 1, x + 5), y), fill=0, width=1)
+
+        for k, p in enumerate(group):
+            im.paste(p, (0, y))
+            if k or ends:
+                mark(y)
             y += p.height
+        if ends:
+            mark(y - 1)
         out.append(im)
     return out
 

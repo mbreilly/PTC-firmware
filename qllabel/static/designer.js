@@ -652,7 +652,8 @@ setInterval(() => { if (!document.hidden) printerStatus(); }, 6000);
 
 // ---------------------------------------------------------------- start
 // ---------------------------------------------------------------- strips: labels end to end, cut by hand
-const S = () => (tpl.strip = { on: false, per: 0, marks: "edge", ...(tpl.strip || {}) });
+const S = () => (tpl.strip = { on: false, per: 0, marks: "edge", ends: true, ...(tpl.strip || {}) });
+$("#strip-ends").addEventListener("change", e => { S().ends = e.target.checked; changed(false); });
 const setStrip = seg($("#strip"), "0", v => { S().on = v === "1"; stripUI(); changed(false); });
 const setMarks = seg($("#strip-marks"), "edge", v => { S().marks = v; changed(false); });
 $("#strip-per").addEventListener("input", e => { S().per = Math.max(0, parseInt(e.target.value, 10) || 0); stripUI(); changed(false); });
@@ -662,6 +663,7 @@ function stripUI() {
   $("#strip").querySelector('[data-v="1"]').disabled = fixed;
   $("#strip-opts").hidden = !s.on || fixed;
   $("#strip-per").value = s.per;
+  $("#strip-ends").checked = s.ends !== false;
   $("#strip-note").textContent = fixed ? "Die-cut labels are already separate." : s.on
     ? `Labels are printed end to end at exactly ${tpl.length_mm} mm each, ${s.per ? s.per + " per strip" : "the whole batch on one strip"}; ` +
       "the printer only adds its ~3 mm feed at the two ends of each strip. Cut on the marks."

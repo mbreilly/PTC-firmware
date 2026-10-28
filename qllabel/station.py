@@ -215,7 +215,7 @@ class Station:
         labels = len(pages)
         strip = {**R.STRIP_DEFAULT, **(tpl.get("strip") or {}), **((over or {}).get("strip") or {})}
         if strip["on"] and not R.tpl_media(tpl).die_cut:
-            pages = R.strips(pages, int(strip.get("per") or 0), strip.get("marks", "edge"))
+            pages = R.strips(pages, int(strip.get("per") or 0), strip.get("marks", "edge"), bool(strip.get("ends", True)))
         if len(pages) > 500:
             raise ValueError("More than 500 labels in one go; split the batch.")
         r = self._print(pages, self.options(tpl, over))
