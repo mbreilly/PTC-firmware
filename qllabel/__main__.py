@@ -32,6 +32,10 @@ def main(argv=None):
     p.add_argument("--copies", type=int, default=1)
     p.add_argument("--margin", type=int, help="override the feed margin (dots)")
     p.add_argument("--cut", choices=["each", "end", "none"], help="override when to cut")
+    p.add_argument("--strip", type=int, metavar="N", help="print labels end to end, N per piece (0 = all); "
+                   "no feed between them, cut marks between labels")
+    p.add_argument("--no-strip", action="store_true", help="one piece per label even if the template uses strips")
+    p.add_argument("--marks", choices=["edge", "full", "none"], help="cut marks between labels on a strip")
     c = sub.add_parser("calibrate", help="print test labels at given lengths")
     c.add_argument("lengths", nargs="+", type=float, help="label lengths in mm")
     c.add_argument("--margin", type=int, default=35)
@@ -50,6 +54,9 @@ def main(argv=None):
             base = dict(kv.split("=", 1) for kv in a.set)
             rows = [{**base, **r} for r in csv.DictReader(a.csv.open())] if a.csv else [base]
             over = {k: v for k, v in (("margin", a.margin), ("cut", a.cut)) if v is not None}
+            if a.strip is not None or a.no_strip or a.marks:
+                over["strip"] = {k: v for k, v in (("on", False if a.no_strip else True if a.strip is not None else None),
+                                                   ("per", a.strip), ("marks", a.marks)) if v is not None}
             if a.batch:
                 tpl["batch"] = {**(tpl.get("batch") or {}), **{k: v for k, v in (("start", a.start), ("count", a.count)) if v is not None}}
                 print(json.dumps(st.print_batch(tpl, a.copies, over)))

@@ -16,6 +16,7 @@ from .printer import JobOptions, Printer, PrinterError
 DATA = Path.home() / "ql-labels-data"
 NAME_OK = re.compile(r"^[\w .-]{1,60}$")
 MAX_BATCH = 500
+MIN_MARGIN = 35
 BATCH_DEFAULT = {"on": False, "source": "range", "field": "serial", "prefix": "PTC-", "suffix": "", "start": 1,
                  "count": 10, "step": 1, "digits": 5, "advance": True, "csv": "", "map": {}, "first_row": 1,
                  "last_row": 0, "list": ""}
@@ -195,7 +196,8 @@ class Station:
 
     def options(self, tpl: dict, over: dict | None = None) -> JobOptions:
         o = {**tpl, **(over or {})}
-        return JobOptions(media=R.tpl_media(o).id, margin=int(o.get("margin", 35)), cut=o.get("cut", "each"),
+        # the QL-810W feeds at least 35 dots (~3 mm) at each end of every page whatever we send (measured 2026-10-28)
+        return JobOptions(media=R.tpl_media(o).id, margin=max(MIN_MARGIN, int(o.get("margin", 35))), cut=o.get("cut", "each"),
                           cut_every=int(o.get("cut_every", 1)))
 
     def print_rows(self, tpl: dict, rows: list[dict] | None = None, copies: int = 1, over: dict | None = None):
@@ -210,9 +212,17 @@ class Station:
             pages += [R.page(img, bool(tpl.get("flip", self.flip)), bool(tpl.get("across")))] * copies
         if bad:
             raise ValueError("Not printing: " + "; ".join(bad[:5]))
+        labels = len(pages)
+        strip = {**R.STRIP_DEFAULT, **(tpl.get("strip") or {}), **((over or {}).get("strip") or {})}
+        if strip["on"] and not R.tpl_media(tpl).die_cut:
+            pages = R.strips(pages, int(strip.get("per") or 0), strip.get("marks", "edge"))
         if len(pages) > 500:
             raise ValueError("More than 500 labels in one go; split the batch.")
-        return self._print(pages, self.options(tpl, over))
+        r = self._print(pages, self.options(tpl, over))
+        r["labels"] = labels
+        if len(pages) != labels:
+            r["strips"] = len(pages)
+        return r
 
     def calibrate(self, lengths: list[float], margin: int = 35, cut: str = "each", tape=None, flip: bool | None = None):
         tape = tape or self.status().get("media") or "29"        # default: whatever roll is loaded
@@ -222,7 +232,7 @@ class Station:
         if not lengths:
             raise ValueError("Give at least one length between 0.5 and 300 mm.")
         flip = self.flip if flip is None else bool(flip)
-        pages = [R.page(p, flip) for p in R.calibration(lengths, tape)]
+        pages = [R.page(p, flip) for p in R.calibration(lengths, tape, f"m{int(margin)}")]
         return self._print(pages, JobOptions(media=str(tape), margin=int(margin), cut=cut))
 
     def _print(self, pages, opt):

@@ -48,6 +48,8 @@
           <button id="use-loaded" title="Switch to the roll that is in the printer">LOADED</button>
         </div>
         <p class="dim" id="media-note"></p>
+        <p class="dim">END FEED is the blank tape the printer adds before and after every piece. It won't go below about
+          3 mm (35 dots); to get labels with no gap, print them as a STRIP (under PRINT).</p>
         <div class="knobrow" id="knobs">
           <div class="knob" id="k-length"></div>
           <div class="knob" id="k-margin"></div>
@@ -118,6 +120,14 @@
         <h2>PRINT</h2>
         <div class="seg" id="mode"><button data-v="single" class="on">ONE LABEL</button><button data-v="batch">BATCH</button></div>
         <p class="dim" id="batch-sum"></p>
+        <h3>PIECES</h3>
+        <div class="seg" id="strip"><button data-v="0" class="on" title="Each label cut on its own (the printer adds ~3 mm feed at both ends)">ONE PER LABEL</button><button data-v="1" title="Labels end to end at their exact length, cut marks between them, one cut per strip">STRIP</button></div>
+        <div id="strip-opts" hidden>
+          <div class="row tight"><span class="lab">LABELS PER STRIP</span><input type="number" id="strip-per" min="0" max="100" class="qty" title="0 = the whole batch on one strip (up to 1 m)"></div>
+          <div class="row tight"><span class="lab">MARKS</span>
+            <div class="seg" id="strip-marks"><button data-v="edge" class="on">EDGE TICKS</button><button data-v="full">DASHED</button><button data-v="none">NONE</button></div></div>
+        </div>
+        <p class="dim" id="strip-note"></p>
         <div class="row tight">
           <span class="lab">COPIES</span>
           <input type="number" id="copies" min="1" max="100" value="1" class="qty">

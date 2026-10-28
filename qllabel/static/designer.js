@@ -108,9 +108,9 @@ function knob(host, o) {
 }
 
 const kLength = knob($("#k-length"), { id: "len", label: "LENGTH", min: 2, max: 1000, step: 0.5, value: 20, log: true,
-  fmt: v => `${v.toFixed(1)} mm`, onChange: v => { tpl.length_mm = v; changed(); } });
-const kMargin = knob($("#k-margin"), { id: "mar", label: "MARGIN", min: 0, max: 100, step: 1, value: 35,
-  fmt: v => `${v} dots`, onChange: v => { tpl.margin = v; changed(false); } });
+  fmt: v => `${v.toFixed(1)} mm`, onChange: v => { tpl.length_mm = v; changed(); if (tpl.strip?.on) stripUI(); } });
+const kMargin = knob($("#k-margin"), { id: "mar", label: "END FEED", min: 35, max: 200, step: 1, value: 35,
+  fmt: v => `${(v / DPMM).toFixed(1)} mm`, onChange: v => { tpl.margin = v; changed(false); } });
 
 function seg(host, value, onChange) {
   const set = v => $$("button", host).forEach(b => b.classList.toggle("on", b.dataset.v === String(v)));
@@ -411,9 +411,10 @@ function use(t) {
   tpl = { ...blank(), ...t };
   nextId = 1; sel = null;
   $("#tpl-name").value = tpl.name;
+  tpl.margin = Math.max(35, tpl.margin ?? 35);   // the printer won't feed less than 35 dots (~3 mm) per page
   kLength.set(tpl.length_mm); kMargin.set(tpl.margin); setCut(tpl.cut); setAcross(tpl.across ? "1" : "0");
   tpl.media = mediaOf(tpl); delete tpl.tape;
-  mediaNote();
+  mediaNote(); stripUI();
   $("#flip").checked = !!tpl.flip;
   $("#fields").dataset.key = "";
   tpl.batch = { ...BATCH, ...(tpl.batch || {}) };
@@ -443,7 +444,8 @@ async function doPrint(rows, copies, btn) {
   const old = btn.textContent; btn.textContent = "PRINTING…";
   try {
     const r = await api("/api/print", { template: tpl, rows, copies });
-    say(r.dry_run ? `Dry run: ${r.pages} label(s) written to ${r.dry_run}` : `Printed ${r.pages} label(s).`);
+    const what = `${r.labels} label(s)` + (r.strips ? ` on ${r.strips} strip(s)` : "");
+    say(r.dry_run ? `Dry run: ${what} written to ${r.dry_run}` : `Printed ${what}.`);
   } catch (e) { say(e.message, true); }
   btn.disabled = false; btn.textContent = old;
   printerStatus(true);
@@ -546,7 +548,8 @@ async function printBatch(btn, copies) {
   const old = btn.textContent; btn.textContent = "PRINTING…";
   try {
     const r = await api("/api/print_batch", { template: tpl, copies });
-    let m = r.dry_run ? `Dry run: ${r.pages} labels written to ${r.dry_run}.` : `Printed ${r.pages} labels.`;
+    const what = `${r.labels} labels` + (r.strips ? ` on ${r.strips} strip(s)` : "");
+    let m = r.dry_run ? `Dry run: ${what} written to ${r.dry_run}.` : `Printed ${what}.`;
     if (r.next_start !== undefined) {
       B().start = r.next_start; changed(false); batchForm();
       m += ` Next batch starts at ${r.next_start}` + (r.advanced ? ` (saved in “${r.advanced}”).` : " (save the template to keep it).");
@@ -648,6 +651,23 @@ $("#p-refresh").addEventListener("click", () => printerStatus(true));
 setInterval(() => { if (!document.hidden) printerStatus(); }, 6000);
 
 // ---------------------------------------------------------------- start
+// ---------------------------------------------------------------- strips: labels end to end, cut by hand
+const S = () => (tpl.strip = { on: false, per: 0, marks: "edge", ...(tpl.strip || {}) });
+const setStrip = seg($("#strip"), "0", v => { S().on = v === "1"; stripUI(); changed(false); });
+const setMarks = seg($("#strip-marks"), "edge", v => { S().marks = v; changed(false); });
+$("#strip-per").addEventListener("input", e => { S().per = Math.max(0, parseInt(e.target.value, 10) || 0); stripUI(); changed(false); });
+function stripUI() {
+  const s = S(), fixed = MEDIA[mediaOf(tpl)]?.kind !== "continuous";
+  setStrip(s.on && !fixed ? "1" : "0"); setMarks(s.marks);
+  $("#strip").querySelector('[data-v="1"]').disabled = fixed;
+  $("#strip-opts").hidden = !s.on || fixed;
+  $("#strip-per").value = s.per;
+  $("#strip-note").textContent = fixed ? "Die-cut labels are already separate." : s.on
+    ? `Labels are printed end to end at exactly ${tpl.length_mm} mm each, ${s.per ? s.per + " per strip" : "the whole batch on one strip"}; ` +
+      "the printer only adds its ~3 mm feed at the two ends of each strip. Cut on the marks."
+    : "Each label is cut on its own; the printer adds about 3 mm of blank tape at both ends.";
+}
+
 // ---------------------------------------------------------------- media (rolls)
 async function loadMedia() {
   const r = await api("/api/media");
@@ -668,7 +688,7 @@ function mediaNote() {
     (loaded ? (loaded === id ? "This roll is in the printer." : `The printer has ${MEDIA[loaded]?.name || "another roll"} in it.`) : "");
   $("#use-loaded").disabled = !loaded || loaded === id;
 }
-$("#media").addEventListener("change", e => { tpl.media = e.target.value; mediaNote(); changed(); printerStatus(); });
+$("#media").addEventListener("change", e => { tpl.media = e.target.value; mediaNote(); stripUI(); changed(); printerStatus(); });
 $("#use-loaded").addEventListener("click", () => { if (loaded) { tpl.media = loaded; mediaNote(); changed(); printerStatus(); } });
 
 (async () => {

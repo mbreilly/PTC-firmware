@@ -246,7 +246,43 @@ def verify(img: Image.Image, tpl: dict, values: dict | None = None) -> list[dict
     return out
 
 
-def calibration(lengths_mm: list[float], tape="29") -> list[Image.Image]:
+STRIP_DEFAULT = {"on": False, "per": 0, "marks": "edge"}
+MAX_PAGE = mm_to_dots(1000)                      # the printer takes pages up to 1 m long
+
+
+def strips(pages: list[Image.Image], per: int = 0, marks: str = "edge") -> list[Image.Image]:
+    """Join printer pages end to end, `per` labels to a piece (0 = as many as fit in 1 m), so labels sit at their
+    exact pitch with no feed between them; the printer only adds its ~3 mm feed at each end of a piece.
+    Cut marks go on the boundary between labels: "edge" = short ticks at both tape edges, "full" = dashed
+    line across, "none"."""
+    out = []
+    i = 0
+    while i < len(pages):
+        group = [pages[i]]
+        i += 1
+        while i < len(pages) and (per <= 0 or len(group) < per) and \
+                sum(p.height for p in group) + pages[i].height <= MAX_PAGE:
+            group.append(pages[i])
+            i += 1
+        w = group[0].width
+        im = Image.new("L", (w, sum(p.height for p in group)), 255)
+        y = 0
+        d = ImageDraw.Draw(im)
+        for k, p in enumerate(group):
+            im.paste(p, (0, y))
+            if k and marks == "edge":
+                tick = max(6, w // 14)
+                d.line((0, y, tick, y), fill=0, width=1)
+                d.line((w - 1 - tick, y, w - 1, y), fill=0, width=1)
+            elif k and marks == "full":
+                for x in range(0, w, 12):
+                    d.line((x, y, min(w - 1, x + 5), y), fill=0, width=1)
+            y += p.height
+        out.append(im)
+    return out
+
+
+def calibration(lengths_mm: list[float], tape="29", note: str = "") -> list[Image.Image]:
     """Test labels: a frame on the exact edge of the image, the length written inside, a tick every mm."""
     pages = []
     h = media(tape).printable
@@ -265,6 +301,9 @@ def calibration(lengths_mm: list[float], tape="29") -> list[Image.Image]:
         while f.size > 10 and d.textlength(txt, font=f) > w - 10:
             f = font("sans-bold", f.size - 4)
         d.text((w / 2, h / 2), txt, font=f, fill=0, anchor="mm")
+        if note:                                   # e.g. the margin used, so pieces can be told apart
+            fn = font("sans-bold", max(10, f.size * 2 // 3))
+            d.text((w / 2, h / 2 + f.size), note, font=fn, fill=0, anchor="mm")
         pages.append(im)
     return pages
 

@@ -56,3 +56,12 @@ def test_die_cut():
     i = job.index(b"\x1biz")
     assert job[i+4:i+7] == bytes([0x0B, 29, 90]) and b"\x1bid\x00\x00" in job   # die-cut type, no margin
     assert R.tpl_media({"tape": 62}).id == "62"            # old templates with only "tape" still work
+
+def test_strips():
+    t = {"media": "29", "length_mm": 10, "across": True, "fields": {"num": "001"},
+         "elements": [{"id": "a", "type": "datamatrix", "x": 200, "y": 20, "module": 6, "data": "PTC{num}"}]}
+    pages = [R.page(R.render(t, {"num": f"{i:03d}"})[0], across=True) for i in range(1, 6)]
+    s = R.strips(pages, per=2, marks="edge")
+    assert [p.height for p in s] == [236, 236, 118]           # 2 + 2 + 1 labels at exactly 118 dots each
+    assert s[0].getpixel((0, 118)) == 0 and s[0].getpixel((150, 118)) == 255   # tick at the edge only
+    assert len(R.strips(pages, per=0)) == 1
