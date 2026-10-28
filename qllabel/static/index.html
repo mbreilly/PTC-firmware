@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QL Label Designer</title>
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/designer.css">
+</head>
+<body>
+<div class="panel">
+  <header>
+    <h1 id="title">QL LABEL DESIGNER</h1>
+    <div class="sub" id="sub">QL-810W  ·  300 dpi  ·  no-margin raster</div>
+    <i class="screw tl"></i><i class="screw tr"></i>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="design" class="on">DESIGN</button>
+    <button data-tab="batch">BATCH PRINT</button>
+    <button data-tab="calibrate">CALIBRATE</button>
+    <button data-tab="printer">PRINTER</button>
+    <span class="grow"></span>
+    <a class="conn-link" href="/colors" title="Colour designer">COLOURS</a>
+    <span class="conn" id="conn">…</span>
+  </nav>
+
+  <div id="msg" class="msg" hidden></div>
+
+  <!-- DESIGN -->
+  <section id="tab-design" class="tab">
+    <div class="cols">
+      <div class="col side">
+        <h2>TEMPLATE</h2>
+        <div class="row tight">
+          <select id="tpl-list" class="grow"><option value="">(unsaved)</option></select>
+          <button id="tpl-new" title="Start a new label">NEW</button>
+        </div>
+        <div class="row tight">
+          <input id="tpl-name" class="grow" placeholder="name" spellcheck="false">
+          <button id="tpl-save" class="accent">SAVE</button>
+          <button id="tpl-del" title="Delete this template">✕</button>
+        </div>
+
+        <h2>LABEL</h2>
+        <div class="knobrow">
+          <div class="knob" id="k-length"></div>
+          <div class="knob" id="k-margin"></div>
+        </div>
+        <h3>CUT</h3>
+        <div class="seg" id="cut">
+          <button data-v="each" class="on">EACH</button><button data-v="end">AT END</button><button data-v="none">NONE</button>
+        </div>
+        <div class="row tight">
+          <button id="fit" title="Shrink or grow the length to the content plus a small border">FIT LENGTH</button>
+          <label class="check"><input type="checkbox" id="flip"> turn 180°</label>
+        </div>
+
+        <h2>ADD</h2>
+        <div class="addgrid" id="add">
+          <button data-t="text">TEXT</button>
+          <button data-t="datamatrix">DATAMATRIX</button>
+          <button data-t="code128">CODE 128</button>
+          <button data-t="qr">QR</button>
+          <button data-t="microqr">MICRO QR</button>
+          <button data-t="code39">CODE 39</button>
+          <button data-t="box">BOX</button>
+          <button data-t="line">LINE</button>
+        </div>
+      </div>
+
+      <div class="col viewcol">
+        <div class="row stagebar">
+          <span class="lab">ZOOM</span>
+          <div class="seg" id="zoom">
+            <button data-v="fit" class="on">FIT</button><button data-v="1">1×</button><button data-v="2">2×</button><button data-v="3">3×</button><button data-v="4">4×</button>
+          </div>
+          <label class="check"><input type="checkbox" id="grid" checked> mm grid</label>
+          <span class="grow"></span>
+          <span class="dim" id="dims"></span>
+        </div>
+        <div class="stage" id="stage">
+          <div class="tape" id="tape">
+            <div class="feed l" id="feed-l"></div>
+            <div class="label" id="label">
+              <img id="bitmap" alt="">
+              <div class="gridlay" id="gridlay"></div>
+              <div id="boxes"></div>
+            </div>
+            <div class="feed r" id="feed-r"></div>
+          </div>
+        </div>
+        <p class="dim">Drag to move. Arrow keys nudge 1 dot (Shift: 10). Delete removes, Ctrl+D duplicates.
+          The white band is the tape; hatching is the feed margin and the edges the head can't reach.</p>
+        <div id="checks"></div>
+      </div>
+
+      <div class="col side wide2">
+        <h2>ELEMENT</h2>
+        <div id="props"><p class="dim">Click something on the label, or add one.</p></div>
+
+        <h2>FIELDS</h2>
+        <p class="dim">Write <span class="mono">{name}</span> in text or barcode data; set test values here.</p>
+        <div class="grid2" id="fields"></div>
+
+        <h2>PRINT</h2>
+        <div class="row tight">
+          <span class="lab">COPIES</span>
+          <input type="number" id="copies" min="1" max="100" value="1" class="qty">
+          <button id="print" class="accent bigbtn">PRINT</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BATCH -->
+  <section id="tab-batch" class="tab" hidden>
+    <div class="cols">
+      <div class="col">
+        <h2>ONE LABEL PER LINE</h2>
+        <p class="dim" id="batch-hint"></p>
+        <textarea id="batch" rows="16" spellcheck="false" class="mono"></textarea>
+        <div class="row">
+          <span class="dim" id="batch-count">0 labels</span>
+          <span class="grow"></span>
+          <button id="batch-print" class="accent bigbtn">PRINT BATCH</button>
+        </div>
+      </div>
+      <div class="col">
+        <h2>NUMBER RANGE</h2>
+        <div class="grid2">
+          <span class="lab">FIELD</span><select id="r-field"></select>
+          <span class="lab">PREFIX</span><input id="r-prefix" value="PTC-" spellcheck="false">
+          <span class="lab">FROM</span><input type="number" id="r-from" value="1">
+          <span class="lab">TO</span><input type="number" id="r-to" value="10">
+          <span class="lab">DIGITS</span><input type="number" id="r-digits" value="5" min="1" max="12">
+          <span class="lab">SUFFIX</span><input id="r-suffix" spellcheck="false">
+        </div>
+        <div class="row"><button id="r-fill">FILL THE LIST</button><span class="dim" id="r-sample"></span></div>
+        <h3>FIRST LABEL</h3>
+        <div class="thumb"><img id="batch-thumb" alt=""></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CALIBRATE -->
+  <section id="tab-calibrate" class="tab" hidden>
+    <div class="cols">
+      <div class="col">
+        <h2>FIND THE PRINTER'S REAL LIMITS</h2>
+        <p class="dim">Prints one test label per length: a frame on the exact edge of the image, the length written
+          inside, a tick every millimetre along the top (long tick every 5). Measure what comes out and compare.
+          Try margin 35 (what Brother's driver uses) and then 0.</p>
+        <div class="grid2">
+          <span class="lab">LENGTHS mm</span><input id="c-lengths" value="25, 15, 10, 8, 6, 5, 4, 3">
+          <span class="lab">MARGIN dots</span><input type="number" id="c-margin" value="35" min="0" max="300">
+          <span class="lab">CUT</span>
+          <div class="seg" id="c-cut"><button data-v="each" class="on">EACH</button><button data-v="end">AT END</button><button data-v="none">NONE</button></div>
+        </div>
+        <div class="row"><button id="c-print" class="accent bigbtn">PRINT TEST STRIP</button></div>
+      </div>
+      <div class="col">
+        <h2>WHAT TO LOOK FOR</h2>
+        <ul class="notes">
+          <li>Is each piece as long as written? If the short ones come out longer, the printer pads up to its own minimum.</li>
+          <li>Does the frame touch the cut on both ends? The gap is the feed margin plus the cutter offset.</li>
+          <li>Are the ticks 1 mm apart? (Checks the 300 dpi assumption along the feed.)</li>
+          <li>Text upside down or mirrored compared to what you expect? Tick "turn 180°" on the design tab.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRINTER -->
+  <section id="tab-printer" class="tab" hidden>
+    <div class="cols">
+      <div class="col">
+        <h2>PRINTER</h2>
+        <div class="kv" id="pstat"></div>
+        <div class="row"><button id="p-refresh">ASK THE PRINTER</button></div>
+      </div>
+      <div class="col">
+        <h2>COMMAND LINE (FOR PTC LATER)</h2>
+        <pre class="mono code">~/apps/ql-labels.sh print my-template --set serial=PTC-00123
+~/apps/ql-labels.sh print my-template --csv serials.csv
+~/apps/ql-labels.sh calibrate 10 6 4 --margin 0
+~/apps/ql-labels.sh status</pre>
+        <p class="dim">Templates are JSON files in ~/ql-labels-data/templates/.</p>
+      </div>
+    </div>
+  </section>
+  <i class="screw bl"></i><i class="screw br"></i>
+</div>
+<script src="/static/designer.js"></script>
+</body>
+</html>
