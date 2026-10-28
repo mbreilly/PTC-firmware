@@ -142,7 +142,7 @@ async function refresh() {
   if (inflight) { again = true; return; }
   inflight = true;
   try {
-    last = await api("/api/preview", { template: tpl });
+    last = await api("api/preview", { template: tpl });
     $("#bitmap").src = "data:image/png;base64," + last.png;
     layout();
     drawChecks();
@@ -402,7 +402,7 @@ window.addEventListener("resize", layout);
 
 // ---------------------------------------------------------------- templates
 async function listTemplates(select) {
-  const r = await api("/api/templates");
+  const r = await api("api/templates");
   const s = $("#tpl-list");
   s.innerHTML = `<option value="">(unsaved)</option>` + r.templates.map(t => `<option>${esc(t.name)}</option>`).join("");
   s.value = select || tpl.name || "";
@@ -422,19 +422,19 @@ function use(t) {
 }
 $("#tpl-list").addEventListener("change", async e => {
   if (!e.target.value) return;
-  try { use(await api("/api/template?name=" + encodeURIComponent(e.target.value))); } catch (x) { say(x.message, true); }
+  try { use(await api("api/template?name=" + encodeURIComponent(e.target.value))); } catch (x) { say(x.message, true); }
 });
 $("#tpl-new").addEventListener("click", () => { use(blank()); $("#tpl-list").value = ""; });
 $("#tpl-save").addEventListener("click", async () => {
   tpl.name = $("#tpl-name").value.trim();
   if (!tpl.name) { say("Give the template a name first.", true); $("#tpl-name").focus(); return; }
-  try { await api("/api/save", { template: tpl }); await listTemplates(tpl.name); say(`Saved “${tpl.name}”.`); saveDraft(); }
+  try { await api("api/save", { template: tpl }); await listTemplates(tpl.name); say(`Saved “${tpl.name}”.`); saveDraft(); }
   catch (e) { say(e.message, true); }
 });
 $("#tpl-del").addEventListener("click", async () => {
   const n = $("#tpl-list").value;
   if (!n || !confirm(`Delete the template “${n}”?`)) return;
-  try { await api("/api/delete", { name: n }); await listTemplates(""); say(`Deleted “${n}”.`); } catch (e) { say(e.message, true); }
+  try { await api("api/delete", { name: n }); await listTemplates(""); say(`Deleted “${n}”.`); } catch (e) { say(e.message, true); }
 });
 function saveDraft() { try { localStorage.setItem("qllabel-draft", JSON.stringify(tpl)); } catch (e) { /* fine */ } }
 
@@ -443,7 +443,7 @@ async function doPrint(rows, copies, btn) {
   btn.disabled = true;
   const old = btn.textContent; btn.textContent = "PRINTING…";
   try {
-    const r = await api("/api/print", { template: tpl, rows, copies });
+    const r = await api("api/print", { template: tpl, rows, copies });
     const what = `${r.labels} label(s)` + (r.strips ? ` on ${r.strips} strip(s)` : "");
     say(r.dry_run ? `Dry run: ${what} written to ${r.dry_run}` : `Printed ${what}.`);
   } catch (e) { say(e.message, true); }
@@ -485,12 +485,12 @@ $$("#tab-batch [data-b]").forEach(i => i.addEventListener("input", () => {
 async function csvForm() {
   const b = B();
   try {
-    const r = await api("/api/csvs");
+    const r = await api("api/csvs");
     $("#b-csvlist").innerHTML = `<option value="">(pick a CSV)</option>` + r.csvs.map(n => `<option${n === b.csv ? " selected" : ""}>${esc(n)}</option>`).join("");
   } catch (e) { say(e.message, true); }
   if (!b.csv) { $("#b-map").innerHTML = ""; $("#b-head").innerHTML = ""; return; }
   let info;
-  try { info = await api("/api/csv?name=" + encodeURIComponent(b.csv)); } catch (e) { say(e.message, true); return; }
+  try { info = await api("api/csv?name=" + encodeURIComponent(b.csv)); } catch (e) { say(e.message, true); return; }
   const names = (last && last.fields) || [];
   $("#b-map").innerHTML = names.map(n => {
     const cur = b.map[n] || info.columns.find(c => c.toLowerCase() === n.toLowerCase()) || "";
@@ -505,7 +505,7 @@ $("#b-csvlist").addEventListener("change", e => { B().csv = e.target.value; B().
 $("#b-csvfile").addEventListener("change", async e => {
   const f = e.target.files[0]; if (!f) return;
   try {
-    const r = await api("/api/upload_csv", { name: f.name.replace(/[^\w .-]/g, "_"), text: await f.text() });
+    const r = await api("api/upload_csv", { name: f.name.replace(/[^\w .-]/g, "_"), text: await f.text() });
     B().csv = r.csv; B().map = {}; changed(false); await csvForm(); batchPreview();
     say(`Loaded ${r.csv}: ${r.count} rows, columns ${r.columns.join(", ")}.`);
   } catch (x) { say(x.message, true); }
@@ -517,12 +517,12 @@ function batchPreviewSoon() { clearTimeout(bpTimer); bpTimer = setTimeout(batchP
 async function batchPreview() {
   if ($("#tab-batch").hidden) return batchSummary();
   try {
-    const info = await api("/api/batch", { template: tpl });
+    const info = await api("api/batch", { template: tpl });
     $("#b-count").textContent = `${info.count} label${info.count === 1 ? "" : "s"}`;
     for (const [id, row] of [["#b-first", info.first[0]], ["#b-last", info.last]]) {
       const img = $(id);
       if (!row) { img.removeAttribute("src"); continue; }
-      const r = await api("/api/preview", { template: tpl, values: row });
+      const r = await api("api/preview", { template: tpl, values: row });
       img.src = "data:image/png;base64," + r.png; img.style.width = `${r.w}px`;
     }
   } catch (e) { $("#b-count").textContent = e.message; }
@@ -533,7 +533,7 @@ async function batchSummary() {
   setMode(b.on ? "batch" : "single");
   if (!b.on) { $("#batch-sum").textContent = "Prints the label as shown, with the test values above."; return; }
   try {
-    const info = await api("/api/batch", { template: tpl });
+    const info = await api("api/batch", { template: tpl });
     const show = r => r ? Object.values(r).join(" / ") : "";
     $("#batch-sum").textContent = `${info.count} labels from ${{ range: "numbers", csv: b.csv || "a CSV", list: "the typed list" }[b.source]}: ` +
       `${show(info.first[0])}${info.count > 1 ? " … " + show(info.last) : ""}. Set it up on the BATCH PRINT tab.`;
@@ -542,12 +542,12 @@ async function batchSummary() {
 
 async function printBatch(btn, copies) {
   let info;
-  try { info = await api("/api/batch", { template: tpl }); } catch (e) { return say(e.message, true); }
+  try { info = await api("api/batch", { template: tpl }); } catch (e) { return say(e.message, true); }
   if (info.count * copies > 20 && !confirm(`Print ${info.count * copies} labels?`)) return;
   btn.disabled = true;
   const old = btn.textContent; btn.textContent = "PRINTING…";
   try {
-    const r = await api("/api/print_batch", { template: tpl, copies });
+    const r = await api("api/print_batch", { template: tpl, copies });
     const what = `${r.labels} labels` + (r.strips ? ` on ${r.strips} strip(s)` : "");
     let m = r.dry_run ? `Dry run: ${what} written to ${r.dry_run}.` : `Printed ${what}.`;
     if (r.next_start !== undefined) {
@@ -588,7 +588,7 @@ function toPng(url, maxSide = 1000) {
   });
 }
 async function useGraphic(el, name, pngUrl) {
-  const r = await api("/api/image", { name, png: pngUrl });
+  const r = await api("api/image", { name, png: pngUrl });
   el.src = r.src;
   changed(); drawProps();
 }
@@ -607,7 +607,7 @@ async function picker(el) {
     URL.revokeObjectURL(url);
   });
   try {
-    const r = await api("/api/images");
+    const r = await api("api/images");
     const g = $("#gal-up"); if (!g) return;
     g.innerHTML = r.images.map(i => `<button data-src="${esc(i.src)}" class="${i.src === el.src ? "on" : ""}" title="${esc(i.name)}">${i.png ? `<img src="data:image/png;base64,${i.png}" alt="">` : esc(i.name)}</button>`).join("")
       || `<span class="dim">Nothing uploaded yet.</span>`;
@@ -621,7 +621,7 @@ $("#c-print").addEventListener("click", async e => {
   const btn = e.target; btn.disabled = true;
   try {
     const lengths = $("#c-lengths").value.split(/[,\s]+/).filter(Boolean).map(Number);
-    const r = await api("/api/calibrate", { lengths, margin: +$("#c-margin").value, cut: $("#c-cut .on").dataset.v, media: MEDIA[mediaOf(tpl)]?.kind === "continuous" ? mediaOf(tpl) : null, flip: !!tpl.flip });
+    const r = await api("api/calibrate", { lengths, margin: +$("#c-margin").value, cut: $("#c-cut .on").dataset.v, media: MEDIA[mediaOf(tpl)]?.kind === "continuous" ? mediaOf(tpl) : null, flip: !!tpl.flip });
     say(r.dry_run ? `Dry run written to ${r.dry_run}` : `Printed ${r.pages} test labels.`);
   } catch (x) { say(x.message, true); }
   btn.disabled = false;
@@ -630,7 +630,7 @@ $("#c-print").addEventListener("click", async e => {
 // ---------------------------------------------------------------- printer status
 async function printerStatus(show = false) {
   let s;
-  try { s = await api("/api/status"); } catch (e) { s = { ok: false, error: e.message }; }
+  try { s = await api("api/status"); } catch (e) { s = { ok: false, error: e.message }; }
   const c = $("#conn");
   c.className = "conn " + (s.ok ? "ok" : "bad");
   c.textContent = s.error ? "PRINTER OFFLINE" : s.busy ? "PRINTING" :
@@ -672,7 +672,7 @@ function stripUI() {
 
 // ---------------------------------------------------------------- media (rolls)
 async function loadMedia() {
-  const r = await api("/api/media");
+  const r = await api("api/media");
   MEDIA = Object.fromEntries(r.media.map(m => [m.id, m]));
   const groups = { continuous: "Continuous rolls (any length)", "die-cut": "Die-cut labels (fixed size)", round: "Round labels" };
   $("#b-media").innerHTML = r.media.filter(m => m.kind === "continuous").map(m => `<option value="${m.id}">${m.name}</option>`).join("");
@@ -706,7 +706,7 @@ function bleedForm() {
 $("#b-media").addEventListener("change", bleedForm);
 $("#b-save").addEventListener("click", async () => {
   try {
-    const r = await api("/api/bleed", { media: $("#b-media").value, head: +$("#b-head").value, open: +$("#b-open").value });
+    const r = await api("api/bleed", { media: $("#b-media").value, head: +$("#b-head").value, open: +$("#b-open").value });
     MEDIA = Object.fromEntries(r.media.map(m => [m.id, m])); bleedForm(); mediaNote(); changed(); say("Bleed saved.");
   } catch (e) { say(e.message, true); }
 });
