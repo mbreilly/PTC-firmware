@@ -327,7 +327,7 @@ class GuiUI(TesterUI):
                 im = await asyncio.to_thread(cv2.imread, str(ref))
                 h, w = im.shape[:2]
             await send({"type": "side", "side": side, "has_reference": ref.is_file(), "width": w, "height": h,
-                        "ref_url": f"/inspection/ref/{side}?v={ref.stat().st_mtime_ns if ref.is_file() else 0}",
+                        "ref_url": f"inspection/ref/{side}?v={ref.stat().st_mtime_ns if ref.is_file() else 0}",
                         "parts": [vars(p) for p in inspection.load_parts(side)], "kinds": inspection.KINDS})
 
     def _ghost_message(self, data: dict):

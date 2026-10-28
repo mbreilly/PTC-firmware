@@ -318,7 +318,7 @@ let ws, S = null, sentId = null, viewKey = "", pendingWarn = null, startMode = "
 const topBar = document.getElementById("top"), screen = document.getElementById("screen"), conn = document.getElementById("conn");
 
 function connect() {
-  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + location.pathname.replace(/[^/]*$/, "") + "ws");
   ws.onopen = () => conn.classList.remove("show");
   ws.onmessage = e => { const m = JSON.parse(e.data); if (m.type === "state") { S = m.state; render(); } };
   ws.onclose = () => { conn.classList.add("show"); setTimeout(connect, 1000); };
@@ -399,7 +399,7 @@ function inspectHTML(a) {
       <div class="flag-h"><b>${esc(f.ref)}</b><span>${esc(f.kind_name)}</span><span class="flag-st ${esc(f.status)}">${FLAG_TEXT[f.status]}${f.status === "rotated" ? ` ${f.turn}°` : ""}</span></div>
       <div class="flag-crops"><figure>Reference<img src="${f.crops.reference}" alt="${esc(f.ref)} on the reference board"></figure><figure>This board<img src="${f.crops.board}" alt="${esc(f.ref)} on this board"></figure></div>
       <div class="flag-btns"><button class="btn opt y" type="button" data-ans="correct" data-ref="${esc(f.ref)}" aria-pressed="false">Correct</button><button class="btn opt f" type="button" data-ans="reversed" data-ref="${esc(f.ref)}" aria-pressed="false">Reversed</button></div></div>`).join("");
-  return `<div class="insp"><a href="/inspect/${a.side}?v=${a.id}" target="_blank" rel="noopener"><img class="insp-img" src="/inspect/${a.side}?v=${a.id}" alt="The ${a.side} photo with each checked part outlined"></a>
+  return `<div class="insp"><a href="inspect/${a.side}?v=${a.id}" target="_blank" rel="noopener"><img class="insp-img" src="inspect/${a.side}?v=${a.id}" alt="The ${a.side} photo with each checked part outlined"></a>
     <div class="insp-side"><div class="insp-sum">${a.flagged.length ? `${a.checked} parts checked: ${ok} look right, <b>${a.flagged.length} to confirm</b>.` : `All ${a.checked} parts look the right way round.`}</div>
       ${flags}<div><button class="btn small" data-a="retake" type="button">Retake photo</button></div></div></div>`;
 }
@@ -803,7 +803,7 @@ function renderStart() {
         <div class="msg" id="msg" role="status"></div>
         <button class="btn pri" id="go" type="button">Show history</button>
         <div class="keys">Read-only. Board history comes from the HWDB, and from this station’s records if the HWDB can’t be reached.</div>
-        <div class="keys">Engineers: <a href="/inspection" style="color:var(--g-accent)">set up the orientation check</a> (reference photos and the parts to check).</div>
+        <div class="keys">Engineers: <a href="inspection" style="color:var(--g-accent)">set up the orientation check</a> (reference photos and the parts to check).</div>
       </div><div style="display:flex;flex-direction:column;gap:18px">
         <div><div class="sh">Waiting for a retest</div>${list(boards.waiting, "No boards are waiting for a retest.")}</div>
         <div><div class="sh">Recently tested on this station</div>${list(boards.recent, "No boards tested on this station yet.")}</div>
@@ -895,7 +895,7 @@ function openLabels() {
     const qs = new URLSearchParams({ start: $("lb-start").value.trim(), count: $("lb-count").value.trim() || "10",
       reprint: $("lb-again").checked ? "1" : "0" });
     try {
-      const r = await labelsGet("/labels/next?" + qs);
+      const r = await labelsGet("labels/next?" + qs);
       serials = r.serials.map(x => x.serial);
       $("lb-info").textContent = (r.highest_serial ? `Highest serial used or printed so far: ${r.highest_serial}. ` : "No PTC### serials used or printed yet. ")
         + (r.skipped_count ? `Skipped ${r.skipped_count}: ` + r.skipped.slice(-6).map(x => `${x.serial} (${x.why})`).join(", ") + ". " : "")
@@ -903,13 +903,13 @@ function openLabels() {
       $("lb-list").innerHTML = r.serials.map(x => `<span class="${x.printed_before ? "again" : ""}" title="${x.printed_before ? "printed before" : ""}">${esc(x.serial)}</span>`).join("");
       $("lb-print").textContent = serials.length ? `Print ${serials.length} label${serials.length === 1 ? "" : "s"}: ${serials[0]}${serials.length > 1 ? " – " + serials[serials.length - 1] : ""}` : "Print";
       $("lb-print").disabled = !serials.length;
-      if (serials.length) { $("lb-prev").src = "/labels/preview.png?num=" + r.serials[0].num; $("lb-prevwrap").hidden = false; }
+      if (serials.length) { $("lb-prev").src = "labels/preview.png?num=" + r.serials[0].num; $("lb-prevwrap").hidden = false; }
     } catch (e) { $("lb-info").textContent = ""; msg(e.message, "err"); }
   };
   const soon = () => { clearTimeout(timer); timer = setTimeout(load, 400); };
   $("lb-start").oninput = soon; $("lb-count").oninput = soon; $("lb-again").onchange = () => load();
   $("lb-prev").onerror = () => { $("lb-prevwrap").hidden = true; };
-  labelsGet("/labels/status").then(s => {
+  labelsGet("labels/status").then(s => {
     $("lb-printer").textContent = s.error ? s.error : s.ok ? `Printer ready: ${s.media_name}. Labels print as one strip, 10 mm each; cut on the marks.`
       : `Printer: ${(s.errors || []).join(", ") || "not ready"}`;
   }).catch(() => {});
@@ -917,7 +917,7 @@ function openLabels() {
     if (!serials.length) return;
     $("lb-print").disabled = true; msg(`Printing ${serials.length} labels…`, "run");
     try {
-      const r = await labelsGet("/labels/print?serials=" + encodeURIComponent(serials.join(",")));
+      const r = await labelsGet("labels/print?serials=" + encodeURIComponent(serials.join(",")));
       msg(`Printed ${r.labels} labels (${r.serials[0]} – ${r.serials[r.serials.length - 1]})${r.dry_run ? " [dry run]" : ""}.`);
       $("lb-start").value = ""; setTimeout(() => load(true), 300);
     } catch (e) { msg(e.message, "err"); $("lb-print").disabled = false; }
@@ -947,7 +947,7 @@ function renderResults() {
     ${F.message ? `<div class="upload ${up}">${esc(F.message)}</div>` : ""}
     <div class="tbl"><table><thead><tr><th>Step</th>${SHOW_KEYS ? "<th>Database key</th>" : ""}<th>Value</th>${SHOW_LIMITS ? "<th>Accept</th>" : ""}<th>Result</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${F.notes ? `<div><span class="lbl">Notes</span>${esc(F.notes)}</div>` : ""}
-    ${Object.keys(S.photos || {}).length ? `<div class="thumbs">${["front", "back", "front_panel", "bare_front", "bare_back"].filter(sd => S.photos[sd]).map(sd => `<figure><a href="/photo/${sd}?v=${S.photos[sd]}" target="_blank" rel="noopener">${{ front: "Front", back: "Back", front_panel: "Front panel", bare_front: "Bare PCB, front", bare_back: "Bare PCB, back" }[sd]}<img src="/photo/${sd}?v=${S.photos[sd]}" alt="${{ front: "Front", back: "Back", front_panel: "Front panel", bare_front: "Bare PCB, front", bare_back: "Bare PCB, back" }[sd]} photo"></a></figure>`).join("")}</div>` : ""}
+    ${Object.keys(S.photos || {}).length ? `<div class="thumbs">${["front", "back", "front_panel", "bare_front", "bare_back"].filter(sd => S.photos[sd]).map(sd => `<figure><a href="photo/${sd}?v=${S.photos[sd]}" target="_blank" rel="noopener">${{ front: "Front", back: "Back", front_panel: "Front panel", bare_front: "Bare PCB, front", bare_back: "Bare PCB, back" }[sd]}<img src="photo/${sd}?v=${S.photos[sd]}" alt="${{ front: "Front", back: "Back", front_panel: "Front panel", bare_front: "Bare PCB, front", bare_back: "Bare PCB, back" }[sd]} photo"></a></figure>`).join("")}</div>` : ""}
     <div class="actions"><button class="btn pri" id="next" type="button">${S.mode === "ship" ? "New entry" : "Test next board"}</button></div></div>`;
   document.getElementById("next").onclick = () => answer(true);
   document.getElementById("next").focus();
@@ -1004,7 +1004,7 @@ function stopCamera() {
 // A Canon EOS on USB is driven by the station with gphoto2: live view arrives as a stream of
 // frames shown in an <img>, and the photo is taken at full resolution by the camera.
 async function canonInfo() {
-  try { const r = await fetch("/canon", { cache: "no-store" }); return r.ok ? await r.json() : { available: false }; }
+  try { const r = await fetch("canon", { cache: "no-store" }); return r.ok ? await r.json() : { available: false }; }
   catch (e) { return { available: false }; }
 }
 function canonFrames() {
@@ -1014,16 +1014,16 @@ function canonFrames() {
     if (!el || cam.shot) { setTimeout(tick, 300); return; }   // nothing to show it in, or reviewing a photo
     el.onload = () => { setAspect(el.naturalWidth, el.naturalHeight); setTimeout(tick, 150); };   // about 5 a second keeps CPU low
     el.onerror = async () => {
-      try { const r = await fetch("/canon/preview.jpg", { cache: "no-store" }); const j = await r.json(); if ($("camEmpty")) camMessage(`Canon live view: ${j.error}`, true); }
+      try { const r = await fetch("canon/preview.jpg", { cache: "no-store" }); const j = await r.json(); if ($("camEmpty")) camMessage(`Canon live view: ${j.error}`, true); }
       catch (e) { }
       if (cam.stream && cam.stream.canon) cam.stream = null;
     };
-    el.src = `/canon/preview.jpg?t=${Date.now()}`;
+    el.src = `canon/preview.jpg?t=${Date.now()}`;
   };
   tick();
 }
 async function canonPhoto() {
-  const r = await fetch(`/canon/capture?t=${Date.now()}`, { cache: "no-store" });
+  const r = await fetch(`canon/capture?t=${Date.now()}`, { cache: "no-store" });
   if (!r.ok) { let m = `error ${r.status}`; try { m = (await r.json()).error; } catch (e) { } throw new Error(m); }
   const blob = await r.blob();
   return await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(blob); });
@@ -1057,7 +1057,7 @@ async function startCamera(deviceId) {
     cam.stream = { canon: true }; cam.deviceId = CANON; store.set("ptc-camera", CANON);
     $("video").hidden = true; $("live").hidden = !!cam.shot;
     $("camEmpty").hidden = true; $("takeBtn").disabled = !!cam.shot;
-    if (!running) canonFrames(); else { const el = $("live"); el.src = `/canon/preview.jpg?t=${Date.now()}`; }
+    if (!running) canonFrames(); else { const el = $("live"); el.src = `canon/preview.jpg?t=${Date.now()}`; }
     await fillCameraList(canon);
     return;
   }
@@ -1105,7 +1105,7 @@ function updateGhost(side) {
   if (!$("ghostOp")) { g.hidden = true; return; }   // close-ups have no ghost
   const ver = S.ghosts[side], name = { front: "front", back: "back", front_panel: "front panel", bare_front: "bare PCB front", bare_back: "bare PCB back" }[side] || side;
   if (ver) {
-    const src = `/ghost/${side}?v=${ver}`;
+    const src = `ghost/${side}?v=${ver}`;
     if (g.dataset.src !== src) {
       g.dataset.src = src; g.src = src;
       g.onload = () => { if (!cam.stream && !cam.shot) setAspect(g.naturalWidth, g.naturalHeight); };
@@ -1214,7 +1214,7 @@ let boardSel = 0, boardAll = false;
 function boardDetail(it) {
   if (!it) return "";
   const photos = names => names.length ? `<div><div class="sh">Photos</div><div class="thumbs">${names.map(n =>
-      `<figure><a href="/stored/${encodeURIComponent(n)}" target="_blank" rel="noopener">${esc(n.replace(/\.(jpg|png)$/, ""))}<img src="/stored/${encodeURIComponent(n)}" alt="" loading="lazy"></a></figure>`).join("")}</div></div>` : "";
+      `<figure><a href="stored/${encodeURIComponent(n)}" target="_blank" rel="noopener">${esc(n.replace(/\.(jpg|png)$/, ""))}<img src="stored/${encodeURIComponent(n)}" alt="" loading="lazy"></a></figure>`).join("")}</div></div>` : "";
   const local = it.uploaded === false ? `<div class="warnbox">Saved on this station only. It wasn’t uploaded to the HWDB.</div>` : "";
   if (it.kind === "run") {
     const rows = boardAll ? it.all : it.failed;
