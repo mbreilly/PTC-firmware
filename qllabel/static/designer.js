@@ -4,8 +4,9 @@
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const DPMM = 300 / 25.4;
-const TAPE_TOTAL = { 12: 142, 29: 342, 38: 449, 50: 590, 54: 636, 62: 732 };   // whole tape width in dots
-const TAPE_PRINT = { 12: 106, 29: 306, 38: 413, 50: 554, 54: 590, 62: 696 };
+let MEDIA = {};               // roll id -> {name, kind, printable, total, ...} from /api/media
+let loaded = null;            // roll id the printer reports
+const mediaOf = t => String(t.media || t.tape || "29");
 const CODE_GROUPS = {
   "2D (matrix) codes": { datamatrix: "DATAMATRIX", qr: "QR", microqr: "MICRO QR", rmqr: "rMQR (thin QR)", aztec: "AZTEC",
     pdf417: "PDF417", compactpdf417: "COMPACT PDF417" },
@@ -36,7 +37,7 @@ let last = null;              // last preview reply
 let nextId = 1;
 
 function blank() {
-  return { name: "", tape: 29, length_mm: 20, margin: 35, cut: "each", cut_every: 1, flip: false,
+  return { name: "", media: loaded || "29", length_mm: 20, margin: 35, cut: "each", cut_every: 1, flip: false,
     fields: { serial: "PTC-00123" }, elements: [] };
 }
 
@@ -106,7 +107,7 @@ function knob(host, o) {
   return k;
 }
 
-const kLength = knob($("#k-length"), { id: "len", label: "LENGTH", min: 2, max: 150, step: 0.5, value: 20, log: true,
+const kLength = knob($("#k-length"), { id: "len", label: "LENGTH", min: 2, max: 1000, step: 0.5, value: 20, log: true,
   fmt: v => `${v.toFixed(1)} mm`, onChange: v => { tpl.length_mm = v; changed(); } });
 const kMargin = knob($("#k-margin"), { id: "mar", label: "MARGIN", min: 0, max: 100, step: 1, value: 35,
   fmt: v => `${v} dots`, onChange: v => { tpl.margin = v; changed(false); } });
@@ -158,9 +159,11 @@ function changed(rerender = true) {
 
 function layout() {
   if (!last) return;
-  const w = last.w, h = last.h, m = tpl.margin;
+  const md = MEDIA[mediaOf(tpl)] || {};
+  const w = last.w, h = last.h, m = md.kind && md.kind !== "continuous" ? 0 : tpl.margin;   // die-cut: no feed margin
   const across = !!tpl.across;   // then the tape runs down the screen: edges left/right, feed above/below
-  const printable = across ? w : h, total = TAPE_TOTAL[tpl.tape] || printable + 36, edge = (total - printable) / 2;
+  const printable = across ? w : h, total = md.total || printable + 36, edge = (total - printable) / 2;
+  $("#label").classList.toggle("round", md.kind === "round");
   if (zoomMode === "fit") {
     const avail = $("#stage").clientWidth - 60;
     zoom = across ? Math.max(0.5, Math.min(6, avail / total, 440 / (h + 2 * m)))
@@ -409,6 +412,8 @@ function use(t) {
   nextId = 1; sel = null;
   $("#tpl-name").value = tpl.name;
   kLength.set(tpl.length_mm); kMargin.set(tpl.margin); setCut(tpl.cut); setAcross(tpl.across ? "1" : "0");
+  tpl.media = mediaOf(tpl); delete tpl.tape;
+  mediaNote();
   $("#flip").checked = !!tpl.flip;
   $("#fields").dataset.key = "";
   tpl.batch = { ...BATCH, ...(tpl.batch || {}) };
@@ -613,7 +618,7 @@ $("#c-print").addEventListener("click", async e => {
   const btn = e.target; btn.disabled = true;
   try {
     const lengths = $("#c-lengths").value.split(/[,\s]+/).filter(Boolean).map(Number);
-    const r = await api("/api/calibrate", { lengths, margin: +$("#c-margin").value, cut: $("#c-cut .on").dataset.v, tape: tpl.tape, flip: !!tpl.flip });
+    const r = await api("/api/calibrate", { lengths, margin: +$("#c-margin").value, cut: $("#c-cut .on").dataset.v, media: MEDIA[mediaOf(tpl)]?.kind === "continuous" ? mediaOf(tpl) : null, flip: !!tpl.flip });
     say(r.dry_run ? `Dry run written to ${r.dry_run}` : `Printed ${r.pages} test labels.`);
   } catch (x) { say(x.message, true); }
   btn.disabled = false;
@@ -626,13 +631,15 @@ async function printerStatus(show = false) {
   const c = $("#conn");
   c.className = "conn " + (s.ok ? "ok" : "bad");
   c.textContent = s.error ? "PRINTER OFFLINE" : s.busy ? "PRINTING" :
-    s.errors && s.errors.length ? s.errors.join(", ").toUpperCase() : `${s.media_width} mm ${s.media_type}`.toUpperCase() + (s.dry_run ? " · DRY RUN" : "");
+    s.errors && s.errors.length ? s.errors.join(", ").toUpperCase() : (s.media_name || "").toUpperCase() + (s.dry_run ? " · DRY RUN" : "");
   c.title = s.error || "";
-  if (s.media_width && TAPE_PRINT[s.media_width] && !s.dry_run && s.media_width !== tpl.tape)
-    c.textContent += ` · LABEL IS ${tpl.tape} mm`;
+  if (s.media) loaded = s.media;
+  if (s.media && s.media !== mediaOf(tpl) && MEDIA[mediaOf(tpl)])
+    c.textContent += ` · LABEL IS FOR ${MEDIA[mediaOf(tpl)].name.toUpperCase()}`;
+  mediaNote();
   if (show) {
     const rows = s.error ? [["Status", s.error]] : [["Status", s.busy ? "printing" : s.errors.length ? s.errors.join(", ") : "ready"],
-      ["Tape", `${s.media_width} mm ${s.media_type}`], ["Fixed length", s.media_length ? `${s.media_length} mm` : "none (continuous)"],
+      ["Loaded", s.media_name], ["Fixed length", s.media_length ? `${s.media_length} mm` : "none (continuous)"],
       ["Device", s.device], ["Mode", s.dry_run ? "dry run (nothing is sent)" : "live"]];
     $("#pstat").innerHTML = rows.map(([k, v]) => `<b>${k}</b><span>${esc(v)}</span>`).join("");
   }
@@ -641,7 +648,32 @@ $("#p-refresh").addEventListener("click", () => printerStatus(true));
 setInterval(() => { if (!document.hidden) printerStatus(); }, 6000);
 
 // ---------------------------------------------------------------- start
+// ---------------------------------------------------------------- media (rolls)
+async function loadMedia() {
+  const r = await api("/api/media");
+  MEDIA = Object.fromEntries(r.media.map(m => [m.id, m]));
+  const groups = { continuous: "Continuous rolls (any length)", "die-cut": "Die-cut labels (fixed size)", round: "Round labels" };
+  $("#media").innerHTML = Object.entries(groups).map(([k, g]) => `<optgroup label="${g}">${r.media.filter(m => m.kind === k)
+    .map(m => `<option value="${m.id}">${m.name}</option>`).join("")}</optgroup>`).join("");
+}
+function mediaNote() {
+  const id = mediaOf(tpl), md = MEDIA[id];
+  if (!md) return;
+  $("#media").value = id;
+  const fixed = md.kind !== "continuous";
+  $("#knobs").classList.toggle("fixed", fixed);
+  $("#fit").disabled = fixed;
+  $("#media-note").textContent = (fixed ? `Fixed size: ${(md.printable / DPMM).toFixed(1)} × ${(md.printable_len / DPMM).toFixed(1)} mm printable. ` :
+    `${(md.printable / DPMM).toFixed(1)} mm printable across; any length. `) +
+    (loaded ? (loaded === id ? "This roll is in the printer." : `The printer has ${MEDIA[loaded]?.name || "another roll"} in it.`) : "");
+  $("#use-loaded").disabled = !loaded || loaded === id;
+}
+$("#media").addEventListener("change", e => { tpl.media = e.target.value; mediaNote(); changed(); printerStatus(); });
+$("#use-loaded").addEventListener("click", () => { if (loaded) { tpl.media = loaded; mediaNote(); changed(); printerStatus(); } });
+
 (async () => {
+  try { await loadMedia(); } catch (e) { say(e.message, true); }
+  await printerStatus();
   let draft = null;
   try { draft = JSON.parse(localStorage.getItem("qllabel-draft") || "null"); } catch (e) { /* none */ }
   if (draft && draft.elements) use(draft);

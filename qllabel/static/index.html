@@ -43,7 +43,12 @@
         </div>
 
         <h2>LABEL</h2>
-        <div class="knobrow">
+        <div class="row tight">
+          <select id="media" class="grow" title="The roll this label is for"></select>
+          <button id="use-loaded" title="Switch to the roll that is in the printer">LOADED</button>
+        </div>
+        <p class="dim" id="media-note"></p>
+        <div class="knobrow" id="knobs">
           <div class="knob" id="k-length"></div>
           <div class="knob" id="k-margin"></div>
         </div>

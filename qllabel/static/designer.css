@@ -18,6 +18,8 @@ input.qty { width: 70px !important; }
 .addgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .addgrid button { justify-content: center; height: 32px; font-size: 12px; }
 .knobrow { gap: 12px; margin-bottom: 4px; }
+.knobrow.fixed .knob { opacity: .35; pointer-events: none; }
+.label.round { border-radius: 50%; overflow: hidden; }
 .seg button { min-width: 0; padding: 0 10px; height: 30px; }
 
 .stagebar { margin: 18px 0 8px; }

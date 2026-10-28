@@ -57,7 +57,7 @@ class Station:
         for f in sorted(self.tdir.glob("*.json")):
             try:
                 t = json.loads(f.read_text())
-                out.append({"name": f.stem, "length_mm": t.get("length_mm"), "tape": t.get("tape"),
+                out.append({"name": f.stem, "length_mm": t.get("length_mm"), "media": str(t.get("media") or t.get("tape") or "29"),
                             "modified": time.strftime("%Y-%m-%d %H:%M", time.localtime(f.stat().st_mtime))})
             except (OSError, json.JSONDecodeError):
                 continue
@@ -195,7 +195,7 @@ class Station:
 
     def options(self, tpl: dict, over: dict | None = None) -> JobOptions:
         o = {**tpl, **(over or {})}
-        return JobOptions(tape=int(o.get("tape", 29)), margin=int(o.get("margin", 35)), cut=o.get("cut", "each"),
+        return JobOptions(media=R.tpl_media(o).id, margin=int(o.get("margin", 35)), cut=o.get("cut", "each"),
                           cut_every=int(o.get("cut_every", 1)))
 
     def print_rows(self, tpl: dict, rows: list[dict] | None = None, copies: int = 1, over: dict | None = None):
@@ -214,13 +214,16 @@ class Station:
             raise ValueError("More than 500 labels in one go; split the batch.")
         return self._print(pages, self.options(tpl, over))
 
-    def calibrate(self, lengths: list[float], margin: int = 35, cut: str = "each", tape: int = 29, flip: bool | None = None):
+    def calibrate(self, lengths: list[float], margin: int = 35, cut: str = "each", tape=None, flip: bool | None = None):
+        tape = tape or self.status().get("media") or "29"        # default: whatever roll is loaded
+        if R.media(tape).die_cut:
+            raise ValueError("Calibration strips need a continuous roll.")
         lengths = [float(x) for x in lengths if 0.5 <= float(x) <= 300][:30]
         if not lengths:
             raise ValueError("Give at least one length between 0.5 and 300 mm.")
         flip = self.flip if flip is None else bool(flip)
         pages = [R.page(p, flip) for p in R.calibration(lengths, tape)]
-        return self._print(pages, JobOptions(tape=tape, margin=int(margin), cut=cut))
+        return self._print(pages, JobOptions(media=str(tape), margin=int(margin), cut=cut))
 
     def _print(self, pages, opt):
         if not self.lock.acquire(timeout=1):

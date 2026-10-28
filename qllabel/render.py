@@ -2,7 +2,9 @@
 
 A template is laid out the way you read the label. Normally x runs along the tape (0 .. length) and y
 across it (0 .. the printable width, 306 dots on 29 mm tape). With "across": true the text reads across
-the tape instead: x is across (0 .. 306) and y along (0 .. length), for short labels like 29 x 10 mm. All positions and sizes are in dots.
+the tape instead: x is across (0 .. 306) and y along (0 .. length), for short labels like 29 x 10 mm.
+"media" names the roll (see printer.MEDIA): "29" = 29 mm continuous (any length), "29x90" = die-cut
+(length fixed by the label). All positions and sizes are in dots.
 Text and barcode data may contain {field} placeholders, filled from the values passed in."""
 
 import re
@@ -12,7 +14,7 @@ import numpy as np
 import zxingcpp
 from PIL import Image, ImageDraw, ImageFont
 
-from .printer import TAPES, PrinterError, dots_to_mm, mm_to_dots
+from .printer import MEDIA, Media, PrinterError, dots_to_mm, media, mm_to_dots
 
 FONTS = {
     "sans": "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -36,7 +38,7 @@ TYPES = ["text", *CODES, "image", "box", "line"]
 SIBLINGS = {"compactpdf417", "upca", "databar"}
 IMAGES = Path.home() / "ql-labels-data" / "images"     # set by Station
 
-DEFAULT = {"name": "untitled", "tape": 29, "length_mm": 20.0, "margin": 35, "cut": "each", "cut_every": 1,
+DEFAULT = {"name": "untitled", "media": "29", "length_mm": 20.0, "margin": 35, "cut": "each", "cut_every": 1,
            "fields": {"serial": "PTC-00123"}, "elements": []}
 
 _font_cache: dict = {}
@@ -183,11 +185,15 @@ def element_image(e: dict, values: dict) -> Image.Image:
     return im
 
 
+def tpl_media(tpl: dict) -> Media:
+    """Templates name their roll in "media"; early ones only had a continuous "tape" width."""
+    return media(tpl.get("media") or tpl.get("tape") or "29")
+
+
 def size(tpl: dict) -> tuple[int, int]:
-    tape = int(tpl.get("tape", 29))
-    if tape not in TAPES:
-        raise PrinterError(f"Unknown tape width {tape} mm.")
-    length, width = max(8, mm_to_dots(float(tpl.get("length_mm", 20)))), TAPES[tape][0]
+    m = tpl_media(tpl)
+    length = m.printable_len if m.die_cut else max(8, min(mm_to_dots(1000), mm_to_dots(float(tpl.get("length_mm", 20)))))
+    width = m.printable
     return (width, length) if tpl.get("across") else (length, width)
 
 
@@ -240,10 +246,10 @@ def verify(img: Image.Image, tpl: dict, values: dict | None = None) -> list[dict
     return out
 
 
-def calibration(lengths_mm: list[float], tape: int = 29) -> list[Image.Image]:
+def calibration(lengths_mm: list[float], tape="29") -> list[Image.Image]:
     """Test labels: a frame on the exact edge of the image, the length written inside, a tick every mm."""
     pages = []
-    h = TAPES[tape][0]
+    h = media(tape).printable
     for L in lengths_mm:
         w = max(8, mm_to_dots(L))
         im = Image.new("L", (w, h), 255)
@@ -266,4 +272,11 @@ def calibration(lengths_mm: list[float], tape: int = 29) -> list[Image.Image]:
 def info(tpl: dict) -> dict:
     w, h = size(tpl)
     return {"across": bool(tpl.get("across")), "w": w, "h": h, "w_mm": round(dots_to_mm(w), 2), "h_mm": round(dots_to_mm(h), 2),
-            "fields": fields_in(tpl)}
+            "fields": fields_in(tpl), "media": tpl_media(tpl).id, "die_cut": tpl_media(tpl).die_cut}
+
+
+def media_list() -> dict:
+    """For the page: every roll, plus the whole tape width in dots (printable + unprintable edges)."""
+    return {"media": [{"id": m.id, "name": m.name(), "kind": m.kind, "width": m.width, "length": m.length,
+                       "printable": m.printable, "printable_len": m.printable_len,
+                       "total": round(m.width * 300 / 25.4)} for m in MEDIA.values()]}

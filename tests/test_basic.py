@@ -31,7 +31,7 @@ def test_raster_layout():
 
 def test_job_shape():
     pages = [R.page(R.render(TPL)[0])] * 2
-    job = build_job(pages, JobOptions(margin=0, cut="each"))
+    job = build_job(pages, JobOptions(media="29", margin=0, cut="each"))
     assert job.startswith(b"\x00" * 400 + b"\x1b@")
     assert job.count(b"\x1biz") == 2 and job.endswith(b"\x1a") and job.count(b"\x1bid\x00\x00") == 2
     i = job.index(b"\x1biz")
@@ -47,3 +47,12 @@ def test_across():
     assert img.size == (306, R.mm_to_dots(10))          # read across: 306 wide, 10 mm tall
     assert R.page(img, across=True).size == (306, R.mm_to_dots(10))
     assert R.verify(img, t)[0]["ok"]
+
+def test_die_cut():
+    t = {"media": "29x90", "elements": [{"id": "a", "type": "qr", "x": 20, "y": 20, "module": 6, "data": "PTC001"}]}
+    img, _, _ = R.render(t)
+    assert img.size == (991, 306)                          # length fixed by the label, not length_mm
+    job = build_job([R.page(img)], JobOptions(media="29x90", margin=35))
+    i = job.index(b"\x1biz")
+    assert job[i+4:i+7] == bytes([0x0B, 29, 90]) and b"\x1bid\x00\x00" in job   # die-cut type, no margin
+    assert R.tpl_media({"tape": 62}).id == "62"            # old templates with only "tape" still work

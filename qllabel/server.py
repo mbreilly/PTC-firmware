@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from .printer import PrinterError
+from . import render as R
 from .station import Station
 
 STATIC = Path(__file__).parent / "static"
@@ -70,7 +71,7 @@ def make_handler(st: Station):
                 return self._send(404, b"not found", "text/plain")
             routes = {"/api/status": st.status, "/api/templates": st.templates,
                       "/api/template": lambda: st.load(q.get("name", "")),
-                      "/api/images": st.images, "/api/csvs": st.csvs,
+                      "/api/media": R.media_list, "/api/images": st.images, "/api/csvs": st.csvs,
                       "/api/csv": lambda: st.csv_info(q.get("name", ""))}
             if path in routes:
                 return self._run(routes[path])
@@ -88,7 +89,7 @@ def make_handler(st: Station):
                 "/api/image": lambda b: st.upload_image(b.get("name", ""), b["png"]),
                 "/api/upload_csv": lambda b: st.upload_csv(b.get("name", ""), b.get("text", "")),
                 "/api/calibrate": lambda b: st.calibrate(b.get("lengths", []), b.get("margin", 35),
-                                                         b.get("cut", "each"), int(b.get("tape", 29)), b.get("flip")),
+                                                         b.get("cut", "each"), b.get("media") or b.get("tape"), b.get("flip")),
             }
             if path not in routes:
                 return self._send(404, b"not found", "text/plain")
