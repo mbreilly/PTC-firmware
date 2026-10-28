@@ -42,7 +42,7 @@ $$("#tabs button").forEach(b => b.onclick = () => {
 
 // ---- connection and lists --------------------------------------------------------------------
 async function loadStatus() {
-  try { ST = await api("/api/status"); } catch (e) { ST = { problem: e.message }; }
+  try { ST = await api("api/status"); } catch (e) { ST = { problem: e.message }; }
   const c = $("#conn");
   if (ST.problem) { c.className = "conn bad"; c.textContent = ST.has_token === false ? "NO API TOKEN" : "PART-DB NOT REACHED"; }
   else { c.className = "conn ok"; c.textContent = `PART-DB ${ST.version}  ·  ${ST.user}`; }
@@ -56,7 +56,7 @@ async function loadStatus() {
 }
 async function loadLists() {
   try {
-    const L = await api("/api/lists");
+    const L = await api("api/lists");
     for (const [k, rows] of Object.entries(L))
       $("#dl-" + k).innerHTML = rows.map(r => `<option value="${esc(r.name)}">${r.path !== r.name ? esc(r.path) : ""}</option>`).join("");
     window.LISTS = L;
@@ -64,7 +64,7 @@ async function loadLists() {
 }
 $("#s-save").onclick = async () => {
   try {
-    await post("/api/config", { url: $("#s-url").value, token: $("#s-token").value });
+    await post("api/config", { url: $("#s-url").value, token: $("#s-token").value });
     $("#s-token").value = "";
     await loadStatus();
     say(ST.problem ? ST.problem : "Connected to Part-DB.", !!ST.problem);
@@ -140,7 +140,7 @@ function frame() {
 async function readBlob(blob, quiet = false) {
   camBusy = true;
   try {
-    const r = await api("/api/decode", { method: "POST", body: blob });
+    const r = await api("api/decode", { method: "POST", body: blob });
     if (!r.codes.length) { if (!quiet) say("No barcode found in that picture. Get closer, or light it better.", true); return false; }
     showCodes(r.codes);
     runScan(r.codes[0].text);
@@ -182,7 +182,7 @@ async function gotPhoto(f) {
 async function runScan(raw) {
   $("#scanwrap").classList.add("busy"); say(""); $("#result").hidden = true;
   try {
-    scan = await post("/api/scan", { raw });
+    scan = await post("api/scan", { raw });
   } catch (e) { say(e.message, true); return; }
   finally { $("#scanwrap").classList.remove("busy"); }
   showLabel();
@@ -271,7 +271,7 @@ async function lookup(provider = "", provider_id = "") {
   const who = VENDOR_NAMES[scan.vendor] || "the suppliers";
   $("#lookup-state").textContent = `Looking it up at ${who} …`;
   try {
-    const r = await post("/api/lookup", { part: scan.part, vendor: scan.vendor, provider, provider_id });
+    const r = await post("api/lookup", { part: scan.part, vendor: scan.vendor, provider, provider_id });
     if (seq !== lookupSeq) return;
     if (r.candidates) showCandidates(r.candidates, r.suggest?.provider);
     applySuggest(r.suggest);
@@ -332,7 +332,7 @@ $("#save").onclick = async () => {
   Object.assign(f, extra, { part_id: chosen ? chosen.id : null, lot_id: +$("#f-lot").value || null, raw: scan ? scan.raw : "" });
   $("#save").disabled = true;
   try {
-    const r = await post("/api/save", f);
+    const r = await post("api/save", f);
     $("#result").hidden = false;
     $("#result").innerHTML = `Saved: <a href="${esc(r.url)}" target="_blank">part #${r.part_id} in Part-DB</a>` +
       `<ul>${r.did.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` + r.warnings.map(w => `<div class="warn">${esc(w)}</div>`).join("");
@@ -348,7 +348,7 @@ $("#save").onclick = async () => {
 // ---- recent ---------------------------------------------------------------------------------
 async function loadRecent() {
   try {
-    const rows = await api("/api/recent");
+    const rows = await api("api/recent");
     $("#recent").innerHTML = rows.map(r => `<tr><td class="no">${esc(r.time)}</td>
       <td><a href="${esc(r.url)}" target="_blank">#${r.part_id} ${esc(r.name)}</a></td><td>${esc(r.qty)}</td>
       <td>${esc(r.location)}</td><td>${esc(r.supplier)} ${esc(r.spn)}</td><td class="no">${esc((r.did || []).join("; "))}</td></tr>`).join("")
