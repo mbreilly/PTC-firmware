@@ -1,6 +1,8 @@
 """What the web page and the command line share: templates on disk, rendering, printing."""
 
 import base64
+import csv
+import hashlib
 import io
 import json
 import re
@@ -13,6 +15,10 @@ from .printer import JobOptions, Printer, PrinterError
 
 DATA = Path.home() / "ql-labels-data"
 NAME_OK = re.compile(r"^[\w .-]{1,60}$")
+MAX_BATCH = 500
+BATCH_DEFAULT = {"on": False, "source": "range", "field": "serial", "prefix": "PTC-", "suffix": "", "start": 1,
+                 "count": 10, "step": 1, "digits": 5, "advance": True, "csv": "", "map": {}, "first_row": 1,
+                 "last_row": 0, "list": ""}
 
 
 def png_b64(img) -> str:
@@ -25,7 +31,16 @@ class Station:
     def __init__(self, data: Path = DATA, device: str | None = None, dry_run: bool = False, flip: bool = False):
         self.data = data
         self.tdir = data / "templates"
-        self.tdir.mkdir(parents=True, exist_ok=True)
+        self.idir = data / "images"
+        self.cdir = data / "csv"
+        for d in (self.tdir, self.idir, self.cdir):
+            d.mkdir(parents=True, exist_ok=True)
+        R.IMAGES = self.idir
+        for f in sorted((Path(__file__).parent.parent / "assets").glob("*.png")):   # built-in graphics
+            try:
+                self.upload_image(f.stem.replace("_", " "), base64.b64encode(f.read_bytes()).decode())
+            except Exception as e:   # a bad asset shouldn't stop the app
+                print(f"skipping {f.name}: {e}")
         self.printer = Printer(device, data / "dry-run" if dry_run else None)
         self.flip = flip
         self.lock = threading.Lock()
@@ -63,6 +78,114 @@ class Station:
         f = self._tfile(name)
         f.unlink(missing_ok=True)
         return {"deleted": name}
+
+    # ---- graphics and CSV files
+    def upload_image(self, name: str, b64png: str) -> dict:
+        raw = base64.b64decode(b64png.split(",")[-1])
+        from PIL import Image
+        im = Image.open(io.BytesIO(raw))
+        im.load()
+        if im.width * im.height > 4000 * 4000:
+            raise ValueError("That picture is too big.")
+        f = self.idir / (hashlib.sha1(raw).hexdigest()[:16] + ".png")
+        if not f.exists():
+            im.save(f, "PNG")
+        (self.idir / (f.stem + ".name")).write_text((name or "graphic")[:80])
+        return {"src": f.name, "w": im.width, "h": im.height}
+
+    def images(self) -> dict:
+        out = []
+        for f in sorted(self.idir.glob("*.png"), key=lambda p: -p.stat().st_mtime):
+            n = self.idir / (f.stem + ".name")
+            out.append({"src": f.name, "name": n.read_text() if n.exists() else f.stem,
+                        "png": base64.b64encode(f.read_bytes()).decode() if f.stat().st_size < 400_000 else ""})
+        return {"images": out}
+
+    def _csvfile(self, name: str) -> Path:
+        name = Path(name or "").name
+        if not name.lower().endswith(".csv"):
+            name += ".csv"
+        if not NAME_OK.match(name):
+            raise ValueError("CSV names: letters, digits, space, dot, dash, underscore.")
+        return self.cdir / name
+
+    def upload_csv(self, name: str, text: str) -> dict:
+        f = self._csvfile(name)
+        f.write_text(text)
+        return self.csv_info(f.name)
+
+    def csv_rows(self, name: str) -> tuple[list[str], list[dict]]:
+        f = self._csvfile(name)
+        if not f.exists():
+            raise ValueError(f"No CSV called {name!r}; upload it on the batch tab.")
+        text = f.read_text(errors="replace").lstrip("\ufeff")
+        try:
+            dialect = csv.Sniffer().sniff(text[:4096], delimiters=",;\t")
+        except csv.Error:
+            dialect = csv.excel
+        rd = csv.DictReader(io.StringIO(text), dialect=dialect)
+        rows = [{k.strip(): (v or "").strip() for k, v in r.items() if k} for r in rd]
+        return [c.strip() for c in (rd.fieldnames or []) if c], rows
+
+    def csv_info(self, name: str) -> dict:
+        cols, rows = self.csv_rows(name)
+        return {"csv": self._csvfile(name).name, "columns": cols, "count": len(rows), "head": rows[:5]}
+
+    def csvs(self) -> dict:
+        return {"csvs": [f.name for f in sorted(self.cdir.glob("*.csv"))]}
+
+    # ---- batches
+    def batch_rows(self, tpl: dict) -> list[dict]:
+        b = {**BATCH_DEFAULT, **(tpl.get("batch") or {})}
+        fields = R.fields_in(tpl)
+        if b["source"] == "range":
+            n, step, start = int(b["count"]), int(b["step"]) or 1, int(b["start"])
+            if not 1 <= n <= MAX_BATCH:
+                raise ValueError(f"Batch count must be 1 to {MAX_BATCH}.")
+            digits = max(0, min(12, int(b["digits"])))
+            return [{b["field"]: f"{b['prefix']}{start + i * step:0{digits}d}{b['suffix']}"} for i in range(n)]
+        if b["source"] == "csv":
+            cols, rows = self.csv_rows(b["csv"])
+            first = max(1, int(b.get("first_row") or 1))
+            last = int(b.get("last_row") or 0) or len(rows)
+            mapping = {f: b["map"].get(f) or next((c for c in cols if c.lower() == f.lower()), None) for f in fields}
+            missing = [f for f, c in mapping.items() if not c]
+            if missing and fields:
+                raise ValueError("Pick a CSV column for " + ", ".join("{" + m + "}" for m in missing) + ".")
+            return [{f: r.get(c, "") for f, c in mapping.items()} for r in rows[first - 1:last]]
+        lines = [l.strip() for l in str(b.get("list", "")).splitlines() if l.strip()]
+        out = []
+        for l in lines:
+            parts = l.split("\t") if "\t" in l else l.split(",") if len(fields) > 1 else [l]
+            out.append({f: (parts[i].strip() if i < len(parts) else "") for i, f in enumerate(fields)})
+        return out
+
+    def batch_info(self, tpl: dict) -> dict:
+        rows = self.batch_rows(tpl)
+        return {"count": len(rows), "first": rows[:3], "last": rows[-1] if rows else None}
+
+    def print_batch(self, tpl: dict, copies: int = 1, over: dict | None = None) -> dict:
+        rows = self.batch_rows(tpl)
+        if not rows:
+            raise ValueError("The batch is empty.")
+        if len(rows) * max(1, int(copies)) > MAX_BATCH:
+            raise ValueError(f"More than {MAX_BATCH} labels in one go; split the batch.")
+        r = self.print_rows(tpl, rows, copies, over)
+        b = {**BATCH_DEFAULT, **(tpl.get("batch") or {})}
+        if b["source"] == "range" and b["advance"]:
+            # carry on numbering next time: stored in the saved template, if there is one
+            b["start"] = int(b["start"]) + int(b["count"]) * (int(b["step"]) or 1)
+            r["next_start"] = b["start"]
+            try:
+                f = self._tfile(tpl.get("name", ""))
+                if f.exists():
+                    saved = json.loads(f.read_text())
+                    saved["batch"] = {**BATCH_DEFAULT, **(saved.get("batch") or {}), "start": b["start"]}
+                    f.write_text(json.dumps(saved, indent=1))
+                    r["advanced"] = f.stem
+            except ValueError:
+                pass
+        return r
 
     # ---- render / print
     def preview(self, tpl: dict, values: dict | None = None) -> dict:

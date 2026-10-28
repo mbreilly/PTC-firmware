@@ -5,6 +5,7 @@ across it (0 .. the printable width, 306 dots on 29 mm tape). All positions and 
 Text and barcode data may contain {field} placeholders, filled from the values passed in."""
 
 import re
+from pathlib import Path
 
 import numpy as np
 import zxingcpp
@@ -20,10 +21,19 @@ FONTS = {
     "mono": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
     "mono-bold": "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf",
 }
-CODES = {"code128": "Code128", "datamatrix": "DataMatrix", "qr": "QRCode", "microqr": "MicroQRCode",
-         "code39": "Code39", "pdf417": "PDF417"}
-LINEAR = {"code128", "code39"}
-TYPES = ["text", *CODES, "box", "line"]
+# element type -> zxing-cpp format. Linear codes are drawn one bar row tall and stretched to "height".
+CODES = {
+    "datamatrix": "DataMatrix", "qr": "QRCode", "microqr": "MicroQRCode", "rmqr": "RMQRCode",
+    "aztec": "Aztec", "pdf417": "PDF417", "compactpdf417": "CompactPDF417",
+    "code128": "Code128", "code39": "Code39", "code93": "Code93", "codabar": "Codabar", "itf": "ITF",
+    "ean13": "EAN13", "ean8": "EAN8", "upca": "UPCA", "upce": "UPCE",
+    "databar": "DataBar", "databarltd": "DataBarLtd", "databarexp": "DataBarExp",
+}
+LINEAR = {"code128", "code39", "code93", "codabar", "itf", "ean13", "ean8", "upca", "upce",
+          "databar", "databarltd", "databarexp"}
+TYPES = ["text", *CODES, "image", "box", "line"]
+SIBLINGS = {"compactpdf417", "upca", "databar"}
+IMAGES = Path.home() / "ql-labels-data" / "images"     # set by Station
 
 DEFAULT = {"name": "untitled", "tape": 29, "length_mm": 20.0, "margin": 35, "cut": "each", "cut_every": 1,
            "fields": {"serial": "PTC-00123"}, "elements": []}
@@ -45,7 +55,7 @@ def fill(text: str, values: dict) -> str:
 def fields_in(tpl: dict) -> list[str]:
     seen = []
     for e in tpl.get("elements", []):
-        for f in re.findall(r"\{(\w+)\}", str(e.get("data", ""))):
+        for f in re.findall(r"\{(\w+)\}", str(e.get("data", "")) + str(e.get("hrt_text", ""))):
             if f not in seen:
                 seen.append(f)
     return seen
@@ -68,12 +78,17 @@ def _text(e: dict, values: dict) -> Image.Image:
     return im.point(lambda v: 0 if v < 140 else 255)  # smooth outline, then hard black/white for the head
 
 
-def _code(e: dict, values: dict) -> Image.Image:
+def symbol(e: dict, values: dict):
+    """The zxing-cpp barcode for an element; .text is what a scanner should read (EAN/UPC add the check digit)."""
     data = fill(e.get("data", ""), values)
     if not data:
         raise ValueError("empty barcode data")
+    return zxingcpp.create_barcode(data, getattr(zxingcpp.BarcodeFormat, CODES[e["type"]]))
+
+
+def _code(e: dict, values: dict) -> Image.Image:
     kind = e["type"]
-    bc = zxingcpp.create_barcode(data, getattr(zxingcpp.BarcodeFormat, CODES[kind]))
+    bc = symbol(e, values)
     m = np.array(bc.to_image(scale=1, add_quiet_zones=False)) < 128
     if kind in LINEAR:
         m = m[:1, :]                                  # one row of bars; height is ours to choose
@@ -81,7 +96,53 @@ def _code(e: dict, values: dict) -> Image.Image:
     m = np.repeat(np.repeat(m, mod, axis=1), 1 if kind in LINEAR else mod, axis=0)
     if kind in LINEAR:
         m = np.repeat(m, max(1, int(e.get("height", 80))), axis=0)
-    return _ink(m)
+    im = _ink(m)
+    side = e.get("hrt", "none")
+    if side not in ("below", "above", "left", "right"):
+        return im
+    # human-readable text next to the code, as part of the same element
+    t = _text({"data": e.get("hrt_text") or "{__data}", "font": e.get("hrt_font", "narrow-bold"),
+               "size": e.get("hrt_size", 28), "align": "center" if side in ("below", "above") else "left"},
+              {**values, "__data": bc.text})
+    gap = int(e.get("hrt_gap", 6))
+    if side in ("below", "above"):
+        out = Image.new("L", (max(im.width, t.width), im.height + gap + t.height), 255)
+        cy, ty = (0, im.height + gap) if side == "below" else (t.height + gap, 0)
+        out.paste(im, ((out.width - im.width) // 2, cy))
+        out.paste(t, ((out.width - t.width) // 2, ty))
+    else:
+        out = Image.new("L", (im.width + gap + t.width, max(im.height, t.height)), 255)
+        cx, tx = (0, im.width + gap) if side == "right" else (t.width + gap, 0)
+        out.paste(im, (cx, (out.height - im.height) // 2))
+        out.paste(t, (tx, (out.height - t.height) // 2))
+    return out
+
+
+def _image(e: dict) -> Image.Image:
+    """An uploaded graphic, scaled to w x h dots (either 0 = keep the aspect), then made black/white."""
+    name = Path(str(e.get("src", ""))).name
+    f = IMAGES / name
+    if not name or not f.is_file():
+        raise ValueError("graphic missing; upload it again")
+    src = Image.open(f)
+    src.load()
+    if src.mode in ("RGBA", "LA", "P"):
+        src = src.convert("RGBA")
+        bg = Image.new("RGBA", src.size, (255, 255, 255, 255))
+        src = Image.alpha_composite(bg, src)
+    g = src.convert("L")
+    w, h = int(e.get("w", 0)), int(e.get("h", 0))
+    if w <= 0 and h <= 0:
+        h = 118                                        # 10 mm tall
+    if w <= 0:                                         # 0 = follow the other side, keeping the shape
+        w = max(1, round(h * g.width / g.height))
+    if h <= 0:
+        h = max(1, round(w * g.height / g.width))
+    g = g.resize((w, h), Image.LANCZOS)
+    if e.get("dither"):
+        return g.convert("1").convert("L")
+    th = int(e.get("threshold", 128))
+    return g.point(lambda v: 0 if v < th else 255)
 
 
 def _box(e: dict) -> Image.Image:
@@ -105,6 +166,8 @@ def element_image(e: dict, values: dict) -> Image.Image:
         im = _text(e, values)
     elif t in CODES:
         im = _code(e, values)
+    elif t == "image":
+        im = _image(e)
     elif t == "box":
         im = _box(e)
     elif t == "line":
@@ -163,9 +226,14 @@ def verify(img: Image.Image, tpl: dict, values: dict | None = None) -> list[dict
     out = []
     for e in tpl.get("elements", []):
         if e.get("type") in CODES:
-            want = fill(e.get("data", ""), values)
+            try:
+                want = symbol(e, values).text
+            except Exception:
+                want = fill(e.get("data", ""), values)
             fmt = getattr(zxingcpp.BarcodeFormat, CODES[e["type"]])
-            out.append({"id": e.get("id"), "type": e["type"], "data": want, "ok": (fmt, want) in found})
+            # Compact PDF417 reads as PDF417, UPC-A as EAN-13, DataBar as DataBar Omni: same text is enough there
+            ok = any(t == want and (f == fmt or e["type"] in SIBLINGS) for f, t in found)
+            out.append({"id": e.get("id"), "type": e["type"], "data": want, "ok": ok})
     return out
 
 

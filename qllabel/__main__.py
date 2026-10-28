@@ -26,6 +26,9 @@ def main(argv=None):
     p.add_argument("template", help="template name or path to a .json file")
     p.add_argument("--set", action="append", default=[], metavar="FIELD=VALUE", help="fill a {field}")
     p.add_argument("--csv", type=Path, help="one label per row; the header row names the fields")
+    p.add_argument("--batch", action="store_true", help="print the template's saved batch (number range, CSV or list)")
+    p.add_argument("--start", type=int, help="with --batch on a number range: first number")
+    p.add_argument("--count", type=int, help="with --batch on a number range: how many")
     p.add_argument("--copies", type=int, default=1)
     p.add_argument("--margin", type=int, help="override the feed margin (dots)")
     p.add_argument("--cut", choices=["each", "end", "none"], help="override when to cut")
@@ -47,7 +50,11 @@ def main(argv=None):
             base = dict(kv.split("=", 1) for kv in a.set)
             rows = [{**base, **r} for r in csv.DictReader(a.csv.open())] if a.csv else [base]
             over = {k: v for k, v in (("margin", a.margin), ("cut", a.cut)) if v is not None}
-            print(json.dumps(st.print_rows(tpl, rows, a.copies, over)))
+            if a.batch:
+                tpl["batch"] = {**(tpl.get("batch") or {}), **{k: v for k, v in (("start", a.start), ("count", a.count)) if v is not None}}
+                print(json.dumps(st.print_batch(tpl, a.copies, over)))
+            else:
+                print(json.dumps(st.print_rows(tpl, rows, a.copies, over)))
         elif a.cmd == "calibrate":
             print(json.dumps(st.calibrate(a.lengths, a.margin, a.cut)))
     except (PrinterError, ValueError) as e:

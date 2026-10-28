@@ -6,10 +6,20 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const DPMM = 300 / 25.4;
 const TAPE_TOTAL = { 12: 142, 29: 342, 38: 449, 50: 590, 54: 636, 62: 732 };   // whole tape width in dots
 const TAPE_PRINT = { 12: 106, 29: 306, 38: 413, 50: 554, 54: 590, 62: 696 };
-const NAMES = { text: "TEXT", datamatrix: "DATAMATRIX", code128: "CODE 128", qr: "QR", microqr: "MICRO QR",
-  code39: "CODE 39", box: "BOX", line: "LINE" };
-const LINEAR = ["code128", "code39"];
-const CODES = ["datamatrix", "code128", "qr", "microqr", "code39"];
+const CODE_GROUPS = {
+  "2D (matrix) codes": { datamatrix: "DATAMATRIX", qr: "QR", microqr: "MICRO QR", rmqr: "rMQR (thin QR)", aztec: "AZTEC",
+    pdf417: "PDF417", compactpdf417: "COMPACT PDF417" },
+  "1D barcodes": { code128: "CODE 128", code39: "CODE 39", code93: "CODE 93", codabar: "CODABAR", itf: "ITF (2 of 5)",
+    ean13: "EAN-13", ean8: "EAN-8", upca: "UPC-A", upce: "UPC-E", databar: "GS1 DATABAR", databarltd: "DATABAR LIMITED",
+    databarexp: "DATABAR EXPANDED" },
+};
+const CODE_NAMES = Object.assign({}, ...Object.values(CODE_GROUPS));
+const NAMES = { text: "TEXT", image: "GRAPHIC", box: "BOX", line: "LINE", ...CODE_NAMES };
+const CODES = Object.keys(CODE_NAMES);
+const LINEAR = Object.keys(CODE_GROUPS["1D barcodes"]);
+// sample data for codes that only take digits or a fixed shape
+const SAMPLE = { ean13: "400638133393", ean8: "9638507", upca: "03600029145", upce: "0123456", itf: "12345678",
+  codabar: "A12345B", databar: "0950110153001", databarltd: "0950110153001", databarexp: "(01)09501101530003" };
 const FONTS = ["sans", "sans-bold", "narrow", "narrow-bold", "mono", "mono-bold"];
 
 // saved colours from the colour designer (same 8 tokens as app.css)
@@ -119,7 +129,7 @@ $("#tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
   $$("#tabs button[data-tab]").forEach(x => x.classList.toggle("on", x === b));
   $$("section.tab").forEach(s => { s.hidden = s.id !== "tab-" + b.dataset.tab; });
-  if (b.dataset.tab === "batch") batchInfo();
+  if (b.dataset.tab === "batch") { batchForm(); batchPreview(); }
   if (b.dataset.tab === "printer") printerStatus(true);
   if (b.dataset.tab === "design") layout();
 });
@@ -231,23 +241,26 @@ function select(id) {
 // ---------------------------------------------------------------- elements
 const DEFAULTS = {
   text: { data: "{serial}", font: "sans-bold", size: 40, align: "left" },
-  datamatrix: { data: "{serial}", module: 5 },
-  qr: { data: "{serial}", module: 4 },
-  microqr: { data: "{serial}", module: 5 },
-  code128: { data: "{serial}", module: 2, height: 80 },
-  code39: { data: "{serial}", module: 2, height: 80 },
+  image: { src: "", w: 0, h: 118, threshold: 128, dither: false },
   box: { w: 120, h: 80, stroke: 3 },
   line: { w: 150, stroke: 3 },
 };
+for (const k of CODES) DEFAULTS[k] = LINEAR.includes(k)
+  ? { data: SAMPLE[k] || "{serial}", module: 2, height: 80, hrt: "none", hrt_size: 28, hrt_gap: 6, hrt_font: "narrow-bold" }
+  : { data: "{serial}", module: k === "pdf417" || k === "compactpdf417" ? 2 : 4, hrt: "none", hrt_size: 28, hrt_gap: 6, hrt_font: "narrow-bold" };
+$("#add-code").innerHTML = Object.entries(CODE_GROUPS).map(([g, m]) =>
+  `<optgroup label="${g}">${Object.entries(m).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</optgroup>`).join("");
 function uid() { let id; do { id = "e" + nextId++; } while (tpl.elements.some(e => e.id === id)); return id; }
 
-$("#add").addEventListener("click", e => {
-  const b = e.target.closest("button"); if (!b) return;
+function add(type) {
   const [x, y] = freeSpot(60, 60);
-  const el = { id: uid(), type: b.dataset.t, x, y, rotate: 0, ...structuredClone(DEFAULTS[b.dataset.t]) };
+  const el = { id: uid(), type, x, y, rotate: 0, ...structuredClone(DEFAULTS[type]) };
   tpl.elements.push(el);
   sel = el.id; changed(); drawProps();
-});
+}
+$("#add").addEventListener("click", e => { const b = e.target.closest("button"); if (b) add(b.dataset.t); });
+$("#add-code-btn").addEventListener("click", () => add($("#add-code").value));
+$("#add-line").addEventListener("click", () => add("line"));
 // first place (scanning across, then down) where a w x h box overlaps nothing already on the label
 function freeSpot(w, h) {
   if (!last) return [10, 10];
@@ -283,25 +296,53 @@ function drawProps() {
     h += `<span class="lab">ALIGN</span><div class="seg" data-seg="align">${["left", "center", "right"].map(a => `<button data-v="${a}" class="${(el.align || "left") === a ? "on" : ""}">${a.toUpperCase()}</button>`).join("")}</div>`;
   }
   if (CODES.includes(el.type)) {
+    h += `<span class="lab">CODE</span><select data-k="type">${Object.entries(CODE_GROUPS).map(([g, m]) =>
+      `<optgroup label="${g}">${Object.entries(m).map(([k, n]) => `<option value="${k}"${k === el.type ? " selected" : ""}>${n}</option>`).join("")}</optgroup>`).join("")}</select>`;
     h += num("module", "MODULE", "dots", 1);
     if (LINEAR.includes(el.type)) h += num("height", "HEIGHT", "dots", 1);
+    const hrt = el.hrt || "none";
+    h += `<span class="lab">TEXT</span><div class="seg" data-seg="hrt">${["none", "below", "above", "right", "left"].map(a => `<button data-v="${a}" class="${hrt === a ? "on" : ""}">${a.toUpperCase()}</button>`).join("")}</div>`;
+    if (hrt !== "none") {
+      h += `<span class="lab">SAYS</span><input data-k="hrt_text" value="${esc(el.hrt_text || "")}" placeholder="(same as the code)" spellcheck="false">`;
+      h += `<span class="lab">TEXT FONT</span><select data-k="hrt_font">${FONTS.map(f => `<option${f === (el.hrt_font || "narrow-bold") ? " selected" : ""}>${f}</option>`).join("")}</select>`;
+      el.hrt_size ??= 28; el.hrt_gap ??= 6;
+      h += num("hrt_size", "TEXT SIZE") + num("hrt_gap", "GAP");
+    }
+  }
+  if (el.type === "image") {
+    h += `<span class="lab">PICTURE</span><span id="pick-name" class="dim">${el.src ? "" : "none yet: pick one below"}</span>`;
+    h += num("h", "HEIGHT", "dots", 0) + num("w", "WIDTH", "dots", 0);
+    h += `<span></span><span class="dim">0 = follows the other side, keeping the shape</span>`;
+    h += `<span class="lab">LEVEL</span><span class="pair2"><input type="number" data-k="threshold" value="${el.threshold ?? 128}" min="1" max="254"><span class="unit">0–255</span></span>`;
   }
   if (el.type === "box") h += num("w", "WIDTH", "dots", 1) + num("h", "HEIGHT", "dots", 1) + num("stroke", "STROKE", "dots", 1);
   if (el.type === "line") h += num("w", "LENGTH", "dots", 1) + num("stroke", "THICK", "dots", 1);
   h += `<span class="lab">ROTATE</span><div class="seg" data-seg="rotate">${[0, 90, 180, 270].map(a => `<button data-v="${a}" class="${(+el.rotate || 0) === a ? "on" : ""}">${a}°</button>`).join("")}</div>`;
   h += `<span class="lab">STYLE</span><span>`;
   if (el.type === "box") h += `<label class="check"><input type="checkbox" data-k="filled"${el.filled ? " checked" : ""}> filled</label> `;
+  if (el.type === "image") h += `<label class="check"><input type="checkbox" data-k="dither"${el.dither ? " checked" : ""}> dither (photos)</label> `;
   h += `<label class="check"><input type="checkbox" data-k="invert"${el.invert ? " checked" : ""}> white on black</label></span>`;
   h += `</div><div class="props-actions">
     <button data-a="ch">CENTRE ↔</button><button data-a="cv">CENTRE ↕</button>
     <button data-a="front">TO FRONT</button><button data-a="back">TO BACK</button>
     <button data-a="dup">DUPLICATE</button><button data-a="del">DELETE</button></div>`;
+  if (el.type === "image") h += `<div class="picker">
+    <div class="row tight"><label class="btn grow" for="img-file">UPLOAD A PICTURE…</label>
+      <input type="file" id="img-file" accept="image/*,.svg" hidden></div>
+    <span class="lab">BUILT IN</span><div class="gal" id="gal-built"></div>
+    <span class="lab">UPLOADED</span><div class="gal" id="gal-up"><span class="dim">…</span></div></div>`;
   host.innerHTML = h;
+  if (el.type === "image") picker(el);
 
   $$("[data-k]", host).forEach(inp => inp.addEventListener("input", () => {
     const k = inp.dataset.k;
     el[k] = inp.type === "checkbox" ? inp.checked : inp.type === "number" ? (parseInt(inp.value, 10) || 0) : inp.value;
     const u = $(`[data-u="${k}"]`, host); if (u && inp.type === "number") u.textContent = mm(el[k]);
+    if (k === "type") {   // switching symbology: keep the data unless the new code can't take it
+      if (SAMPLE[el.type]) el.data = SAMPLE[el.type];
+      if (LINEAR.includes(el.type) && !el.height) { el.height = 80; el.module = 2; }
+      changed(); return drawProps();
+    }
     changed();
   }));
   $$("[data-seg]", host).forEach(s => s.addEventListener("click", e => {
@@ -309,6 +350,7 @@ function drawProps() {
     $$("button", s).forEach(x => x.classList.toggle("on", x === b));
     el[s.dataset.seg] = s.dataset.seg === "rotate" ? +b.dataset.v : b.dataset.v;
     changed();
+    if (s.dataset.seg === "hrt") drawProps();
   }));
   $(".props-actions", host).addEventListener("click", e => {
     const a = e.target.closest("button")?.dataset.a; if (!a) return;
@@ -360,7 +402,8 @@ function use(t) {
   kLength.set(tpl.length_mm); kMargin.set(tpl.margin); setCut(tpl.cut);
   $("#flip").checked = !!tpl.flip;
   $("#fields").dataset.key = "";
-  drawProps(); changed();
+  tpl.batch = { ...BATCH, ...(tpl.batch || {}) };
+  drawProps(); changed(); batchSummary();
 }
 $("#tpl-list").addEventListener("change", async e => {
   if (!e.target.value) return;
@@ -391,58 +434,171 @@ async function doPrint(rows, copies, btn) {
   btn.disabled = false; btn.textContent = old;
   printerStatus(true);
 }
-$("#print").addEventListener("click", e => doPrint([{}], +$("#copies").value || 1, e.target));
+$("#print").addEventListener("click", e => B().on ? printBatch(e.target, +$("#copies").value || 1) : doPrint([{}], +$("#copies").value || 1, e.target));
 
-function batchRows() {
+// ---------------------------------------------------------------- batch
+const BATCH = { on: false, source: "range", field: "serial", prefix: "PTC-", suffix: "", start: 1, count: 10, step: 1,
+  digits: 5, advance: true, csv: "", map: {}, first_row: 1, last_row: 0, list: "" };
+const B = () => (tpl.batch = { ...BATCH, ...(tpl.batch || {}) });
+const setMode = seg($("#mode"), "single", v => { B().on = v === "batch"; changed(false); batchSummary(); });
+const setSource = seg($("#b-source"), "range", v => { B().source = v; batchForm(); batchPreview(); changed(false); });
+
+function batchForm() {
+  const b = B(), names = (last && last.fields) || [];
+  setSource(b.source);
+  $$(".bsrc").forEach(d => { d.hidden = d.id !== "b-" + b.source; });
+  $$("#tab-batch [data-b]").forEach(i => {
+    const v = b[i.dataset.b];
+    if (i.type === "checkbox") i.checked = !!v; else if (i.tagName !== "SELECT") i.value = v ?? "";
+  });
+  $$(".b-field").forEach(s => {
+    s.innerHTML = (names.length ? names : [b.field]).map(n => `<option${n === b.field ? " selected" : ""}>${esc(n)}</option>`).join("");
+    if (!names.includes(b.field) && names.length) { b.field = names[0]; s.value = b.field; }
+  });
+  $("#b-listhint").textContent = names.length > 1
+    ? `One label per line: ${names.map(n => "{" + n + "}").join(", ")}, separated by a comma or a tab.`
+    : names.length ? `One {${names[0]}} per line.` : "This template has no {fields}; each line prints the same label.";
+  if (b.source === "csv") csvForm();
+}
+$$("#tab-batch [data-b]").forEach(i => i.addEventListener("input", () => {
+  const b = B(), k = i.dataset.b;
+  b[k] = i.type === "checkbox" ? i.checked : i.type === "number" ? (parseInt(i.value, 10) || 0) : i.value;
+  changed(false); batchPreviewSoon();
+}));
+
+async function csvForm() {
+  const b = B();
+  try {
+    const r = await api("/api/csvs");
+    $("#b-csvlist").innerHTML = `<option value="">(pick a CSV)</option>` + r.csvs.map(n => `<option${n === b.csv ? " selected" : ""}>${esc(n)}</option>`).join("");
+  } catch (e) { say(e.message, true); }
+  if (!b.csv) { $("#b-map").innerHTML = ""; $("#b-head").innerHTML = ""; return; }
+  let info;
+  try { info = await api("/api/csv?name=" + encodeURIComponent(b.csv)); } catch (e) { say(e.message, true); return; }
   const names = (last && last.fields) || [];
-  return $("#batch").value.split("\n").map(l => l.trim()).filter(Boolean).map(l => {
-    const parts = l.includes("\t") ? l.split("\t") : names.length > 1 ? l.split(",") : [l];
-    return Object.fromEntries(names.map((n, i) => [n, (parts[i] ?? "").trim()]));
+  $("#b-map").innerHTML = names.map(n => {
+    const cur = b.map[n] || info.columns.find(c => c.toLowerCase() === n.toLowerCase()) || "";
+    return `<span class="lab">{${esc(n)}}</span><select data-map="${esc(n)}"><option value="">(choose)</option>${info.columns.map(c => `<option${c === cur ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
+  }).join("") || `<span class="dim" style="grid-column:1/3">The template has no {fields} to fill.</span>`;
+  $$("#b-map select").forEach(s => s.addEventListener("change", () => { b.map[s.dataset.map] = s.value; changed(false); batchPreview(); }));
+  $("#b-head").innerHTML = `<table><tr>${info.columns.map(c => `<th>${esc(c)}</th>`).join("")}</tr>` +
+    info.head.map(r => `<tr>${info.columns.map(c => `<td>${esc(r[c] ?? "")}</td>`).join("")}</tr>`).join("") + `</table>` +
+    `<p class="dim">${info.count} rows in ${esc(info.csv)}${info.count > 5 ? " (first 5 shown)" : ""}</p>`;
+}
+$("#b-csvlist").addEventListener("change", e => { B().csv = e.target.value; B().map = {}; changed(false); csvForm(); batchPreview(); });
+$("#b-csvfile").addEventListener("change", async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const r = await api("/api/upload_csv", { name: f.name.replace(/[^\w .-]/g, "_"), text: await f.text() });
+    B().csv = r.csv; B().map = {}; changed(false); await csvForm(); batchPreview();
+    say(`Loaded ${r.csv}: ${r.count} rows, columns ${r.columns.join(", ")}.`);
+  } catch (x) { say(x.message, true); }
+  e.target.value = "";
+});
+
+let bpTimer;
+function batchPreviewSoon() { clearTimeout(bpTimer); bpTimer = setTimeout(batchPreview, 300); }
+async function batchPreview() {
+  if ($("#tab-batch").hidden) return batchSummary();
+  try {
+    const info = await api("/api/batch", { template: tpl });
+    $("#b-count").textContent = `${info.count} label${info.count === 1 ? "" : "s"}`;
+    for (const [id, row] of [["#b-first", info.first[0]], ["#b-last", info.last]]) {
+      const img = $(id);
+      if (!row) { img.removeAttribute("src"); continue; }
+      const r = await api("/api/preview", { template: tpl, values: row });
+      img.src = "data:image/png;base64," + r.png; img.style.width = `${r.w}px`;
+    }
+  } catch (e) { $("#b-count").textContent = e.message; }
+  batchSummary();
+}
+async function batchSummary() {
+  const b = B();
+  setMode(b.on ? "batch" : "single");
+  if (!b.on) { $("#batch-sum").textContent = "Prints the label as shown, with the test values above."; return; }
+  try {
+    const info = await api("/api/batch", { template: tpl });
+    const show = r => r ? Object.values(r).join(" / ") : "";
+    $("#batch-sum").textContent = `${info.count} labels from ${{ range: "numbers", csv: b.csv || "a CSV", list: "the typed list" }[b.source]}: ` +
+      `${show(info.first[0])}${info.count > 1 ? " … " + show(info.last) : ""}. Set it up on the BATCH PRINT tab.`;
+  } catch (e) { $("#batch-sum").textContent = e.message; }
+}
+
+async function printBatch(btn, copies) {
+  let info;
+  try { info = await api("/api/batch", { template: tpl }); } catch (e) { return say(e.message, true); }
+  if (info.count * copies > 20 && !confirm(`Print ${info.count * copies} labels?`)) return;
+  btn.disabled = true;
+  const old = btn.textContent; btn.textContent = "PRINTING…";
+  try {
+    const r = await api("/api/print_batch", { template: tpl, copies });
+    let m = r.dry_run ? `Dry run: ${r.pages} labels written to ${r.dry_run}.` : `Printed ${r.pages} labels.`;
+    if (r.next_start !== undefined) {
+      B().start = r.next_start; changed(false); batchForm();
+      m += ` Next batch starts at ${r.next_start}` + (r.advanced ? ` (saved in “${r.advanced}”).` : " (save the template to keep it).");
+    }
+    say(m);
+  } catch (e) { say(e.message, true); }
+  btn.disabled = false; btn.textContent = old;
+  batchPreview(); printerStatus(true);
+}
+$("#batch-print").addEventListener("click", e => printBatch(e.target, +$("#b-copies").value || 1));
+
+// ---------------------------------------------------------------- graphics
+const ICONS = {
+  arrow: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M10 40h50V18l32 32-32 32V60H10z"/></svg>',
+  warning: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50 6 96 92H4z" fill="none" stroke="#000" stroke-width="9" stroke-linejoin="round"/><rect x="45" y="34" width="10" height="32"/><rect x="45" y="72" width="10" height="10"/></svg>',
+  esd: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50 6 96 92H4z" fill="none" stroke="#000" stroke-width="7" stroke-linejoin="round"/><path d="M38 80c0-14 4-22 10-30l-6-8 10-6 6 10c4-2 8-2 10 2l-4 6-4-2c-4 8-6 16-6 28z"/><path d="M28 40 72 84" stroke="#000" stroke-width="6"/></svg>',
+  check: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M10 54l26 26L90 22" fill="none" stroke="#000" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  pin1: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="#000" stroke-width="10"/><circle cx="50" cy="50" r="18"/></svg>',
+  ground: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M50 6v44M14 50h72M28 68h44M42 86h16" stroke="#000" stroke-width="9" stroke-linecap="round"/></svg>',
+  hv: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M58 4 22 56h24L36 96l42-58H54z"/></svg>',
+  hand: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="none" stroke="#000" stroke-width="8"/><path d="M20 20 80 80" stroke="#000" stroke-width="8"/><path d="M36 74V40a5 5 0 0 1 10 0v-8a5 5 0 0 1 10 0v4a5 5 0 0 1 10 0v26c0 8-6 14-14 14h-6c-6 0-10-2-10-2z"/></svg>',
+};
+// any picture (also SVG) -> PNG on a canvas, so the Pi only ever stores PNGs
+function toPng(url, maxSide = 1000) {
+  return new Promise((ok, bad) => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, maxSide / Math.max(img.naturalWidth || maxSide, img.naturalHeight || maxSide));
+      const w = Math.max(1, Math.round((img.naturalWidth || maxSide) * s)), h = Math.max(1, Math.round((img.naturalHeight || maxSide) * s));
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+      ok(c.toDataURL("image/png"));
+    };
+    img.onerror = () => bad(new Error("That file isn't a picture the browser can read."));
+    img.src = url;
   });
 }
-function batchInfo() {
-  const names = (last && last.fields) || [];
-  $("#batch-hint").textContent = names.length
-    ? `This template uses ${names.map(n => "{" + n + "}").join(", ")}. ` + (names.length > 1 ? "Separate them with a comma or a tab, in that order." : "Put one value on each line.")
-    : "This template has no {fields}: every line prints the same label.";
-  $("#r-field").innerHTML = names.map(n => `<option>${esc(n)}</option>`).join("");
-  $("#batch-count").textContent = `${batchRows().length} labels`;
-  rangeSample();
-  thumb();
+async function useGraphic(el, name, pngUrl) {
+  const r = await api("/api/image", { name, png: pngUrl });
+  el.src = r.src;
+  changed(); drawProps();
 }
-async function thumb() {
-  const rows = batchRows();
+async function picker(el) {
+  $("#gal-built").innerHTML = Object.entries(ICONS).map(([k, svg]) =>
+    `<button data-icon="${k}" title="${k}"><img src="data:image/svg+xml;base64,${btoa(svg)}" alt="${k}"></button>`).join("");
+  $("#gal-built").addEventListener("click", async e => {
+    const b = e.target.closest("button"); if (!b) return;
+    try { await useGraphic(el, b.dataset.icon, await toPng("data:image/svg+xml;base64," + btoa(ICONS[b.dataset.icon]), 600)); }
+    catch (x) { say(x.message, true); }
+  });
+  $("#img-file").addEventListener("change", async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f);
+    try { await useGraphic(el, f.name, await toPng(url)); } catch (x) { say(x.message, true); }
+    URL.revokeObjectURL(url);
+  });
   try {
-    const r = await api("/api/preview", { template: tpl, values: rows[0] || {} });
-    const img = $("#batch-thumb");
-    img.src = "data:image/png;base64," + r.png; img.style.width = `${r.w}px`;
-  } catch (e) { /* the design tab shows errors */ }
+    const r = await api("/api/images");
+    const g = $("#gal-up"); if (!g) return;
+    g.innerHTML = r.images.map(i => `<button data-src="${esc(i.src)}" class="${i.src === el.src ? "on" : ""}" title="${esc(i.name)}">${i.png ? `<img src="data:image/png;base64,${i.png}" alt="">` : esc(i.name)}</button>`).join("")
+      || `<span class="dim">Nothing uploaded yet.</span>`;
+    g.addEventListener("click", e => { const b = e.target.closest("button"); if (b) { el.src = b.dataset.src; changed(); drawProps(); } });
+    const cur = r.images.find(i => i.src === el.src);
+    if (cur && $("#pick-name")) $("#pick-name").textContent = cur.name;
+  } catch (x) { say(x.message, true); }
 }
-$("#batch").addEventListener("input", () => { $("#batch-count").textContent = `${batchRows().length} labels`; });
-$("#batch").addEventListener("change", thumb);
-function rangeVals() {
-  const a = +$("#r-from").value, b = +$("#r-to").value, d = +$("#r-digits").value || 1;
-  const out = [];
-  for (let i = a; a <= b ? i <= b : i >= b; i += a <= b ? 1 : -1) {
-    out.push($("#r-prefix").value + String(i).padStart(d, "0") + $("#r-suffix").value);
-    if (out.length >= 500) break;
-  }
-  return out;
-}
-function rangeSample() { const v = rangeVals(); $("#r-sample").textContent = v.length ? `${v[0]} … ${v[v.length - 1]}  (${v.length})` : ""; }
-$$("#r-prefix, #r-from, #r-to, #r-digits, #r-suffix").forEach(i => i.addEventListener("input", rangeSample));
-$("#r-fill").addEventListener("click", () => {
-  const names = (last && last.fields) || [];
-  const f = $("#r-field").value, i = names.indexOf(f);
-  $("#batch").value = rangeVals().map(v => names.length > 1 ? names.map((n, j) => j === i ? v : (tpl.fields[n] ?? "")).join("\t") : v).join("\n");
-  batchInfo();
-});
-$("#batch-print").addEventListener("click", e => {
-  const rows = batchRows();
-  if (!rows.length) { say("The list is empty.", true); return; }
-  if (rows.length > 20 && !confirm(`Print ${rows.length} labels?`)) return;
-  doPrint(rows, 1, e.target);
-});
 
 $("#c-print").addEventListener("click", async e => {
   const btn = e.target; btn.disabled = true;

@@ -62,3 +62,16 @@ input.qty { width: 70px !important; }
 .notes { font-size: 13px; padding-left: 18px; } .notes li { margin: 6px 0; }
 pre.code { background: color-mix(in srgb, var(--panelEdge) 60%, transparent); padding: 10px 12px; border-radius: 3px; white-space: pre-wrap; }
 @media (max-width: 1100px) { .cols { flex-wrap: wrap; } .col.side, .col.side.wide2 { flex: 1 1 280px; } .viewcol { flex-basis: 100%; order: -1; } }
+
+.bsrc { margin-top: 12px; }
+.big { font-size: 18px; font-weight: 700; margin: 4px 0 10px; }
+.thumbs { display: flex; gap: 14px; flex-wrap: wrap; }
+.thumbs figure { margin: 0; }
+.thumbs figcaption { margin-bottom: 4px; }
+label.btn { height: 30px; font-size: 12px; }
+.picker { border: 1px solid var(--panelEdge); border-radius: 4px; padding: 8px; margin: 8px 0;
+  background: color-mix(in srgb, var(--panelEdge) 40%, transparent); }
+.picker .gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 6px; max-height: 210px; overflow: auto; margin-top: 6px; }
+.picker .gal button { height: 56px; padding: 4px; background: #fff; justify-content: center; }
+.picker .gal button img { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+.picker .gal button.on { outline: 2px solid var(--accent); }

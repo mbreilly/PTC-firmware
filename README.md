@@ -12,9 +12,13 @@ label length are whatever we send. Stand-alone for now; meant to be called from 
     ~/apps/ql-labels.sh --dry-run ...         write jobs to ~/ql-labels-data/dry-run/ instead
 
 - `qllabel/printer.py`  raster protocol (ESC i z / M / A / K / d, 90-byte lines) and status replies, on /dev/usb/lpN.
-- `qllabel/render.py`   templates -> 300 dpi bitmaps (text, Code128/39, DataMatrix, QR, Micro QR, PDF417, box, line);
+- `qllabel/render.py`   templates -> 300 dpi bitmaps: text, graphics (PNG; `assets/` are built in), boxes, lines and
+  19 symbologies (DataMatrix, QR, Micro QR, rMQR, Aztec, PDF417, Code 128/39/93, EAN/UPC, ITF, Codabar, DataBar),
+  optionally with readable text beside the code;
   every barcode is decoded back from the bitmap before printing and the job is refused if one doesn't read.
 - `qllabel/station.py`, `server.py`, `static/`  the web designer; `/colors` is the colour designer.
+- Batches (saved per template): a number range with preamble/suffix/digits that can carry on numbering, a CSV
+  (uploaded on the batch tab, columns mapped to {fields}), or a typed list. `print NAME --batch` prints it.
 - Templates: `~/ql-labels-data/templates/*.json`. Positions/sizes in dots (300 dpi; 11.8 dots per mm),
   x along the tape, y across it (306 printable dots on 29 mm tape). `{field}` placeholders in data.
 - `/dev/usb/lp0` is group `lp`; the launcher uses `sg lp` when the shell predates joining the group.

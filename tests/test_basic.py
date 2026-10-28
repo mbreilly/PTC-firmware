@@ -27,7 +27,7 @@ def test_raster_layout():
     assert len(data) == 3 * 93 and data[:3] == b"g\x00\x5a"
     line = data[3:93]
     bit = [i for i in range(720) if line[i // 8] >> (7 - i % 8) & 1]
-    assert bit == [720 - 6 - 1]      # mirrored onto the head: x=0 lands at the last printable pin
+    assert bit == [6 + 306 - 1]      # 29 mm tape: pins 6..311, mirrored (as brother_ql does)
 
 def test_job_shape():
     pages = [R.page(R.render(TPL)[0])] * 2
@@ -35,7 +35,7 @@ def test_job_shape():
     assert job.startswith(b"\x00" * 400 + b"\x1b@")
     assert job.count(b"\x1biz") == 2 and job.endswith(b"\x1a") and job.count(b"\x1bid\x00\x00") == 2
     i = job.index(b"\x1biz")
-    assert job[i+3:i+7] == bytes([0xC6, 0x0A, 29, 0]) and int.from_bytes(job[i+7:i+11], "little") == R.mm_to_dots(12)
+    assert job[i+3:i+7] == bytes([0xCE, 0x0A, 29, 0]) and int.from_bytes(job[i+7:i+11], "little") == R.mm_to_dots(12)
 
 def test_calibration():
     for p in R.calibration([25, 10, 5, 3]):

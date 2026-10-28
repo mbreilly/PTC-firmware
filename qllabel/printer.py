@@ -89,13 +89,14 @@ class JobOptions:
 
 def raster_lines(img: Image.Image, tape: int) -> bytes:
     """One label image (width = printable dots across the tape, height = length in dots) -> raster data.
-    Black pixels print. The printer's pin 0 is on the far side, so the image is mirrored onto the head."""
+    Black pixels print, mirrored into the `right` .. `right + printable` pins of the 720-pin line (byte-for-byte the
+    same as brother_ql produces; mirroring it onto the far end of the head printed nothing on 29 mm tape)."""
     printable, right = TAPES[tape]
     if img.width != printable:
         raise PrinterError(f"Image is {img.width} dots wide; {tape} mm tape takes {printable}.")
     g = img.convert("L")
     full = Image.new("L", (LINE_BYTES * 8, g.height), 255)
-    full.paste(ImageOps.mirror(g), (LINE_BYTES * 8 - printable - right, 0))
+    full.paste(ImageOps.mirror(g), (right, 0))
     bits = ImageOps.invert(full).point(lambda v: 255 if v >= 128 else 0).convert("1")   # 1 bit = print
     data = bits.tobytes()
     out = bytearray()
@@ -114,7 +115,7 @@ def build_job(pages: list[Image.Image], opt: JobOptions) -> bytes:
     for i, img in enumerate(pages):
         lines = img.height
         out += b"\x1bia\x01"                            # raster mode
-        flags = 0x02 | 0x04 | 0x80 | (0x40 if opt.quality else 0)   # media type + width valid, recover
+        flags = 0x02 | 0x04 | 0x08 | 0x80 | (0x40 if opt.quality else 0)   # type, width, length valid; recover
         out += b"\x1biz" + bytes([flags, 0x0A, opt.tape, 0]) + lines.to_bytes(4, "little") \
             + bytes([0 if i == 0 else 1, 0])
         out += b"\x1biM" + bytes([0x40 if opt.cut == "each" else 0])          # auto cut

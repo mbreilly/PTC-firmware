@@ -59,14 +59,17 @@
         <h2>ADD</h2>
         <div class="addgrid" id="add">
           <button data-t="text">TEXT</button>
+          <button data-t="image">GRAPHIC</button>
           <button data-t="datamatrix">DATAMATRIX</button>
-          <button data-t="code128">CODE 128</button>
           <button data-t="qr">QR</button>
-          <button data-t="microqr">MICRO QR</button>
-          <button data-t="code39">CODE 39</button>
+          <button data-t="code128">CODE 128</button>
           <button data-t="box">BOX</button>
-          <button data-t="line">LINE</button>
         </div>
+        <div class="row tight">
+          <select id="add-code" class="grow"></select>
+          <button id="add-code-btn">ADD</button>
+        </div>
+        <div class="row tight"><button id="add-line" class="grow">LINE</button></div>
       </div>
 
       <div class="col viewcol">
@@ -104,6 +107,8 @@
         <div class="grid2" id="fields"></div>
 
         <h2>PRINT</h2>
+        <div class="seg" id="mode"><button data-v="single" class="on">ONE LABEL</button><button data-v="batch">BATCH</button></div>
+        <p class="dim" id="batch-sum"></p>
         <div class="row tight">
           <span class="lab">COPIES</span>
           <input type="number" id="copies" min="1" max="100" value="1" class="qty">
@@ -117,28 +122,54 @@
   <section id="tab-batch" class="tab" hidden>
     <div class="cols">
       <div class="col">
-        <h2>ONE LABEL PER LINE</h2>
-        <p class="dim" id="batch-hint"></p>
-        <textarea id="batch" rows="16" spellcheck="false" class="mono"></textarea>
-        <div class="row">
-          <span class="dim" id="batch-count">0 labels</span>
-          <span class="grow"></span>
-          <button id="batch-print" class="accent bigbtn">PRINT BATCH</button>
+        <h2>WHERE THE LABELS COME FROM</h2>
+        <div class="seg" id="b-source"><button data-v="range" class="on">NUMBERS</button><button data-v="csv">CSV FILE</button><button data-v="list">TYPED LIST</button></div>
+        <p class="dim">Saved with the template. Turn on BATCH under PRINT on the design tab to print this instead of one label.</p>
+
+        <div id="b-range" class="bsrc">
+          <div class="grid2">
+            <span class="lab">FIELD</span><select data-b="field" class="b-field"></select>
+            <span class="lab">PREAMBLE</span><input data-b="prefix" spellcheck="false" placeholder="e.g. PTC-">
+            <span class="lab">START AT</span><input type="number" data-b="start">
+            <span class="lab">HOW MANY</span><input type="number" data-b="count" min="1" max="500">
+            <span class="lab">STEP</span><input type="number" data-b="step">
+            <span class="lab">DIGITS</span><input type="number" data-b="digits" min="0" max="12">
+            <span class="lab">SUFFIX</span><input data-b="suffix" spellcheck="false">
+          </div>
+          <label class="check" style="margin-top:10px"><input type="checkbox" data-b="advance"> carry on numbering: after printing, the next batch starts where this one ended</label>
+        </div>
+
+        <div id="b-csv" class="bsrc" hidden>
+          <div class="row tight">
+            <select id="b-csvlist" class="grow"></select>
+            <label class="btn" for="b-csvfile">UPLOAD CSV…</label><input type="file" id="b-csvfile" accept=".csv,.txt,text/csv" hidden>
+          </div>
+          <p class="dim">The first row must name the columns. Comma, semicolon or tab separated.</p>
+          <h3>WHICH COLUMN FILLS WHICH FIELD</h3>
+          <div class="grid2" id="b-map"></div>
+          <div class="grid2" style="margin-top:8px">
+            <span class="lab">FROM ROW</span><input type="number" data-b="first_row" min="1">
+            <span class="lab">TO ROW</span><input type="number" data-b="last_row" min="0" placeholder="0 = last">
+          </div>
+          <div class="tablewrap short" id="b-head"></div>
+        </div>
+
+        <div id="b-list" class="bsrc" hidden>
+          <p class="dim" id="b-listhint"></p>
+          <textarea data-b="list" rows="14" spellcheck="false" class="mono"></textarea>
         </div>
       </div>
       <div class="col">
-        <h2>NUMBER RANGE</h2>
-        <div class="grid2">
-          <span class="lab">FIELD</span><select id="r-field"></select>
-          <span class="lab">PREFIX</span><input id="r-prefix" value="PTC-" spellcheck="false">
-          <span class="lab">FROM</span><input type="number" id="r-from" value="1">
-          <span class="lab">TO</span><input type="number" id="r-to" value="10">
-          <span class="lab">DIGITS</span><input type="number" id="r-digits" value="5" min="1" max="12">
-          <span class="lab">SUFFIX</span><input id="r-suffix" spellcheck="false">
+        <h2>THE BATCH</h2>
+        <p id="b-count" class="big"></p>
+        <div class="thumbs">
+          <figure><figcaption class="lab">FIRST</figcaption><div class="thumb"><img id="b-first" alt=""></div></figure>
+          <figure><figcaption class="lab">LAST</figcaption><div class="thumb"><img id="b-last" alt=""></div></figure>
         </div>
-        <div class="row"><button id="r-fill">FILL THE LIST</button><span class="dim" id="r-sample"></span></div>
-        <h3>FIRST LABEL</h3>
-        <div class="thumb"><img id="batch-thumb" alt=""></div>
+        <div class="row">
+          <span class="lab">COPIES EACH</span><input type="number" id="b-copies" min="1" max="20" value="1" class="qty">
+          <button id="batch-print" class="accent bigbtn">PRINT BATCH</button>
+        </div>
       </div>
     </div>
   </section>
@@ -182,6 +213,8 @@
       <div class="col">
         <h2>COMMAND LINE (FOR PTC LATER)</h2>
         <pre class="mono code">~/apps/ql-labels.sh print my-template --set serial=PTC-00123
+~/apps/ql-labels.sh print my-template --batch            (its saved numbers / CSV / list)
+~/apps/ql-labels.sh print my-template --batch --start 200 --count 50
 ~/apps/ql-labels.sh print my-template --csv serials.csv
 ~/apps/ql-labels.sh calibrate 10 6 4 --margin 0
 ~/apps/ql-labels.sh status</pre>
