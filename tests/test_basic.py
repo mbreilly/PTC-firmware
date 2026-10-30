@@ -75,3 +75,24 @@ def test_wide():
     line = raster_lines(R.page(img, across=True), "29")[3:93]
     bit = [i for i in range(720) if line[i // 8] >> (7 - i % 8) & 1]
     assert bit[0] == 0 and bit[-1] == 329                  # pins 0..329: 6 + 306 + 18
+
+def test_data_table():
+    from qllabel import data as D
+    t = {"fields": {"num": "001"}, "elements": [], "data": {
+        "main": "num", "count": 3, "advance": True, "rows": [{"note": "a"}, {"note": ""}],
+        "columns": [{"name": "num", "mode": "sequence", "prefix": "PTC", "start": 9, "step": 1, "digits": 3, "suffix": ""},
+                    {"name": "ip", "mode": "ip", "start": "10.0.1.254", "step": 1},
+                    {"name": "rev", "mode": "fixed", "value": "B"},
+                    {"name": "note", "mode": "manual"}]}}
+    rows, warn = D.resolve(t)
+    assert [r["num"] for r in rows] == ["PTC009", "PTC010", "PTC011"]
+    assert [r["ip"] for r in rows] == ["10.0.1.254", "10.0.1.255", "10.0.2.0"]     # carries into the next octet
+    assert all(r["rev"] == "B" for r in rows) and rows[0]["note"] == "a"
+    assert any("{note}" in w for w in warn)                                          # rows 2 and 3 have no note
+    D.advance(t["data"], 3)
+    assert t["data"]["columns"][0]["start"] == 12 and t["data"]["columns"][1]["start"] == "10.0.2.1"
+    old = {"batch": {"on": True, "source": "range", "field": "num", "prefix": "", "start": 11, "count": 5, "step": 1, "digits": 3}}
+    D.migrate(old)
+    assert old["data"]["main"] == "num" and old["data"]["on"] and old["data"]["columns"][0]["start"] == 11 and "batch" not in old
+    t2 = {"data": {"main": "sn", "columns": [{"name": "sn", "mode": "manual"}], "rows": [{"sn": "A"}, {"sn": ""}, {"sn": "C"}]}}
+    assert D.count(t2["data"]) == 3

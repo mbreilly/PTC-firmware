@@ -17,7 +17,7 @@
 
   <nav class="tabs" id="tabs">
     <button data-tab="design" class="on">DESIGN</button>
-    <button data-tab="batch">BATCH PRINT</button>
+    <button data-tab="batch">DATA &amp; BATCH</button>
     <button data-tab="calibrate">CALIBRATE</button>
     <button data-tab="printer">PRINTER</button>
     <span class="grow"></span>
@@ -91,8 +91,18 @@
             <button data-v="fit" class="on">FIT</button><button data-v="1">1×</button><button data-v="2">2×</button><button data-v="3">3×</button><button data-v="4">4×</button>
           </div>
           <label class="check"><input type="checkbox" id="grid" checked> mm grid</label>
+          <label class="check" title="Snap to the label centre and to other items while dragging (hold Alt to drag freely)"><input type="checkbox" id="snap" checked> snap</label>
           <span class="grow"></span>
           <span class="dim" id="dims"></span>
+        </div>
+        <div class="row alignbar" id="align" title="One item selected: lines it up on the label. Several (Shift+click): lines them up with each other.">
+          <span class="lab">ALIGN</span>
+          <button data-a="left" title="Left edges">⇤</button><button data-a="hcenter" title="Centres, left to right">↔</button><button data-a="right" title="Right edges">⇥</button>
+          <button data-a="top" title="Top edges">⤒</button><button data-a="vcenter" title="Centres, top to bottom">↕</button><button data-a="bottom" title="Bottom edges">⤓</button>
+          <span class="sep"></span>
+          <button data-a="label-h" title="Centre the selection on the label, left to right">CENTRE ON LABEL ↔</button>
+          <button data-a="label-v" title="Centre the selection on the label, top to bottom">CENTRE ON LABEL ↕</button>
+          <span class="dim" id="selcount"></span>
         </div>
         <div class="stage" id="stage">
           <div class="tape" id="tape">
@@ -100,12 +110,14 @@
             <div class="label" id="label">
               <img id="bitmap" alt="">
               <div class="gridlay" id="gridlay"></div>
+              <div id="guides"></div>
               <div id="boxes"></div>
             </div>
             <div class="feed r" id="feed-r"></div>
           </div>
         </div>
-        <p class="dim">Drag to move. Arrow keys nudge 1 dot (Shift: 10). Delete removes, Ctrl+D duplicates.
+        <p class="dim">Drag to move; lines show when something is centred on the label or lines up with another item (hold Alt to
+          drag without snapping). Shift+click selects several. Arrow keys nudge 1 dot (Shift: 10). Delete removes, Ctrl+D duplicates.
           The white band is the tape; hatching is the feed margin and the edges the head can't reach.</p>
         <div id="checks"></div>
       </div>
@@ -139,57 +151,42 @@
     </div>
   </section>
 
-  <!-- BATCH -->
+  <!-- DATA TABLE + BATCH -->
   <section id="tab-batch" class="tab" hidden>
+    <h2>DATA TABLE</h2>
+    <p class="dim">Each column is a field you can put in any text, barcode or QR as <span class="mono">{name}</span>.
+      Each row is one label. The <b>MAIN</b> column counts and orders the rows; the other columns follow it row by row
+      (row 3 of the IP goes with row 3 of the board number). Saved with the template.</p>
+    <div class="row datatools">
+      <button id="d-addcol">+ COLUMN</button>
+      <button id="d-addrow" title="Add a row for typed values">+ ROW</button>
+      <label class="btn" for="d-csv">IMPORT CSV…</label><input type="file" id="d-csv" accept=".csv,.txt,text/csv" hidden>
+      <button id="d-export">EXPORT CSV</button>
+      <span class="sep"></span>
+      <span class="lab">HOW MANY</span><input type="number" id="d-count" min="0" max="500" class="qty">
+      <label class="check"><input type="checkbox" id="d-advance"> carry on numbering after printing</label>
+      <span class="grow"></span>
+      <select id="d-tables" title="Tables saved for reuse"></select>
+      <button id="d-load">LOAD</button>
+      <button id="d-saveas">SAVE AS TABLE…</button>
+    </div>
+    <div class="gridwrap"><table id="dt"></table></div>
+    <p class="dim">Typed columns: paste straight from a spreadsheet into a cell to fill rows and columns from there.</p>
+
     <div class="cols">
-      <div class="col">
-        <h2>WHERE THE LABELS COME FROM</h2>
-        <div class="seg" id="b-source"><button data-v="range" class="on">NUMBERS</button><button data-v="csv">CSV FILE</button><button data-v="list">TYPED LIST</button></div>
-        <p class="dim">Saved with the template. Turn on BATCH under PRINT on the design tab to print this instead of one label.</p>
-
-        <div id="b-range" class="bsrc">
-          <div class="grid2">
-            <span class="lab">FIELD</span><select data-b="field" class="b-field"></select>
-            <span class="lab">PREAMBLE</span><input data-b="prefix" spellcheck="false" placeholder="e.g. PTC-">
-            <span class="lab">START AT</span><input type="number" data-b="start">
-            <span class="lab">HOW MANY</span><input type="number" data-b="count" min="1" max="500">
-            <span class="lab">STEP</span><input type="number" data-b="step">
-            <span class="lab">DIGITS</span><input type="number" data-b="digits" min="0" max="12">
-            <span class="lab">SUFFIX</span><input data-b="suffix" spellcheck="false">
-          </div>
-          <label class="check" style="margin-top:10px"><input type="checkbox" data-b="advance"> carry on numbering: after printing, the next batch starts where this one ended</label>
-        </div>
-
-        <div id="b-csv" class="bsrc" hidden>
-          <div class="row tight">
-            <select id="b-csvlist" class="grow"></select>
-            <label class="btn" for="b-csvfile">UPLOAD CSV…</label><input type="file" id="b-csvfile" accept=".csv,.txt,text/csv" hidden>
-          </div>
-          <p class="dim">The first row must name the columns. Comma, semicolon or tab separated.</p>
-          <h3>WHICH COLUMN FILLS WHICH FIELD</h3>
-          <div class="grid2" id="b-map"></div>
-          <div class="grid2" style="margin-top:8px">
-            <span class="lab">FROM ROW</span><input type="number" data-b="first_row" min="1">
-            <span class="lab">TO ROW</span><input type="number" data-b="last_row" min="0" placeholder="0 = last">
-          </div>
-          <div class="tablewrap short" id="b-head"></div>
-        </div>
-
-        <div id="b-list" class="bsrc" hidden>
-          <p class="dim" id="b-listhint"></p>
-          <textarea data-b="list" rows="14" spellcheck="false" class="mono"></textarea>
-        </div>
-      </div>
       <div class="col">
         <h2>THE BATCH</h2>
         <p id="b-count" class="big"></p>
-        <div class="thumbs">
-          <figure><figcaption class="lab">FIRST</figcaption><div class="thumb"><img id="b-first" alt=""></div></figure>
-          <figure><figcaption class="lab">LAST</figcaption><div class="thumb"><img id="b-last" alt=""></div></figure>
-        </div>
+        <div id="b-warn"></div>
         <div class="row">
           <span class="lab">COPIES EACH</span><input type="number" id="b-copies" min="1" max="20" value="1" class="qty">
           <button id="batch-print" class="accent bigbtn">PRINT BATCH</button>
+        </div>
+      </div>
+      <div class="col">
+        <div class="thumbs">
+          <figure><figcaption class="lab">FIRST</figcaption><div class="thumb"><img id="b-first" alt=""></div></figure>
+          <figure><figcaption class="lab">LAST</figcaption><div class="thumb"><img id="b-last" alt=""></div></figure>
         </div>
       </div>
     </div>
@@ -245,7 +242,7 @@
       <div class="col">
         <h2>COMMAND LINE (FOR PTC LATER)</h2>
         <pre class="mono code">~/apps/ql-labels.sh print my-template --set serial=PTC-00123
-~/apps/ql-labels.sh print my-template --batch            (its saved numbers / CSV / list)
+~/apps/ql-labels.sh print my-template --batch            (its data table)
 ~/apps/ql-labels.sh print my-template --batch --start 200 --count 50
 ~/apps/ql-labels.sh print my-template --csv serials.csv
 ~/apps/ql-labels.sh calibrate 10 6 4 --margin 0

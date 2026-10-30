@@ -131,7 +131,7 @@ $("#tabs").addEventListener("click", e => {
   const b = e.target.closest("button[data-tab]"); if (!b) return;
   $$("#tabs button[data-tab]").forEach(x => x.classList.toggle("on", x === b));
   $$("section.tab").forEach(s => { s.hidden = s.id !== "tab-" + b.dataset.tab; });
-  if (b.dataset.tab === "batch") { batchForm(); batchPreview(); }
+  if (b.dataset.tab === "batch") { listTables(); batchPreview(true); }
   if (b.dataset.tab === "printer") printerStatus(true);
   if (b.dataset.tab === "design") layout();
 });
@@ -194,7 +194,7 @@ function drawBoxes() {
   for (const b of last.boxes) {
     const e = tpl.elements.find(x => x.id === b.id); if (!e) continue;
     const d = document.createElement("div");
-    d.className = "el" + (b.id === sel ? " sel" : "") + (b.bad ? " bad" : "");
+    d.className = "el" + (b.id === sel ? " sel" : "") + (multi.has(b.id) && b.id !== sel ? " multi" : "") + (b.bad ? " bad" : "");
     d.dataset.id = b.id;
     // the element may have moved since this preview was made: place by the element, size by the preview
     Object.assign(d.style, { left: `${e.x * zoom}px`, top: `${e.y * zoom}px`, width: `${b.w * zoom}px`, height: `${b.h * zoom}px` });
@@ -212,41 +212,150 @@ function drawChecks() {
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
-// ---------------------------------------------------------------- dragging & keys
+// ---------------------------------------------------------------- selecting, dragging, smart guides, keys
 let drag = null;
+const multi = new Set();      // more selected items besides `sel` (Shift+click)
+const selected = () => sel ? [sel, ...[...multi].filter(id => id !== sel)] : [];
+const boxOf = id => {         // size from the last preview, position from the element (it may have moved since)
+  const e = tpl.elements.find(x => x.id === id), b = last && last.boxes.find(x => x.id === id);
+  return e && b ? { x: e.x, y: e.y, w: b.w, h: b.h } : null;
+};
+function groupBox(ids) {
+  const bs = ids.map(boxOf).filter(Boolean); if (!bs.length) return null;
+  const x = Math.min(...bs.map(b => b.x)), y = Math.min(...bs.map(b => b.y));
+  return { x, y, w: Math.max(...bs.map(b => b.x + b.w)) - x, h: Math.max(...bs.map(b => b.y + b.h)) - y };
+}
+
+// Snap the moving box to the label's centre/edges and other items' centres/edges; returns the shift and the guides.
+function snap(box, ids, free) {
+  const out = { dx: 0, dy: 0, guides: [] };
+  if (free || !$("#snap").checked || !last) return out;
+  const tol = 6 / zoom;
+  const xs = [{ v: last.w / 2, label: true }, { v: 0, label: true }, { v: last.w, label: true }];
+  const ys = [{ v: last.h / 2, label: true }, { v: 0, label: true }, { v: last.h, label: true }];
+  for (const e of tpl.elements) {
+    if (ids.includes(e.id)) continue;
+    const b = boxOf(e.id); if (!b) continue;
+    xs.push({ v: b.x }, { v: b.x + b.w / 2 }, { v: b.x + b.w });
+    ys.push({ v: b.y }, { v: b.y + b.h / 2 }, { v: b.y + b.h });
+  }
+  const best = (anchors, lines) => {
+    let hit = null;
+    for (const a of anchors) for (const l of lines) {
+      const d = l.v - a;
+      if (Math.abs(d) <= tol && (!hit || Math.abs(d) < Math.abs(hit.d) || (Math.abs(d) === Math.abs(hit.d) && l.label))) hit = { d, l };
+    }
+    return hit;
+  };
+  const hx = best([box.x, box.x + box.w / 2, box.x + box.w], xs);
+  const hy = best([box.y, box.y + box.h / 2, box.y + box.h], ys);
+  if (hx) { out.dx = Math.round(hx.d); out.guides.push({ dir: "v", at: hx.l.v, label: !!hx.l.label }); }
+  if (hy) { out.dy = Math.round(hy.d); out.guides.push({ dir: "h", at: hy.l.v, label: !!hy.l.label }); }
+  return out;
+}
+function drawGuides(guides) {
+  $("#guides").innerHTML = guides.map(g => `<div class="g ${g.dir} ${g.label ? "label" : "item"}" style="${g.dir === "v" ? "left" : "top"}:${g.at * zoom}px"></div>`).join("");
+}
+// guides for where the selection sits now: shown briefly after a nudge or an align
+let guideTimer;
+function flashGuides() {
+  const ids = selected(), b = groupBox(ids); if (!b) return;
+  const tol = 0.5, gs = [];
+  if (Math.abs(b.x + b.w / 2 - last.w / 2) <= tol) gs.push({ dir: "v", at: last.w / 2, label: true });
+  if (Math.abs(b.y + b.h / 2 - last.h / 2) <= tol) gs.push({ dir: "h", at: last.h / 2, label: true });
+  for (const e of tpl.elements) {
+    if (ids.includes(e.id)) continue;
+    const o = boxOf(e.id); if (!o) continue;
+    if ([o.x, o.x + o.w / 2, o.x + o.w].some(v => [b.x, b.x + b.w / 2, b.x + b.w].some(a => Math.abs(a - v) <= tol))) {
+      const v = [o.x, o.x + o.w / 2, o.x + o.w].find(v => [b.x, b.x + b.w / 2, b.x + b.w].some(a => Math.abs(a - v) <= tol)); gs.push({ dir: "v", at: v });
+    }
+    if ([o.y, o.y + o.h / 2, o.y + o.h].some(v => [b.y, b.y + b.h / 2, b.y + b.h].some(a => Math.abs(a - v) <= tol))) {
+      const v = [o.y, o.y + o.h / 2, o.y + o.h].find(v => [b.y, b.y + b.h / 2, b.y + b.h].some(a => Math.abs(a - v) <= tol)); gs.push({ dir: "h", at: v });
+    }
+  }
+  drawGuides(gs);
+  clearTimeout(guideTimer); guideTimer = setTimeout(() => drawGuides([]), 900);
+}
+
 $("#boxes").addEventListener("pointerdown", e => {
   const d = e.target.closest(".el"); if (!d) return;
   e.preventDefault();
-  select(d.dataset.id);
-  const el = tpl.elements.find(x => x.id === sel);
-  drag = { x: e.clientX, y: e.clientY, ex: el.x, ey: el.y, el, node: $(`.el[data-id="${sel}"]`) };
-  drag.node.setPointerCapture(e.pointerId);
+  const id = d.dataset.id;
+  if (e.shiftKey && sel) {                       // add to / take out of the selection
+    if (id === sel) { const rest = selected().slice(1); sel = rest[0] || null; multi.clear(); rest.slice(1).forEach(x => multi.add(x)); }
+    else if (multi.has(id)) multi.delete(id); else multi.add(id);
+    markSelection(); drawProps(); return;
+  }
+  if (!selected().includes(id)) select(id);
+  const ids = selected();
+  drag = { x: e.clientX, y: e.clientY, ids, start: Object.fromEntries(ids.map(i => { const el = tpl.elements.find(x => x.id === i); return [i, [el.x, el.y]]; })),
+    box: groupBox(ids), node: d };
+  d.setPointerCapture(e.pointerId);
 });
 document.addEventListener("pointermove", e => {
   if (!drag) return;
-  drag.el.x = Math.round(drag.ex + (e.clientX - drag.x) / zoom);
-  drag.el.y = Math.round(drag.ey + (e.clientY - drag.y) / zoom);
-  drag.node.style.left = `${drag.el.x * zoom}px`; drag.node.style.top = `${drag.el.y * zoom}px`;
-  $(".tag", drag.node).textContent = `${NAMES[drag.el.type]}  ${drag.el.x}, ${drag.el.y}`;
+  let dx = Math.round((e.clientX - drag.x) / zoom), dy = Math.round((e.clientY - drag.y) / zoom);
+  const s = drag.box ? snap({ ...drag.box, x: drag.box.x + dx, y: drag.box.y + dy }, drag.ids, e.altKey) : { dx: 0, dy: 0, guides: [] };
+  dx += s.dx; dy += s.dy;
+  drawGuides(s.guides);
+  for (const id of drag.ids) {
+    const el = tpl.elements.find(x => x.id === id), [sx, sy] = drag.start[id];
+    el.x = sx + dx; el.y = sy + dy;
+    const node = $(`.el[data-id="${id}"]`);
+    if (node) { node.style.left = `${el.x * zoom}px`; node.style.top = `${el.y * zoom}px`; $(".tag", node).textContent = `${NAMES[el.type]}  ${el.x}, ${el.y}`; }
+  }
   refresh();
 });
-document.addEventListener("pointerup", () => { if (drag) { drag = null; changed(); drawProps(); } });
+document.addEventListener("pointerup", () => { if (drag) { drag = null; drawGuides([]); changed(); drawProps(); } });
 $("#stage").addEventListener("pointerdown", e => { if (!e.target.closest(".el")) select(null); });
 
 document.addEventListener("keydown", e => {
   if (!sel || e.target.matches("input, textarea, select")) return;
-  const el = tpl.elements.find(x => x.id === sel); if (!el) return;
   const step = e.shiftKey ? 10 : 1;
   const mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-  if (mv) { e.preventDefault(); el.x += mv[0]; el.y += mv[1]; changed(); drawProps(); return; }
-  if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); remove(sel); }
+  if (mv) {
+    e.preventDefault();
+    for (const id of selected()) { const el = tpl.elements.find(x => x.id === id); if (el) { el.x += mv[0]; el.y += mv[1]; } }
+    changed(); drawProps(); flashGuides(); return;
+  }
+  if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); removeSelected(); }
   if (e.key.toLowerCase() === "d" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); duplicate(sel); }
 });
 
 function select(id) {
-  sel = id;
-  $$("#boxes .el").forEach(d => d.classList.toggle("sel", d.dataset.id === id));
-  drawProps();
+  sel = id; multi.clear();
+  markSelection(); drawProps();
+}
+function markSelection() {
+  $$("#boxes .el").forEach(d => { d.classList.toggle("sel", d.dataset.id === sel); d.classList.toggle("multi", multi.has(d.dataset.id) && d.dataset.id !== sel); });
+  const n = selected().length;
+  $("#selcount").textContent = n > 1 ? `${n} selected: lining up with each other` : n ? "1 selected: lining up on the label" : "";
+}
+
+// align: several items to each other, or one (or a group) on the label
+$("#align").addEventListener("click", e => {
+  const a = e.target.closest("button")?.dataset.a; if (!a || !last) return;
+  const ids = selected(); if (!ids.length) return say("Select something first (Shift+click for several).", true);
+  const g = groupBox(ids);
+  const ref = ids.length > 1 && !a.startsWith("label") ? g : { x: 0, y: 0, w: last.w, h: last.h };
+  if (a === "label-h" || a === "label-v") {   // move the whole selection, keeping its layout
+    const dx = a === "label-h" ? Math.round(last.w / 2 - (g.x + g.w / 2)) : 0, dy = a === "label-v" ? Math.round(last.h / 2 - (g.y + g.h / 2)) : 0;
+    ids.forEach(id => { const el = tpl.elements.find(x => x.id === id); el.x += dx; el.y += dy; });
+  } else {
+    for (const id of ids) {
+      const el = tpl.elements.find(x => x.id === id), b = boxOf(id); if (!b) continue;
+      if (a === "left") el.x = ref.x;
+      if (a === "hcenter") el.x = Math.round(ref.x + ref.w / 2 - b.w / 2);
+      if (a === "right") el.x = ref.x + ref.w - b.w;
+      if (a === "top") el.y = ref.y;
+      if (a === "vcenter") el.y = Math.round(ref.y + ref.h / 2 - b.h / 2);
+      if (a === "bottom") el.y = ref.y + ref.h - b.h;
+    }
+  }
+  changed(); drawProps(); setTimeout(flashGuides, 50);
+});
+function removeSelected() {
+  const ids = selected(); tpl.elements = tpl.elements.filter(e => !ids.includes(e.id)); sel = null; multi.clear(); changed(); drawProps();
 }
 
 // ---------------------------------------------------------------- elements
@@ -281,7 +390,7 @@ function freeSpot(w, h) {
       if (!hit(x, y)) return [x, y];
   return [10, 10];
 }
-function remove(id) { tpl.elements = tpl.elements.filter(e => e.id !== id); sel = null; changed(); drawProps(); }
+function remove(id) { tpl.elements = tpl.elements.filter(e => e.id !== id); sel = null; multi.clear(); changed(); drawProps(); }
 function duplicate(id) {
   const src = tpl.elements.find(e => e.id === id); if (!src) return;
   const el = { ...structuredClone(src), id: uid(), x: src.x + 10, y: src.y + 10 };
@@ -409,7 +518,7 @@ async function listTemplates(select) {
 }
 function use(t) {
   tpl = { ...blank(), ...t };
-  nextId = 1; sel = null;
+  nextId = 1; sel = null; multi.clear();
   $("#tpl-name").value = tpl.name;
   tpl.margin = Math.max(35, tpl.margin ?? 35);   // the printer won't feed less than 35 dots (~3 mm) per page
   kLength.set(tpl.length_mm); kMargin.set(tpl.margin); setCut(tpl.cut); setAcross(tpl.across ? "1" : "0");
@@ -417,8 +526,8 @@ function use(t) {
   mediaNote(); stripUI();
   $("#flip").checked = !!tpl.flip;
   $("#fields").dataset.key = "";
-  tpl.batch = { ...BATCH, ...(tpl.batch || {}) };
-  drawProps(); changed(); batchSummary();
+  batch = null; D();
+  drawProps(); changed(); batchPreview(!$("#tab-batch").hidden);
 }
 $("#tpl-list").addEventListener("change", async e => {
   if (!e.target.value) return;
@@ -450,93 +559,210 @@ async function doPrint(rows, copies, btn) {
   btn.disabled = false; btn.textContent = old;
   printerStatus(true);
 }
-$("#print").addEventListener("click", e => B().on ? printBatch(e.target, +$("#copies").value || 1) : doPrint([{}], +$("#copies").value || 1, e.target));
+$("#print").addEventListener("click", e => D().on ? printBatch(e.target, +$("#copies").value || 1) : doPrint([{}], +$("#copies").value || 1, e.target));
 
-// ---------------------------------------------------------------- batch
-const BATCH = { on: false, source: "range", field: "serial", prefix: "PTC-", suffix: "", start: 1, count: 10, step: 1,
-  digits: 5, advance: true, csv: "", map: {}, first_row: 1, last_row: 0, list: "" };
-const B = () => (tpl.batch = { ...BATCH, ...(tpl.batch || {}) });
-const setMode = seg($("#mode"), "single", v => { B().on = v === "batch"; changed(false); batchSummary(); });
-const setSource = seg($("#b-source"), "range", v => { B().source = v; batchForm(); batchPreview(); changed(false); });
+// ---------------------------------------------------------------- data table + batch (see qllabel/data.py)
+const MODE_NAMES = { sequence: "Sequence (001, 002…)", ip: "IP address (counts up)", fixed: "Same on every label", manual: "Typed / from CSV" };
+const D = () => {
+  if (!(tpl.data && tpl.data.columns) && tpl.batch && (tpl.batch.source || "range") === "range") {   // older one-field batch
+    const o = tpl.batch, f = o.field || "num";
+    tpl.data = { on: !!o.on, main: f, count: o.count ?? 10, advance: o.advance !== false, rows: [],
+      columns: [{ name: f, mode: "sequence", prefix: o.prefix || "", start: o.start ?? 1, step: o.step || 1, digits: o.digits ?? 3, suffix: o.suffix || "" }] };
+    delete tpl.batch;
+  }
+  const d = (tpl.data = tpl.data && tpl.data.columns ? tpl.data : { on: false, main: "num", count: 10, advance: true, columns: [], rows: [] });
+  d.rows = d.rows || [];
+  return d;
+};
+let batch = null;            // last /api/batch reply: {count, rows, warnings, data}
+const setMode = seg($("#mode"), "single", v => { D().on = v === "batch"; changed(false); batchSummary(); });
+const colDefaults = { sequence: { prefix: "", start: 1, step: 1, digits: 3, suffix: "" }, ip: { start: "10.0.0.1", step: 1 }, fixed: { value: "" }, manual: {} };
 
-function batchForm() {
-  const b = B(), names = (last && last.fields) || [];
-  setSource(b.source);
-  $$(".bsrc").forEach(d => { d.hidden = d.id !== "b-" + b.source; });
-  $$("#tab-batch [data-b]").forEach(i => {
-    const v = b[i.dataset.b];
-    if (i.type === "checkbox") i.checked = !!v; else if (i.tagName !== "SELECT") i.value = v ?? "";
-  });
-  $$(".b-field").forEach(s => {
-    s.innerHTML = (names.length ? names : [b.field]).map(n => `<option${n === b.field ? " selected" : ""}>${esc(n)}</option>`).join("");
-    if (!names.includes(b.field) && names.length) { b.field = names[0]; s.value = b.field; }
-  });
-  $("#b-listhint").textContent = names.length > 1
-    ? `One label per line: ${names.map(n => "{" + n + "}").join(", ")}, separated by a comma or a tab.`
-    : names.length ? `One {${names[0]}} per line.` : "This template has no {fields}; each line prints the same label.";
-  if (b.source === "csv") csvForm();
+function renderGrid() {
+  const d = D(), used = new Set((last && last.fields) || []);
+  const rowsShown = Math.max(batch ? batch.count : 0, d.rows.length) + (mainCol()?.mode === "manual" ? 1 : 0);
+  const head = `<tr><th class="rn">#</th>${d.columns.map((c, ci) => {
+    const set = c.mode === "sequence" ? `<div class="set"><span>BEFORE</span><input data-k="prefix" value="${esc(c.prefix ?? "")}"><span>START</span><input type="number" data-k="start" value="${esc(c.start)}">
+        <span>STEP</span><input type="number" data-k="step" value="${esc(c.step)}"><span>DIGITS</span><input type="number" data-k="digits" min="0" max="12" value="${esc(c.digits)}"><span>AFTER</span><input data-k="suffix" value="${esc(c.suffix ?? "")}"></div>`
+      : c.mode === "ip" ? `<div class="set"><span>FIRST</span><input data-k="start" value="${esc(c.start)}" placeholder="10.0.1.11"><span>STEP</span><input type="number" data-k="step" value="${esc(c.step)}"></div>`
+      : c.mode === "fixed" ? `<div class="set"><span>VALUE</span><input data-k="value" value="${esc(c.value ?? "")}"></div>` : "";
+    return `<th data-ci="${ci}" class="${c.name === d.main ? "main" : ""}">
+      <div class="hrow"><input class="nm" data-k="name" value="${esc(c.name)}" title="Use it on the label as {${esc(c.name)}}">
+        <button class="x" data-del="${ci}" title="Remove this column">✕</button></div>
+      <div class="hrow"><label class="mainpick" title="The main column counts and orders the rows; the others follow it"><input type="radio" name="d-main" data-main="${ci}"${c.name === d.main ? " checked" : ""}> MAIN</label>
+        <select data-k="mode">${Object.entries(MODE_NAMES).map(([k, n]) => `<option value="${k}"${k === c.mode ? " selected" : ""}>${n}</option>`).join("")}</select></div>
+      ${set}${used.has(c.name) ? "" : `<div class="unused">not on the label yet</div>`}</th>`;
+  }).join("")}</tr>`;
+  let body = "";
+  for (let r = 0; r < Math.min(rowsShown, 500); r++) {
+    const extra = batch && r >= batch.count;
+    body += `<tr class="${extra ? "extra" : ""}"><td class="rn">${r + 1}</td>` + d.columns.map((c, ci) => {
+      if (c.mode === "manual") {
+        const v = (d.rows[r] || {})[c.name] ?? "";
+        return `<td class="${!extra && !String(v).trim() ? "miss" : ""}"><input data-r="${r}" data-c="${ci}" value="${esc(v)}" spellcheck="false"></td>`;
+      }
+      return `<td class="calc" data-r="${r}" data-c="${ci}">${extra ? "" : esc(batch?.rows[r]?.[c.name] ?? "")}</td>`;
+    }).join("") + `</tr>`;
+  }
+  $("#dt").innerHTML = head + body;
+  $("#d-count").value = d.count; $("#d-advance").checked = d.advance !== false;
+  $("#d-count").disabled = mainCol()?.mode === "manual";
+  $("#d-count").title = mainCol()?.mode === "manual" ? "The main column is typed: one label per filled row" : "";
 }
-$$("#tab-batch [data-b]").forEach(i => i.addEventListener("input", () => {
-  const b = B(), k = i.dataset.b;
-  b[k] = i.type === "checkbox" ? i.checked : i.type === "number" ? (parseInt(i.value, 10) || 0) : i.value;
-  changed(false); batchPreviewSoon();
-}));
+const mainCol = () => D().columns.find(c => c.name === D().main);
 
-async function csvForm() {
-  const b = B();
-  try {
-    const r = await api("api/csvs");
-    $("#b-csvlist").innerHTML = `<option value="">(pick a CSV)</option>` + r.csvs.map(n => `<option${n === b.csv ? " selected" : ""}>${esc(n)}</option>`).join("");
-  } catch (e) { say(e.message, true); }
-  if (!b.csv) { $("#b-map").innerHTML = ""; $("#b-head").innerHTML = ""; return; }
-  let info;
-  try { info = await api("api/csv?name=" + encodeURIComponent(b.csv)); } catch (e) { say(e.message, true); return; }
-  const names = (last && last.fields) || [];
-  $("#b-map").innerHTML = names.map(n => {
-    const cur = b.map[n] || info.columns.find(c => c.toLowerCase() === n.toLowerCase()) || "";
-    return `<span class="lab">{${esc(n)}}</span><select data-map="${esc(n)}"><option value="">(choose)</option>${info.columns.map(c => `<option${c === cur ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>`;
-  }).join("") || `<span class="dim" style="grid-column:1/3">The template has no {fields} to fill.</span>`;
-  $$("#b-map select").forEach(s => s.addEventListener("change", () => { b.map[s.dataset.map] = s.value; changed(false); batchPreview(); }));
-  $("#b-head").innerHTML = `<table><tr>${info.columns.map(c => `<th>${esc(c)}</th>`).join("")}</tr>` +
-    info.head.map(r => `<tr>${info.columns.map(c => `<td>${esc(r[c] ?? "")}</td>`).join("")}</tr>`).join("") + `</table>` +
-    `<p class="dim">${info.count} rows in ${esc(info.csv)}${info.count > 5 ? " (first 5 shown)" : ""}</p>`;
-}
-$("#b-csvlist").addEventListener("change", e => { B().csv = e.target.value; B().map = {}; changed(false); csvForm(); batchPreview(); });
-$("#b-csvfile").addEventListener("change", async e => {
-  const f = e.target.files[0]; if (!f) return;
-  try {
-    const r = await api("api/upload_csv", { name: f.name.replace(/[^\w .-]/g, "_"), text: await f.text() });
-    B().csv = r.csv; B().map = {}; changed(false); await csvForm(); batchPreview();
-    say(`Loaded ${r.csv}: ${r.count} rows, columns ${r.columns.join(", ")}.`);
-  } catch (x) { say(x.message, true); }
-  e.target.value = "";
+// header edits (name, mode, sequence settings), main radio, delete
+$("#dt").addEventListener("change", e => {
+  const d = D(), th = e.target.closest("th[data-ci]");
+  if (e.target.dataset.main !== undefined) { d.main = d.columns[+e.target.dataset.main].name; dataChanged(true); return; }
+  if (!th) return;
+  const c = d.columns[+th.dataset.ci], k = e.target.dataset.k;
+  if (k === "name") {
+    const nv = e.target.value.trim().replace(/\W/g, "_");
+    if (!nv || d.columns.some(x => x !== c && x.name === nv)) { say("Column names must be different, letters, digits and _ only.", true); e.target.value = c.name; return; }
+    d.rows.forEach(r => { if (c.name in r) { r[nv] = r[c.name]; delete r[c.name]; } });
+    if (d.main === c.name) d.main = nv;
+    c.name = nv; dataChanged(true); return;
+  }
+  if (k === "mode") {
+    const keep = { name: c.name, mode: e.target.value };
+    Object.keys(c).forEach(x => delete c[x]); Object.assign(c, keep, colDefaults[keep.mode]);
+    dataChanged(true); return;
+  }
+  if (k) { c[k] = e.target.type === "number" ? (parseInt(e.target.value, 10) || 0) : e.target.value; dataChanged(false); }
+});
+$("#dt").addEventListener("click", e => {
+  const del = e.target.closest("[data-del]"); if (!del) return;
+  const d = D(), c = d.columns[+del.dataset.del];
+  if (!confirm(`Remove the column {${c.name}}?`)) return;
+  d.columns.splice(+del.dataset.del, 1);
+  if (d.main === c.name) d.main = d.columns[0]?.name || "";
+  dataChanged(true);
+});
+// typed cells, and pasting a block from a spreadsheet
+$("#dt").addEventListener("input", e => {
+  const i = e.target; if (i.dataset.r === undefined) return;
+  const d = D(), r = +i.dataset.r, c = d.columns[+i.dataset.c];
+  while (d.rows.length <= r) d.rows.push({});
+  d.rows[r][c.name] = i.value;
+  i.parentElement.classList.toggle("miss", !i.value.trim());
+  dataChanged(false, r >= (batch?.count ?? 0));
+});
+$("#dt").addEventListener("paste", e => {
+  const i = e.target; if (i.dataset.r === undefined) return;
+  const text = (e.clipboardData || window.clipboardData).getData("text");
+  if (!/[\t\n]/.test(text.trim())) return;
+  e.preventDefault();
+  const d = D(), r0 = +i.dataset.r, manual = d.columns.map((c, ci) => ci).filter(ci => d.columns[ci].mode === "manual" && ci >= +i.dataset.c);
+  text.replace(/\r/g, "").replace(/\n$/, "").split("\n").forEach((line, dr) => {
+    while (d.rows.length <= r0 + dr) d.rows.push({});
+    line.split("\t").forEach((v, dc) => { if (dc < manual.length) d.rows[r0 + dr][d.columns[manual[dc]].name] = v.trim(); });
+  });
+  dataChanged(true);
 });
 
-let bpTimer;
-function batchPreviewSoon() { clearTimeout(bpTimer); bpTimer = setTimeout(batchPreview, 300); }
-async function batchPreview() {
-  if ($("#tab-batch").hidden) return batchSummary();
+$("#d-addcol").addEventListener("click", () => {
+  const d = D(); let n = d.columns.length + 1, name;
+  do { name = "field" + n++; } while (d.columns.some(c => c.name === name));
+  d.columns.push({ name, mode: "manual" });
+  if (!d.main) d.main = name;
+  dataChanged(true);
+});
+$("#d-addrow").addEventListener("click", () => { D().rows.push({}); dataChanged(true); });
+$("#d-count").addEventListener("input", e => { D().count = Math.max(0, Math.min(500, parseInt(e.target.value, 10) || 0)); dataChanged(false, true); });
+$("#d-advance").addEventListener("change", e => { D().advance = e.target.checked; changed(false); });
+
+// CSV in and out
+function parseCSV(text) {
+  const rows = []; let row = [], f = "", q = false;
+  const delim = (text.split("\n")[0].match(/;/g) || []).length > (text.split("\n")[0].match(/,/g) || []).length ? ";" : text.split("\n")[0].includes("\t") ? "\t" : ",";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === delim) { row.push(f); f = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += ch;
+  }
+  if (f || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim()));
+}
+$("#d-csv").addEventListener("change", async e => {
+  const file = e.target.files[0]; if (!file) return;
+  const rows = parseCSV((await file.text()).replace(/^﻿/, ""));
+  e.target.value = "";
+  if (rows.length < 2) return say("That CSV has no rows under its header.", true);
+  const d = D(), head = rows[0].map(h => h.trim().replace(/\W/g, "_"));
+  head.forEach(h => {   // columns by name: existing ones become typed, new ones are added
+    const c = d.columns.find(x => x.name === h);
+    if (c) { Object.keys(c).forEach(x => x !== "name" && delete c[x]); c.mode = "manual"; } else if (h) d.columns.push({ name: h, mode: "manual" });
+  });
+  d.rows = rows.slice(1).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] ?? "").trim()]).filter(([h]) => h)));
+  if (!d.columns.some(c => c.name === d.main)) d.main = head[0];
+  dataChanged(true);
+  say(`Imported ${d.rows.length} rows: ${head.join(", ")}. Check which column is MAIN.`);
+});
+$("#d-export").addEventListener("click", () => {
+  if (!batch) return;
+  const cols = D().columns.map(c => c.name), q = v => /[",\n]/.test(v) ? `"${String(v).replace(/"/g, '""')}"` : v;
+  const csv = [cols.join(","), ...batch.rows.map(r => cols.map(c => q(r[c] ?? "")).join(","))].join("\n") + "\n";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  a.download = `${tpl.name || "labels"}-data.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+
+// saved tables, to reuse in other templates
+async function listTables() {
+  try { const r = await api("api/tables"); $("#d-tables").innerHTML = `<option value="">(saved tables)</option>` + r.tables.map(t => `<option>${esc(t)}</option>`).join(""); }
+  catch (e) { /* not fatal */ }
+}
+$("#d-load").addEventListener("click", async () => {
+  const n = $("#d-tables").value; if (!n) return;
+  try { const t = await api("api/table?name=" + encodeURIComponent(n)); Object.assign(D(), t); dataChanged(true); say(`Loaded the table “${n}”.`); }
+  catch (e) { say(e.message, true); }
+});
+$("#d-saveas").addEventListener("click", async () => {
+  const n = prompt("Save this table as:", tpl.name ? tpl.name + "-data" : ""); if (!n) return;
+  try { await api("api/save_table", { name: n.trim(), data: D() }); await listTables(); say(`Saved the table “${n}”.`); }
+  catch (e) { say(e.message, true); }
+});
+
+let dpTimer;
+function dataChanged(structure, recount = false) {
+  changed(false);
+  if (structure) renderGrid();
+  clearTimeout(dpTimer); dpTimer = setTimeout(() => batchPreview(structure || recount), structure ? 0 : 350);
+}
+async function batchPreview(regrid = true) {
   try {
-    const info = await api("api/batch", { template: tpl });
-    $("#b-count").textContent = `${info.count} label${info.count === 1 ? "" : "s"}`;
-    for (const [id, row] of [["#b-first", info.first[0]], ["#b-last", info.last]]) {
-      const img = $(id);
-      if (!row) { img.removeAttribute("src"); continue; }
-      const r = await api("api/preview", { template: tpl, values: row });
-      img.src = "data:image/png;base64," + r.png; img.style.width = `${r.w}px`;
-    }
-  } catch (e) { $("#b-count").textContent = e.message; }
+    batch = await api("api/batch", { template: tpl });
+    // the server adds a column for any {field} on the label that has none yet
+    const d = D();
+    if (!d.columns.length) { Object.assign(d, batch.data); regrid = true; }
+    for (const c of batch.data.columns) if (!d.columns.some(x => x.name === c.name)) { d.columns.push(c); regrid = true; }
+    if (!d.main) d.main = batch.data.main;
+  } catch (e) { batch = null; $("#b-count").textContent = e.message; }
+  if (regrid) renderGrid(); else if (batch) $$("#dt td.calc").forEach(td => { td.textContent = batch.rows[+td.dataset.r]?.[D().columns[+td.dataset.c].name] ?? ""; });
+  if (!batch) return batchSummary();
+  $("#b-count").textContent = `${batch.count} label${batch.count === 1 ? "" : "s"}` + (batch.count ? `  ·  decode checked on rows ${batch.checked.join(", ")}` : "");
+  $("#b-warn").innerHTML = batch.warnings.map(w => `<div class="chk">${esc(w)}</div>`).join("");
+  for (const [id, row] of [["#b-first", batch.first[0]], ["#b-last", batch.last]]) {
+    const img = $(id);
+    if (!row) { img.removeAttribute("src"); continue; }
+    try { const r = await api("api/preview", { template: tpl, values: row }); img.src = "data:image/png;base64," + r.png; img.style.width = `${r.w}px`; }
+    catch (e) { /* the design tab shows render errors */ }
+  }
   batchSummary();
 }
 async function batchSummary() {
-  const b = B();
-  setMode(b.on ? "batch" : "single");
-  if (!b.on) { $("#batch-sum").textContent = "Prints the label as shown, with the test values above."; return; }
+  const d = D();
+  setMode(d.on ? "batch" : "single");
+  if (!d.on) { $("#batch-sum").textContent = "Prints the label as shown, with the test values above."; return; }
   try {
-    const info = await api("api/batch", { template: tpl });
-    const show = r => r ? Object.values(r).join(" / ") : "";
-    $("#batch-sum").textContent = `${info.count} labels from ${{ range: "numbers", csv: b.csv || "a CSV", list: "the typed list" }[b.source]}: ` +
-      `${show(info.first[0])}${info.count > 1 ? " … " + show(info.last) : ""}. Set it up on the BATCH PRINT tab.`;
+    const info = batch || await api("api/batch", { template: tpl });
+    const show = r => r ? r[d.main] ?? Object.values(r)[0] : "";
+    $("#batch-sum").textContent = `${info.count} labels from the data table (main {${d.main}}): ` +
+      `${show(info.first[0])}${info.count > 1 ? " … " + show(info.last) : ""}. Edit it on the DATA & BATCH tab.`;
   } catch (e) { $("#batch-sum").textContent = e.message; }
 }
 
@@ -550,8 +776,8 @@ async function printBatch(btn, copies) {
     const r = await api("api/print_batch", { template: tpl, copies });
     const what = `${r.labels} labels` + (r.strips ? ` on ${r.strips} strip(s)` : "");
     let m = r.dry_run ? `Dry run: ${what} written to ${r.dry_run}.` : `Printed ${what}.`;
-    if (r.next_start !== undefined) {
-      B().start = r.next_start; changed(false); batchForm();
+    if (r.data) {
+      D().columns = r.data.columns; changed(false);
       m += ` Next batch starts at ${r.next_start}` + (r.advanced ? ` (saved in “${r.advanced}”).` : " (save the template to keep it).");
     }
     say(m);

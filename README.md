@@ -17,8 +17,13 @@ label length are whatever we send. Stand-alone for now; meant to be called from 
   optionally with readable text beside the code;
   every barcode is decoded back from the bitmap before printing and the job is refused if one doesn't read.
 - `qllabel/station.py`, `server.py`, `static/`  the web designer; `/colors` is the colour designer.
-- Batches (saved per template): a number range with preamble/suffix/digits that can carry on numbering, a CSV
-  (uploaded on the batch tab, columns mapped to {fields}), or a typed list. `print NAME --batch` prints it.
+- Data table (saved per template, `qllabel/data.py`): columns are {fields}; modes sequence (prefix/start/step/digits),
+  IP address (counts up, carries into the next octet), fixed, typed (or imported CSV). The MAIN column counts and orders
+  the rows, the others follow row by row. "Carry on numbering" advances every sequence after printing. Tables can be
+  saved by name (<data>/tables/) and loaded into another template. Old one-field "batch" templates migrate on load.
+  `print NAME --batch [--start N --count N] [--set field=value]`.
+- Designer: smart guides snap to the label centre/edges and other items' centres/edges while dragging (Alt = free);
+  Shift+click multi-select; ALIGN bar (edges/centres to each other, or centre on the label).
 - Media: every Brother roll the QL-810W takes (continuous 12-62 mm, die-cut, round; `printer.MEDIA`). A template
   names its roll in "media"; the printer must report that roll loaded or the job is refused. Continuous = any length
   (up to 1 m), die-cut = the label size. "across": true makes text read across the tape (e.g. 29 x 10 mm labels).

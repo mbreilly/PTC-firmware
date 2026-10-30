@@ -72,7 +72,8 @@ def make_handler(st: Station):
             routes = {"/api/status": st.status, "/api/templates": st.templates,
                       "/api/template": lambda: st.load(q.get("name", "")),
                       "/api/media": R.media_list, "/api/images": st.images, "/api/csvs": st.csvs,
-                      "/api/csv": lambda: st.csv_info(q.get("name", ""))}
+                      "/api/csv": lambda: st.csv_info(q.get("name", "")),
+                      "/api/tables": st.tables, "/api/table": lambda: st.load_table(q.get("name", ""))}
             if path in routes:
                 return self._run(routes[path])
             self._send(404, b"not found", "text/plain")
@@ -85,6 +86,7 @@ def make_handler(st: Station):
                 "/api/delete": lambda b: st.delete(b.get("name", "")),
                 "/api/print": lambda b: st.print_rows(b["template"], b.get("rows"), b.get("copies", 1)),
                 "/api/print_batch": lambda b: st.print_batch(b["template"], b.get("copies", 1)),
+                "/api/save_table": lambda b: st.save_table(b.get("name", ""), b.get("data") or {}),
                 "/api/batch": lambda b: st.batch_info(b["template"]),
                 "/api/image": lambda b: st.upload_image(b.get("name", ""), b["png"]),
                 "/api/upload_csv": lambda b: st.upload_csv(b.get("name", ""), b.get("text", "")),

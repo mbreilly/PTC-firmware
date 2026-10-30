@@ -10,6 +10,7 @@ import threading
 import time
 from pathlib import Path
 
+from . import data as D
 from . import render as R
 from .printer import JobOptions, Printer, PrinterError
 
@@ -17,9 +18,6 @@ DATA = Path.home() / "ql-labels-data"
 NAME_OK = re.compile(r"^[\w .-]{1,60}$")
 MAX_BATCH = 500
 MIN_MARGIN = 35
-BATCH_DEFAULT = {"on": False, "source": "range", "field": "serial", "prefix": "PTC-", "suffix": "", "start": 1,
-                 "count": 10, "step": 1, "digits": 5, "advance": True, "csv": "", "map": {}, "first_row": 1,
-                 "last_row": 0, "list": ""}
 
 
 def png_b64(img) -> str:
@@ -34,7 +32,8 @@ class Station:
         self.tdir = data / "templates"
         self.idir = data / "images"
         self.cdir = data / "csv"
-        for d in (self.tdir, self.idir, self.cdir):
+        self.bdir = data / "tables"
+        for d in (self.tdir, self.idir, self.cdir, self.bdir):
             d.mkdir(parents=True, exist_ok=True)
         R.IMAGES = self.idir
         self.load_bleed()
@@ -69,10 +68,12 @@ class Station:
         f = self._tfile(name)
         if not f.exists():
             raise ValueError(f"No template called {name!r}.")
-        return {**R.DEFAULT, **json.loads(f.read_text()), "name": name}
+        return D.migrate({**R.DEFAULT, **json.loads(f.read_text()), "name": name}, self.csv_rows)
 
     def save(self, tpl: dict) -> dict:
         f = self._tfile(tpl.get("name", ""))
+        D.migrate(tpl, self.csv_rows)
+        D.check(tpl["data"])
         f.write_text(json.dumps(tpl, indent=1))
         return {"saved": f.stem}
 
@@ -159,58 +160,74 @@ class Station:
     def csvs(self) -> dict:
         return {"csvs": [f.name for f in sorted(self.cdir.glob("*.csv"))]}
 
-    # ---- batches
-    def batch_rows(self, tpl: dict) -> list[dict]:
-        b = {**BATCH_DEFAULT, **(tpl.get("batch") or {})}
-        fields = R.fields_in(tpl)
-        if b["source"] == "range":
-            n, step, start = int(b["count"]), int(b["step"]) or 1, int(b["start"])
-            if not 1 <= n <= MAX_BATCH:
-                raise ValueError(f"Batch count must be 1 to {MAX_BATCH}.")
-            digits = max(0, min(12, int(b["digits"])))
-            return [{b["field"]: f"{b['prefix']}{start + i * step:0{digits}d}{b['suffix']}"} for i in range(n)]
-        if b["source"] == "csv":
-            cols, rows = self.csv_rows(b["csv"])
-            first = max(1, int(b.get("first_row") or 1))
-            last = int(b.get("last_row") or 0) or len(rows)
-            mapping = {f: b["map"].get(f) or next((c for c in cols if c.lower() == f.lower()), None) for f in fields}
-            missing = [f for f, c in mapping.items() if not c]
-            if missing and fields:
-                raise ValueError("Pick a CSV column for " + ", ".join("{" + m + "}" for m in missing) + ".")
-            return [{f: r.get(c, "") for f, c in mapping.items()} for r in rows[first - 1:last]]
-        lines = [l.strip() for l in str(b.get("list", "")).splitlines() if l.strip()]
-        out = []
-        for l in lines:
-            parts = l.split("\t") if "\t" in l else l.split(",") if len(fields) > 1 else [l]
-            out.append({f: (parts[i].strip() if i < len(parts) else "") for i, f in enumerate(fields)})
-        return out
+    # ---- batches: the template's data table (data.py)
+    def _data(self, tpl: dict) -> dict:
+        D.migrate(tpl, self.csv_rows)
+        D.ensure_fields(tpl["data"], R.fields_in(tpl), tpl.get("fields") or {})
+        return tpl["data"]
+
+    def batch_rows(self, tpl: dict, overrides: dict | None = None) -> tuple[list[dict], list[str]]:
+        self._data(tpl)
+        return D.resolve(tpl, overrides)
 
     def batch_info(self, tpl: dict) -> dict:
-        rows = self.batch_rows(tpl)
-        return {"count": len(rows), "first": rows[:3], "last": rows[-1] if rows else None}
+        """Every row (for the table) plus a decode check of the first and last few labels."""
+        rows, warn = self.batch_rows(tpl)
+        sample = sorted(set(list(range(min(3, len(rows)))) + list(range(max(0, len(rows) - 3), len(rows)))))
+        bad = []
+        for i in sample:
+            img, _, _ = R.render(tpl, rows[i])
+            for c in R.verify(img, tpl, rows[i]):
+                if not c["ok"]:
+                    bad.append(f"row {i + 1}: {c['type']} '{c['data']}' doesn't read back")
+        return {"count": len(rows), "rows": rows, "first": rows[:3], "last": rows[-1] if rows else None,
+                "warnings": warn + bad, "checked": [i + 1 for i in sample], "data": tpl["data"]}
 
-    def print_batch(self, tpl: dict, copies: int = 1, over: dict | None = None) -> dict:
-        rows = self.batch_rows(tpl)
+    def print_batch(self, tpl: dict, copies: int = 1, over: dict | None = None, values: dict | None = None) -> dict:
+        rows, warn = self.batch_rows(tpl, values)
         if not rows:
-            raise ValueError("The batch is empty.")
+            raise ValueError("The batch is empty: " + "; ".join(warn))
         if len(rows) * max(1, int(copies)) > MAX_BATCH:
             raise ValueError(f"More than {MAX_BATCH} labels in one go; split the batch.")
         r = self.print_rows(tpl, rows, copies, over)
-        b = {**BATCH_DEFAULT, **(tpl.get("batch") or {})}
-        if b["source"] == "range" and b["advance"]:
+        d = tpl["data"]
+        if d.get("advance", True) and any(c["mode"] in ("sequence", "ip") for c in d["columns"]):
             # carry on numbering next time: stored in the saved template, if there is one
-            b["start"] = int(b["start"]) + int(b["count"]) * (int(b["step"]) or 1)
-            r["next_start"] = b["start"]
+            D.advance(d, len(rows))
+            main = next((c for c in d["columns"] if c["name"] == d.get("main")), {})
+            r["next_start"] = main.get("start")
+            r["data"] = d
             try:
                 f = self._tfile(tpl.get("name", ""))
                 if f.exists():
-                    saved = json.loads(f.read_text())
-                    saved["batch"] = {**BATCH_DEFAULT, **(saved.get("batch") or {}), "start": b["start"]}
+                    saved = D.migrate(json.loads(f.read_text()), self.csv_rows)
+                    saved["data"]["columns"] = d["columns"]
                     f.write_text(json.dumps(saved, indent=1))
                     r["advanced"] = f.stem
             except ValueError:
                 pass
         return r
+
+    # ---- named tables, to reuse a table in another template
+    def _tbl(self, name: str) -> Path:
+        if not NAME_OK.match(name or "") or name.startswith("."):
+            raise ValueError("Table names: letters, digits, space, dot, dash, underscore (max 60).")
+        return self.bdir / f"{name}.json"
+
+    def tables(self) -> dict:
+        return {"tables": [f.stem for f in sorted(self.bdir.glob("*.json"))]}
+
+    def save_table(self, name: str, data: dict) -> dict:
+        D.check(data)
+        keep = {k: data[k] for k in ("main", "count", "advance", "columns", "rows") if k in data}
+        self._tbl(name).write_text(json.dumps(keep, indent=1))
+        return {"saved": name, **self.tables()}
+
+    def load_table(self, name: str) -> dict:
+        f = self._tbl(name)
+        if not f.exists():
+            raise ValueError(f"No table called {name!r}.")
+        return json.loads(f.read_text())
 
     # ---- render / print
     def preview(self, tpl: dict, values: dict | None = None) -> dict:

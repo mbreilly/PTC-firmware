@@ -81,3 +81,40 @@ label.btn { height: 30px; font-size: 12px; }
 .picker .gal button { height: 56px; padding: 4px; background: #fff; justify-content: center; }
 .picker .gal button img { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
 .picker .gal button.on { outline: 2px solid var(--accent); }
+
+.datatools { flex-wrap: wrap; }
+.datatools button, .datatools label.btn { height: 30px; font-size: 12px; padding: 0 10px; }
+.gridwrap { max-height: 46vh; overflow: auto; border: 1px solid var(--panelEdge); border-radius: 3px; margin: 8px 0; }
+#dt { border-collapse: separate; border-spacing: 0; font-size: 12px; min-width: 100%; }
+#dt th { position: sticky; top: 0; z-index: 1; background: var(--panelEdge); vertical-align: top; text-align: left; padding: 6px; min-width: 170px; }
+#dt th.rn, #dt td.rn { min-width: 34px; width: 34px; text-align: right; color: var(--dimInk); opacity: .7; position: sticky; left: 0; background: var(--panelEdge); z-index: 2; }
+#dt th.main { box-shadow: inset 0 3px 0 var(--accent); }
+#dt th .hrow { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; }
+#dt th input, #dt th select { height: 24px; font-size: 12px; padding: 0 4px; min-width: 0; }
+#dt th input.nm { font-weight: 700; flex: 1; width: 90px; }
+#dt th .set { display: grid; grid-template-columns: 52px 1fr; gap: 3px 6px; align-items: center; font-weight: 400; }
+#dt th .set span { font-size: 10px; color: var(--dimInk); }
+#dt th .set input { width: 100%; }
+#dt th .mainpick { font-size: 10px; color: var(--dimInk); display: inline-flex; gap: 3px; align-items: center; cursor: pointer; white-space: nowrap; }
+#dt th .mainpick input { accent-color: var(--accent); }
+#dt th .x { height: 22px; min-width: 22px; padding: 0 6px; font-size: 11px; }
+#dt th .unused { font-size: 10px; color: var(--dimInk); opacity: .7; }
+#dt td { padding: 0; border-bottom: 1px solid color-mix(in srgb, var(--panelEdge) 70%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--panelEdge) 70%, transparent); }
+#dt td input { width: 100%; height: 26px; border: 0; border-radius: 0; background: transparent; font: 12px ui-monospace, Menlo, monospace; }
+#dt td input:focus { outline: 1px solid var(--accent); background: color-mix(in srgb, var(--panelEdge) 60%, transparent); }
+#dt td.calc { padding: 0 8px; font: 12px ui-monospace, Menlo, monospace; color: var(--dimInk); white-space: nowrap; }
+#dt td.miss input { box-shadow: inset 0 -2px 0 #FF6B5B; }
+#dt tr.extra td.rn { opacity: .35; }
+#b-warn .chk { font-size: 12px; padding: 4px 10px; margin: 4px 0; border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--panelEdge) 50%, transparent); }
+
+.alignbar { margin: 0 0 8px; gap: 4px; }
+.alignbar button { height: 28px; min-width: 32px; padding: 0 8px; font-size: 13px; justify-content: center; }
+.alignbar .sep { height: 20px; }
+#guides { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+#guides .g { position: absolute; background: var(--accent); }
+#guides .g.v { top: -14px; bottom: -14px; width: 1px; } #guides .g.h { left: -14px; right: -14px; height: 1px; }
+#guides .g.item { background: transparent; }
+#guides .g.item.v { border-left: 1px dashed var(--accent); } #guides .g.item.h { border-top: 1px dashed var(--accent); }
+#guides .g.label { box-shadow: 0 0 4px var(--accent); }
+.el.multi { outline: 2px dashed var(--accent); outline-offset: 1px; }

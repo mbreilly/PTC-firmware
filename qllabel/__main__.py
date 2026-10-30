@@ -26,9 +26,9 @@ def main(argv=None):
     p.add_argument("template", help="template name or path to a .json file")
     p.add_argument("--set", action="append", default=[], metavar="FIELD=VALUE", help="fill a {field}")
     p.add_argument("--csv", type=Path, help="one label per row; the header row names the fields")
-    p.add_argument("--batch", action="store_true", help="print the template's saved batch (number range, CSV or list)")
-    p.add_argument("--start", type=int, help="with --batch on a number range: first number")
-    p.add_argument("--count", type=int, help="with --batch on a number range: how many")
+    p.add_argument("--batch", action="store_true", help="print the template's data table (--set still overrides a field)")
+    p.add_argument("--start", type=int, help="with --batch: first number of the main (sequence) column")
+    p.add_argument("--count", type=int, help="with --batch: how many labels")
     p.add_argument("--copies", type=int, default=1)
     p.add_argument("--margin", type=int, help="override the feed margin (dots)")
     p.add_argument("--cut", choices=["each", "end", "none"], help="override when to cut")
@@ -60,8 +60,14 @@ def main(argv=None):
                                                    ("per", a.strip), ("marks", a.marks),
                                                    ("ends", False if a.no_end_marks else None)) if v is not None}
             if a.batch:
-                tpl["batch"] = {**(tpl.get("batch") or {}), **{k: v for k, v in (("start", a.start), ("count", a.count)) if v is not None}}
-                print(json.dumps(st.print_batch(tpl, a.copies, over)))
+                d = st._data(tpl)              # the template's table; --start/--count change its main column
+                main = next(c for c in d["columns"] if c["name"] == d["main"])
+                if a.start is not None:
+                    main["start"] = a.start if main["mode"] == "sequence" else main["start"]
+                if a.count is not None:
+                    d["count"] = a.count
+                r = st.print_batch(tpl, a.copies, over, base or None)
+                print(json.dumps({k: v for k, v in r.items() if k != "data"}))
             else:
                 print(json.dumps(st.print_rows(tpl, rows, a.copies, over)))
         elif a.cmd == "calibrate":
