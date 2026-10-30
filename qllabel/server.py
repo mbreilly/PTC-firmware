@@ -11,8 +11,18 @@ from . import render as R
 from .station import Station
 
 STATIC = Path(__file__).parent / "static"
+HELP = Path(__file__).parent.parent / "HELP.md"
+HELP_PAGE = STATIC / "help.html"
 MAX_BODY = 12 * 1024 * 1024
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css", ".js": "application/javascript", ".svg": "image/svg+xml"}
+
+
+def help_page() -> bytes:
+    """HELP.md as a page in the designer's style (one source for the page and the file)."""
+    import markdown
+    md = markdown.Markdown(extensions=["tables", "toc"], extension_configs={"toc": {"title": "Contents"}})
+    body = md.convert(HELP.read_text())
+    return HELP_PAGE.read_text().replace("<!--BODY-->", body).encode()
 
 
 def make_handler(st: Station):
@@ -62,6 +72,8 @@ def make_handler(st: Station):
             path, q = u.path, {k: v[0] for k, v in parse_qs(u.query).items()}
             if path in ("/", "/index.html"):
                 path = "/static/index.html"
+            if path == "/help":
+                return self._send(200, help_page(), "text/html; charset=utf-8")
             if path == "/colors":
                 path = "/static/colors.html"
             if path.startswith("/static/"):

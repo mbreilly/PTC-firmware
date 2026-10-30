@@ -876,6 +876,37 @@ async function printerStatus(show = false) {
 $("#p-refresh").addEventListener("click", () => printerStatus(true));
 setInterval(() => { if (!document.hidden) printerStatus(); }, 6000);
 
+// ---------------------------------------------------------------- help: "?" links to the help page, and hover tips
+const HELP_FOR = { "TEMPLATE": "templates", "LABEL": "label-size-and-roll", "ADD": "items-you-can-add",
+  "ELEMENT": "items-you-can-add", "FIELDS": "fields-and-the-data-batch-table", "PRINT": "printing",
+  "DATA TABLE": "fields-and-the-data-batch-table", "THE BATCH": "fields-and-the-data-batch-table",
+  "PRINTER": "printer-and-calibration-tabs", "FULL-WIDTH BLEED": "printer-and-calibration-tabs",
+  "FIND THE PRINTER'S REAL LIMITS": "printer-and-calibration-tabs", "COMMAND LINE (FOR PTC LATER)": "command-line-on-the-pi" };
+$$("h2").forEach(h => {
+  const id = HELP_FOR[h.textContent.trim()];
+  if (id) h.insertAdjacentHTML("beforeend", `<a class="q" href="help#${id}" target="_blank" title="Help on this">?</a>`);
+});
+$("#align .lab").insertAdjacentHTML("beforeend", `<a class="q" href="help#the-align-bar" target="_blank" title="Help on aligning">?</a>`);
+const TIPS = {
+  "#k-length": "Label length along the tape. Drag up/down, scroll, or double-click the value to type it.",
+  "#k-margin": "Blank tape the printer adds before and after each piece (at least 3 mm). Use STRIP for no gaps.",
+  '#add [data-t="text"]': "Add a line of text. Use {name} to fill it from a field.",
+  '#add [data-t="image"]': "Add a logo or symbol: built-in ones or upload a picture.",
+  '#add [data-t="datamatrix"]': "Add a DataMatrix: the most compact 2D code, best for small labels.",
+  '#add [data-t="qr"]': "Add a QR code: easiest to scan with a phone.",
+  '#add [data-t="code128"]': "Add a normal 1D barcode (Code 128).",
+  '#add [data-t="box"]': "Add a rectangle (outline or filled).",
+  "#add-code": "Every other barcode type", "#add-code-btn": "Add the code chosen on the left", "#add-line": "Add a straight line",
+  '#cut [data-v="each"]': "Cut after every label", '#cut [data-v="end"]': "Cut once, after the last label", '#cut [data-v="none"]': "Don't cut",
+  "#fit": "Shrink or grow the length to fit what's on the label", '#mode [data-v="single"]': "Print the label as shown, with the test values",
+  '#mode [data-v="batch"]': "Print every row of the DATA & BATCH table", "#copies": "How many of each label", "#print": "Print now",
+  '#zoom [data-v="fit"]': "Fit the label to the window", "#tpl-list": "Open a saved template", "#tpl-name": "Name to save this template under",
+  "#tpl-save": "Save under the name on the left", "#media": "The roll this label is for",
+};
+for (const [q, t] of Object.entries(TIPS)) { const el = $(q); if (el && !el.title) el.title = t; }
+$$("#k-length .kl, #k-length svg").forEach(e => e.setAttribute("title", TIPS["#k-length"]));
+$$("#k-margin .kl, #k-margin svg").forEach(e => e.setAttribute("title", TIPS["#k-margin"]));
+
 // ---------------------------------------------------------------- start
 // ---------------------------------------------------------------- strips: labels end to end, cut by hand
 const S = () => (tpl.strip = { on: false, per: 0, marks: "edge", ends: true, ...(tpl.strip || {}) });
