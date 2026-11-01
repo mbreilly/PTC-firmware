@@ -1,0 +1,8 @@
+*.aux
+*.log
+*.out
+*.toc
+*.loc
+*.soc
+__pycache__/
+*.pdf
