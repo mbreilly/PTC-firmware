@@ -1333,7 +1333,7 @@
    "kind": "ic",
    "value": "LTM8064IY",
    "description": "DC DC CONVERTER 1.2-36V",
-   "hidden": "under a heatsink"
+   "hidden": null
   },
   {
    "ref": "UT15",
@@ -1356,7 +1356,7 @@
    "kind": "ic",
    "value": "LTM8064IY",
    "description": "DC DC CONVERTER 1.2-36V",
-   "hidden": "under a heatsink"
+   "hidden": null
   },
   {
    "ref": "UT16",
@@ -1632,7 +1632,7 @@
    "kind": "ic",
    "value": "LTM8064IY",
    "description": "DC DC CONVERTER 1.2-36V",
-   "hidden": "under a heatsink"
+   "hidden": null
   },
   {
    "ref": "UT27",
@@ -1655,7 +1655,7 @@
    "kind": "ic",
    "value": "LTM8064IY",
    "description": "DC DC CONVERTER 1.2-36V",
-   "hidden": "under a heatsink"
+   "hidden": null
   },
   {
    "ref": "UT28",
@@ -1724,7 +1724,7 @@
    "kind": "ic",
    "value": "LTM8064IY",
    "description": "DC DC CONVERTER 1.2-36V",
-   "hidden": "under a heatsink"
+   "hidden": null
   },
   {
    "ref": "UT30",
@@ -1977,7 +1977,7 @@
    "kind": "ic",
    "value": "LTM8064IY",
    "description": "DC DC CONVERTER 1.2-36V",
-   "hidden": "under a heatsink"
+   "hidden": null
   },
   {
    "ref": "UT5",
@@ -2000,7 +2000,7 @@
    "kind": "ic",
    "value": "LTM8064IY",
    "description": "DC DC CONVERTER 1.2-36V",
-   "hidden": "under a heatsink"
+   "hidden": null
   },
   {
    "ref": "UT6",

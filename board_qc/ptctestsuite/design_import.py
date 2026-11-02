@@ -20,8 +20,9 @@ from pathlib import Path
 
 from ptctestsuite.config import parameters
 
-# Parts that can't be seen in a board photo, by BOM value: (match, reason)
-HIDDEN = [("LTM8064", "under a heatsink")]
+# Parts that can't be seen in a board photo, by BOM value: (match, reason). None on the PTC: the
+# photos are taken before the LTM8064 heatsinks are fitted, so the regulators are checked too.
+HIDDEN = []
 
 
 def _find_step(root: Path) -> Path:
