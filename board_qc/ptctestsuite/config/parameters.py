@@ -101,8 +101,8 @@ inspection_min_match = 0.60        # below this a part doesn't look like the ref
 #   python -m ptctestsuite.design_import --odb <design>_odb.tgz --bom <BOM>.csv
 board_design_file = "board_design.json"   # in ptctestsuite/config/, beside this file
 # How the board lies in each photo, as signs from board axes to photo axes (photo y points down):
-# front side up with the D-sub at the top, then turned over top to bottom for the back.
-inspection_orientation = {"front": ("top", 1, -1), "back": ("bot", 1, 1)}
+# front side up with the D-sub at the top, then turned over left to right for the back (D-sub still at the top).
+inspection_orientation = {"front": ("top", 1, -1), "back": ("bot", -1, -1)}
 inspection_min_part_px = 14        # parts smaller than this in the photo can't be checked
 
 # Vendor certificates uploaded with bare and assembled PCB shipments are also kept here
