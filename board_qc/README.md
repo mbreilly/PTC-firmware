@@ -130,8 +130,8 @@ it from the photo step at any time. Ghosts are kept in `ghost_images/` as `front
 `back.jpg` (or `.png`).
 
 Every board is photographed the same way round: front side up with the D-sub connector and SFP
-cages at the top, then turned over top to bottom for the back, so the connectors end up at the
-bottom. `reference_photos/` has a front and back photo of preproduction board BRD# 006 (taken by
+cages at the top, then turned over left to right for the back, so the D-sub stays at the top
+(`inspection_orientation` in `config/parameters.py`). `reference_photos/` has a front and back photo of preproduction board BRD# 006 (taken by
 hand, not on the camera stand) as an example of the two sides. They aren't used as ghosts: the
 ghosts come from the station's own camera so they line up.
 

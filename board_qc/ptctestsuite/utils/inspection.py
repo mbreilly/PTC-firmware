@@ -14,6 +14,7 @@ parameters (inspection_*) and should be tuned on real boards photographed on the
 """
 
 import base64
+import itertools
 import json
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -156,12 +157,53 @@ def board_to_photo(board_pts, photo_pts):
 def _gold_dots(img) -> np.ndarray:
     """Small round gold pads the size of a fiducial."""
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    m = cv2.inRange(hsv, (12, 70, 120), (38, 255, 255))
-    n, _, st, cen = cv2.connectedComponentsWithStats(m)
     s = img.shape[1] / 2576
+    # gold, plus the pale glare in the middle of a pad under a bright lamp
+    m = cv2.inRange(hsv, (12, 70, 120), (38, 255, 255)) | cv2.inRange(hsv, (12, 40, 235), (38, 255, 255))
+    # under warm light the silkscreen crosshair round a fiducial also looks gold and joins the pad:
+    # an opening wider than a silkscreen line cuts it off
+    k = int(5 * s) | 1
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    n, _, st, cen = cv2.connectedComponentsWithStats(m)
     dots = [cen[i] for i in range(1, n) if 60 * s ** 2 < st[i][4] < 280 * s ** 2 and 8 * s < st[i][2] < 20 * s
             and 0.7 < st[i][2] / st[i][3] < 1.4 and st[i][4] / (np.pi * (st[i][2] / 2) ** 2) > 0.6]
     return np.array(dots).reshape(-1, 2)
+
+
+def _corner_fiducials(dots: np.ndarray, bpos: np.ndarray, names: list, per_corner: int = 6) -> dict:
+    """Picks the four corner fiducials among the gold dots. Vias and test points near the corners look
+    the same, so it takes the few outermost dots in each corner and keeps the four whose shape best
+    matches the design's fiducials (a similarity fit: shift, turn and scale)."""
+    corners = ((1, 1), (-1, 1), (1, -1), (-1, -1))
+    refs = [int(np.argmin(a * bpos[:, 0] + b * bpos[:, 1])) for a, b in corners]
+    cands = [dots[np.argsort(a * dots[:, 0] + b * dots[:, 1])[:per_corner]] for a, b in corners]
+    src = bpos[refs].astype(np.float64)
+    zs = (src[:, 0] - src[:, 0].mean()) + 1j * (src[:, 1] - src[:, 1].mean())
+    best, best_err = None, np.inf
+    for pick in itertools.product(*cands):
+        dst = np.array(pick, np.float64)
+        zd = (dst[:, 0] - dst[:, 0].mean()) + 1j * (dst[:, 1] - dst[:, 1].mean())
+        k = (np.conj(zs) @ zd) / (np.conj(zs) @ zs)   # least-squares similarity, design to photo
+        err = np.abs(zd - k * zs).max() / (abs(k) * np.abs(zs).max())
+        if err < best_err:
+            best, best_err = pick, err
+    if best_err > 0.03:   # no four dots have the fiducials' shape (good photos fit to under 0.01)
+        return {}
+    return {names[r]: p for r, p in zip(refs, best)}
+
+
+def photo_problems(img: np.ndarray) -> list[str]:
+    """What is wrong with a board photo that would stop the fiducials being found, in words for the tester."""
+    small = cv2.resize(img, (2576, round(2576 * img.shape[0] / img.shape[1])))
+    gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+    out = []
+    if cv2.Laplacian(gray, cv2.CV_64F).var() < 40:   # sharp photos measure 140 and up
+        out.append("it’s blurred: focus on the board and keep the camera still")
+    if (gray >= 250).mean() > 0.25:
+        out.append("much of it is overexposed: lower the exposure or move the lamp to stop the glare")
+    if gray.mean() < 50:
+        out.append("it’s too dark: add light or raise the exposure")
+    return out
 
 
 def fiducial_order(side: str) -> list[dict]:
@@ -190,6 +232,10 @@ def place_from_design(side: str, img: np.ndarray, clicks: dict | None = None) ->
     fids = {r: f for r, f in design["fiducials"].items() if f["side"] == layer}
     if len(fids) < 4:
         return {"ok": False, "message": f"The design has {len(fids)} fiducials on the {side}; four are needed."}
+    problems = photo_problems(img)
+    if problems:
+        return {"ok": False, "message": "This photo isn’t good enough to place the parts: " + "; ".join(problems)
+                                        + ". Take it again."}
     dots = _gold_dots(img)
     names = list(fids)
     bpos = np.array([[sx * fids[r]["x"], sy * fids[r]["y"]] for r in names])   # as the board lies in the photo
@@ -204,8 +250,7 @@ def place_from_design(side: str, img: np.ndarray, clicks: dict | None = None) ->
             else:
                 found[r] = xy
     elif len(dots) >= 4:
-        for a, b in ((1, 1), (-1, 1), (1, -1), (-1, -1)):   # the outermost dot in each corner
-            found[names[int(np.argmin(a * bpos[:, 0] + b * bpos[:, 1]))]] = dots[int(np.argmin(a * dots[:, 0] + b * dots[:, 1]))]
+        found = _corner_fiducials(dots, bpos, names)
     B = [[fids[r]["x"], fids[r]["y"]] for r in found]
     P = [list(map(float, found[r])) for r in found]
     # check the four points have the design's shape before trusting them
@@ -223,8 +268,9 @@ def place_from_design(side: str, img: np.ndarray, clicks: dict | None = None) ->
         ok = pw > img.shape[1] * 0.3 and abs((pw / ph) / (bw / bh) - 1) < 0.15
     if not ok:
         return {"ok": False, "need_fiducials": fiducial_order(side),
-                "message": "The fiducials couldn’t be found in this photo. Click each one in turn." if not clicks
-                else "Those points don’t match the board’s fiducials. Click them again, in the order shown."}
+                "message": "The fiducials couldn’t be found in this photo. Check the whole board is in the frame, the right "
+                           "side up, and the fiducials aren’t hidden by glare. Take it again, or click each one in turn."
+                if not clicks else "Those points don’t match the board’s fiducials. Click them again, in the order shown."}
     H, _ = cv2.findHomography(np.float32(B), np.float32(P), 0)
     px_per_in = float(np.linalg.norm(np.float32(P)[0] - np.float32(P)[3]) / np.linalg.norm(np.float32(B)[0] - np.float32(B)[3]))
     tants = [p for p in design["parts"] if p["side"] == layer and p["kind"] == "tantalum"]
@@ -293,6 +339,9 @@ def _gray(img):
 
 def align(photo: np.ndarray, ref: np.ndarray) -> tuple[np.ndarray | None, str]:
     """The photo warped onto the reference, or None and why not."""
+    problems = photo_problems(photo)
+    if problems:
+        return None, "This photo isn’t good enough to check: " + "; ".join(problems) + ". Retake it."
     s = min(1.0, parameters.inspection_align_width / ref.shape[1])
     g_ref = cv2.resize(_gray(ref), None, fx=s, fy=s, interpolation=cv2.INTER_AREA)
     sp = g_ref.shape[1] / photo.shape[1]
