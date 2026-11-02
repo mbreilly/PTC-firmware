@@ -477,7 +477,7 @@ class GuiUI(TesterUI):
             answers = v.get("answers") or {}
             if not result.aligned:
                 return "Retake the photo, or carry on without the check."
-            if any(answers.get(r) not in ("correct", "reversed") for r in refs):
+            if any(answers.get(r) not in ("correct", "not_correct") for r in refs):
                 return "Answer every flagged part first."
             return None
 

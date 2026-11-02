@@ -91,11 +91,12 @@ def _orient_step(side: str) -> Step:
     return Step(f"orientation_{side}", f"{side.capitalize()} orientation check", "4.1.3",
                 f"The program checked that the polarised parts on the {side} are the right way round. Confirm any "
                 "it flagged.", "Board photos", kind="inspect", how=[
-        "Green boxes look right. Red ones look reversed and orange ones don’t match the reference: answer each "
-        "flagged part.",
+        "Green boxes look right. Red ones may not be correct and orange ones don’t match the reference: answer "
+        "each flagged part.",
         "Compare the two closeups: the known-good reference on the left, this board on the right. Look at the band "
         "on capacitors and diodes and the pin 1 dot or marking on ICs.",
-        "If a part really is reversed, answer Reversed. It’s saved as FAIL so the board goes for repair.",
+        "If a part isn’t right, answer Not correct and write what’s wrong with it (reversed, missing, wrong part…). "
+        "It’s saved as FAIL with your note, so the board goes for repair.",
         "If glare or a blurred photo caused the flag, press Retake photo.",
         "This check helps the visual inspection; it doesn’t replace it."])
 
@@ -598,10 +599,13 @@ async def take_and_check_photo(ui: TesterUI, q: qc_record, side: str, step: Step
         q.add_result(key, qc_result.ERROR, {"checked": 0, "not_checked": result.message})
         return photo, None
     answers = answer.get("answers") or {}
-    reversed_ = [r.ref for r in result.flagged if answers.get(r.ref) != "correct"]
+    notes = answer.get("notes") or {}
+    # each part the tester says isn't right, with what they wrote about it, goes in the record and the HWDB
+    not_correct = [{"ref": r.ref, "kind": inspection.KINDS.get(r.kind, r.kind), "note": notes.get(r.ref, "")}
+                   for r in result.flagged if answers.get(r.ref) != "correct"]
     confirmed = [r.ref for r in result.flagged if answers.get(r.ref) == "correct"]
-    q.add_result(key, qc_result.FAIL if reversed_ else qc_result.PASS,
-                 {"checked": len(result.results), "reversed": reversed_, "flagged_but_correct": confirmed})
+    q.add_result(key, qc_result.FAIL if not_correct else qc_result.PASS,
+                 {"checked": len(result.results), "not_correct": not_correct, "flagged_but_correct": confirmed})
     return photo, inspection.overlay_from(result, answers)
 
 

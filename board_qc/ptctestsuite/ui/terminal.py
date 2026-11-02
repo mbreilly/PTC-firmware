@@ -162,13 +162,17 @@ class TerminalUI(TesterUI):
             print(result.message)
             return {"retake": True} if await self._yesno("Retake the photo?") else {"skip": True}
         print(f"{len(result.results)} parts checked, {len(result.flagged)} flagged.")
-        answers = {}
+        answers, notes = {}, {}
         for r in result.flagged:
-            what = {"reversed": "looks reversed", "rotated": f"looks turned {r.best_turn}°", "check": "doesn’t match the reference"}[r.status]
+            what = "doesn’t match the reference" if r.status == "check" else "may not be correct"
             if await self._yesno(f"{r.ref} {what}. Retake the photo instead?"):
                 return {"retake": True}
-            answers[r.ref] = "correct" if await self._yesno(f"Is {r.ref} the right way round on the board?") else "reversed"
-        return {"answers": answers}
+            if await self._yesno(f"Is {r.ref} correct on the board?"):
+                answers[r.ref] = "correct"
+            else:
+                answers[r.ref] = "not_correct"
+                notes[r.ref] = (await self.session.prompt_async(f"What’s wrong with {r.ref}? ")).strip()
+        return {"answers": answers, "notes": notes}
 
     async def ask_files(self, step: Step, max_files: int = 5) -> list:
         from ptctestsuite.utils.photos import PhotoError, document_from_file

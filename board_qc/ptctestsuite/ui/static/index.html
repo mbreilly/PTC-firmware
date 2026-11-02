@@ -166,7 +166,8 @@ textarea.field { font: 1.05em var(--g-font); height: 140px; width: 100%; max-wid
 .flag-crops figure { margin: 0; font-size: .78em; color: var(--g-dim); }
 .flag-crops img { display: block; width: 150px; height: auto; border: 1px solid var(--g-line); border-radius: var(--g-r); margin-top: 3px; }
 .flag-btns { display: flex; gap: 10px; }
-.flag-btns .btn { min-width: 130px; height: 46px; }
+.flag-btns .btn { min-width: 150px; height: 46px; white-space: nowrap; }
+.flag-note { width: 100%; min-height: 60px; resize: vertical; font: inherit; }
 .btn.pass { background: var(--g-pass); border-color: var(--g-pass); color: var(--g-on-pass); min-width: 170px; }
 .btn.fail { background: var(--g-fail); border-color: var(--g-fail); color: var(--g-on-fail); min-width: 170px; }
 .msg { font-size: .95em; min-height: 1.4em; }
@@ -390,15 +391,16 @@ function checklistHTML(a) {
   }).join("");
   return `<div class="clh"><b>Checklist</b><span id="ckcount"></span></div><div class="cl">${rows}</div>`;
 }
-const FLAG_TEXT = { reversed: "Looks reversed", rotated: "Looks turned", check: "Doesn’t match the reference" };
+const FLAG_TEXT = { reversed: "May not be correct", rotated: "May not be correct", check: "Doesn’t match the reference" };
 function inspectHTML(a) {
   if (!a.aligned) return `<div class="warnbox">${esc(a.message)}</div>
     <div class="entry"><button class="btn pri" data-a="retake" type="button">Retake photo</button><button class="btn" data-a="skipcheck" type="button">Carry on without the check</button></div>`;
   const ok = a.checked - a.flagged.length;
   const flags = a.flagged.map(f => `<div class="flag">
-      <div class="flag-h"><b>${esc(f.ref)}</b><span>${esc(f.kind_name)}</span><span class="flag-st ${esc(f.status)}">${FLAG_TEXT[f.status]}${f.status === "rotated" ? ` ${f.turn}°` : ""}</span></div>
+      <div class="flag-h"><b>${esc(f.ref)}</b><span>${esc(f.kind_name)}</span><span class="flag-st ${esc(f.status)}">${FLAG_TEXT[f.status]}</span></div>
       <div class="flag-crops"><figure>Reference<img src="${f.crops.reference}" alt="${esc(f.ref)} on the reference board"></figure><figure>This board<img src="${f.crops.board}" alt="${esc(f.ref)} on this board"></figure></div>
-      <div class="flag-btns"><button class="btn opt y" type="button" data-ans="correct" data-ref="${esc(f.ref)}" aria-pressed="false">Correct</button><button class="btn opt f" type="button" data-ans="reversed" data-ref="${esc(f.ref)}" aria-pressed="false">Reversed</button></div></div>`).join("");
+      <div class="flag-btns"><button class="btn opt y" type="button" data-ans="correct" data-ref="${esc(f.ref)}" aria-pressed="false">Correct</button><button class="btn opt f" type="button" data-ans="not_correct" data-ref="${esc(f.ref)}" aria-pressed="false">Not correct</button></div>
+      <textarea class="field flag-note" data-note="${esc(f.ref)}" hidden placeholder="What’s wrong with ${esc(f.ref)}? For example: reversed, turned, missing, wrong part, lifted pin, solder bridge" aria-label="What’s wrong with ${esc(f.ref)}"></textarea></div>`).join("");
   return `<div class="insp"><a href="inspect/${a.side}?v=${a.id}" target="_blank" rel="noopener"><img class="insp-img" src="inspect/${a.side}?v=${a.id}" alt="The ${a.side} photo with each checked part outlined"></a>
     <div class="insp-side"><div class="insp-sum">${a.flagged.length ? `${a.checked} parts checked: ${ok} look right, <b>${a.flagged.length} to confirm</b>.` : `All ${a.checked} parts look the right way round.`}</div>
       ${flags}<div><button class="btn small" data-a="retake" type="button">Retake photo</button></div></div></div>`;
@@ -516,7 +518,7 @@ function ready(a) {
       if (!a.aligned) return { ok: false, hint: "Retake the photo, or carry on without the check." };
       const left = a.flagged.filter(f => !pend.answers[f.ref]).length;
       if (left) return { ok: false, hint: `${left} flagged ${left === 1 ? "part" : "parts"} to answer.` };
-      return Object.values(pend.answers).includes("reversed") ? { ok: true, warn: true, hint: "Reversed parts are saved as FAIL." } : { ok: true };
+      return Object.values(pend.answers).includes("not_correct") ? { ok: true, warn: true, hint: "Parts marked not correct are saved as FAIL, with your notes." } : { ok: true };
     }
     case "page": {
       const states = a.fields.map(pageState), left = states.filter(x => x === "empty").length;
@@ -544,7 +546,11 @@ function nextValue(a) {
     case "photo": return { image: cam.shot, source: cam.source, ghost: !!($("asGhost") && $("asGhost").checked) };
     case "checklist": return { ticks: { ...pend.ticks }, voltage: +fieldVal("ck-v"), current: +fieldVal("ck-i") };
     case "autodone": return true;
-    case "inspect": return { answers: { ...pend.answers } };
+    case "inspect": {
+      const notes = {};
+      document.querySelectorAll("[data-note]").forEach(t => { if (pend.answers[t.dataset.note] === "not_correct" && t.value.trim()) notes[t.dataset.note] = t.value.trim(); });
+      return { answers: { ...pend.answers }, notes };
+    }
     case "choice": return pend.opt;
     case "files": return { files: pend.files.map(f => ({ name: f.name, data: f.data })) };
     case "page": return Object.fromEntries(a.fields.map(f => { const v = pageValue(f); return [f.key, f.kind === "number" ? Number(v) : v]; }));
@@ -734,6 +740,8 @@ function bindMain() {
   });
   screen.querySelectorAll("[data-ans]").forEach(b => b.onclick = () => {
     pend.answers[b.dataset.ref] = b.dataset.ans;
+    const note = b.closest(".flag").querySelector("[data-note]");
+    if (note) { note.hidden = b.dataset.ans !== "not_correct"; if (!note.hidden) note.focus(); }
     b.closest(".flag-btns").querySelectorAll("[data-ans]").forEach(o => { const on = o === b; o.classList.toggle("on", on); o.setAttribute("aria-pressed", on); });
     updateNext();
   });

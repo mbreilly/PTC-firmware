@@ -152,6 +152,9 @@ def format_value(value, unit: str | None = None) -> str:
     if value is None:
         return ""
     def num(v):
+        if isinstance(v, list):   # e.g. the orientation check's parts marked not correct, with their notes
+            return "; ".join(p["ref"] + (f": {p['note']}" if p.get("note") else "") if isinstance(p, dict) and "ref" in p
+                             else str(p) for p in v) or "none"
         return int(v) if isinstance(v, float) and v.is_integer() else v
     if isinstance(value, dict):
         text = ", ".join(f"{k}={num(v)}" for k, v in value.items())
@@ -219,7 +222,8 @@ class TesterUI:
 
     async def ask_inspection(self, step: Step, result) -> dict:
         """The orientation check of a board photo (result is utils.inspection.Inspection). Returns
-        {"answers": {ref: "correct" | "reversed"}} for the flagged parts, {"retake": True} to take
+        {"answers": {ref: "correct" | "not_correct"}, "notes": {ref: what the tester says is wrong}} for the
+        flagged parts, {"retake": True} to take
         the photo again, or {"skip": True} to carry on without the check when it couldn't run."""
         raise NotImplementedError
 

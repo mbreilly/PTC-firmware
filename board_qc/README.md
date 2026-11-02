@@ -168,13 +168,15 @@ capacitors, diodes, LEDs) are the right way round. It lines the photo up with a 
 of a known-good board (feature matching, so the board can be a little rotated, shifted or closer
 than the reference), then compares every marked part with the same part on the reference, as
 placed and turned round (180°, and 90° for square ICs). The tester sees the photo with every part
-outlined (green fine, red looks reversed, orange doesn't match the reference) and a closeup of each
-flagged part beside the reference, and answers each one **Correct** or **Reversed**. Next test
-stays greyed out until all are answered. A photo that can't be lined up (wrong side, badly out of
+outlined (green fine, red may not be correct, orange doesn't match the reference) and a closeup of
+each flagged part beside the reference, and answers each one **Correct** or **Not correct**. Not
+correct opens a box to write what's wrong with the part (reversed, missing, wrong part, ...). Next
+test stays greyed out until all are answered. A photo that can't be lined up (wrong side, badly out of
 line, blurred) can be retaken, or the check skipped (saved as ERROR).
 
-The result is saved as `orientation_front` / `orientation_back`: PASS, or FAIL listing the parts
-answered Reversed, with the parts flagged but confirmed correct. The outlined photo is uploaded to
+The result is saved as `orientation_front` / `orientation_back`, in the board record and the HWDB:
+PASS, or FAIL with `not_correct` listing each part answered Not correct as `{ref, kind, note}`, and
+`flagged_but_correct` with the parts flagged but confirmed correct. The outlined photo is uploaded to
 the HWDB beside the board photo ("Run n, orientation check, front").
 
 **Setting it up.** Open `http://localhost:8080/inspection` (linked from the Look up a board screen).
