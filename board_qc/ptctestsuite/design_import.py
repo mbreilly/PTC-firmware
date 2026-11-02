@@ -85,6 +85,8 @@ def read_bom(path: Path) -> dict:
     out = {}
     with path.open(encoding="latin-1", newline="") as f:
         for r in csv.DictReader(f):
+            if r.get("Value", "").strip().upper() == "DNP":   # not fitted on any board (e.g. XT2)
+                continue
             kind = classify(r.get("Description", ""), r.get("Part Type", ""))
             if not kind:
                 continue

@@ -2118,29 +2118,6 @@
    "hidden": null
   },
   {
-   "ref": "XT2",
-   "side": "top",
-   "x": 9.206,
-   "y": 1.15,
-   "rot": 180.0,
-   "mirror": false,
-   "package": "XTAL_SG3225VAN125000000M-KEGA3",
-   "bbox": [
-    -0.066929,
-    -0.077559,
-    0.066929,
-    0.077559
-   ],
-   "pin1": [
-    9.242417,
-    1.099213
-   ],
-   "kind": "ic",
-   "value": "SG3225VAN 125.000000M-KEGA3",
-   "description": "XTAL OSC XO 125.0000MHZ LVDS SMD",
-   "hidden": null
-  },
-  {
    "ref": "YT1",
    "side": "top",
    "x": 8.409,
