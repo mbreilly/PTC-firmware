@@ -86,6 +86,11 @@ class GuiUI(TesterUI):
             body = SETUP_PAGE.read_bytes()
             return Response(200, "OK", Headers([("Content-Type", "text/html; charset=utf-8"),
                                                 ("Content-Length", str(len(body))), ("Cache-Control", "no-store")]), body)
+        if path.startswith("/inspection/example/") and path.count("/") == 4:
+            side, ex_id = path.split("/")[3:5]
+            f = inspection.example_path(side, ex_id) if side in photos.BOARD_SIDES else None
+            if f and f.is_file():
+                return self._file_response(f.read_bytes(), "image/jpeg")
         if path in ("/inspection/ref/front", "/inspection/ref/back"):
             ref = inspection.reference_path(path.rsplit("/", 1)[1])
             if ref.is_file():
@@ -319,6 +324,15 @@ class GuiUI(TesterUI):
                                     for f in r.flagged],
                         "overlay": "data:image/jpeg;base64," + base64.b64encode(r.overlay).decode() if r.overlay else None})
             return
+        if kind in ("delete_example", "trust_reference"):
+            if kind == "delete_example":
+                inspection.delete_example(side, str(m.get("id", "")))
+            else:
+                inspection.set_reference_wrong(side, str(m.get("ref", "")), False)
+            kind = "examples"
+        if kind == "examples":
+            await send({"type": "examples", "side": side, **inspection.load_examples(side)})
+            return
         if kind == "get":
             ref = inspection.reference_path(side)
             w = h = None
@@ -466,8 +480,13 @@ class GuiUI(TesterUI):
     async def ask_inspection(self, step, result):
         self._inspection_images[result.side] = result.overlay
         flagged = [{"ref": r.ref, "kind": r.kind, "kind_name": inspection.KINDS.get(r.kind, r.kind), "status": r.status,
-                    "turn": r.best_turn, "score": r.score, "crops": r.crops} for r in result.flagged]
+                    "turn": r.best_turn, "score": r.score, "crops": r.crops, "why": r.why} for r in result.flagged]
         refs = {f["ref"] for f in flagged}
+        # the other checked parts, so the tester can flag one the check missed (boxes as fractions of the photo)
+        aligned = getattr(result, "_aligned", None)
+        H, W = aligned.shape[:2] if aligned is not None else (1, 1)
+        others = [{"ref": r.ref, "kind_name": inspection.KINDS.get(r.kind, r.kind),
+                   "box": [r.box[0] / W, r.box[1] / H, r.box[2] / W, r.box[3] / H]} for r in result.results if r.ref not in refs]
 
         def check(v):
             if not isinstance(v, dict):
@@ -479,10 +498,12 @@ class GuiUI(TesterUI):
                 return "Retake the photo, or carry on without the check."
             if any(answers.get(r) not in ("correct", "not_correct") for r in refs):
                 return "Answer every flagged part first."
+            if any(not isinstance(m, dict) or m.get("ref") not in {o["ref"] for o in others} for m in v.get("missed") or []):
+                return "A part flagged by hand isn't one of the checked parts."
             return None
 
         v = await self._ask("inspect", step, check, side=result.side, aligned=result.aligned, message=result.message,
-                            checked=len(result.results), flagged=flagged, overlay_id=self._ask_id + 1)
+                            checked=len(result.results), flagged=flagged, others=others, overlay_id=self._ask_id + 1)
         return v
 
     def _page_test(self, key):

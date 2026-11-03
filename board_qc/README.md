@@ -175,9 +175,23 @@ test stays greyed out until all are answered. A photo that can't be lined up (wr
 line, blurred) can be retaken, or the check skipped (saved as ERROR).
 
 The result is saved as `orientation_front` / `orientation_back`, in the board record and the HWDB:
-PASS, or FAIL with `not_correct` listing each part answered Not correct as `{ref, kind, note}`, and
-`flagged_but_correct` with the parts flagged but confirmed correct. The outlined photo is uploaded to
-the HWDB beside the board photo ("Run n, orientation check, front").
+PASS, or FAIL with `not_correct` listing each part answered Not correct as `{ref, kind, note, found_by}`
+(`check`, or `tester` for a part flagged by hand), and `flagged_but_correct` with the parts flagged but
+confirmed correct. The outlined photo is uploaded to the HWDB beside the board photo ("Run n,
+orientation check, front").
+
+**Parts the check missed.** "Flag a part the check missed" on the check page lets the tester click a
+part on the photo (or pick it from a list) and say what's wrong with it. It's saved like the others,
+with `found_by: tester`.
+
+**Learning from the answers.** Every answer is kept as an example of that part in
+`inspection/<side>/examples/`: Correct as a good example, Not correct (flagged or missed) as a bad one
+with the tester's note, up to 20 of each per part. Later boards are compared with the examples as
+well as the reference: a part that looks like a bad example is flagged as "Looks like a fault seen
+before" with the note, and a flagged part that looks like a confirmed-good example isn't flagged
+again. When the tester flags a part the check passed, the reference itself shows that part wrong, so
+for that part the reference turned round counts as the right look instead (setting a new reference
+trusts it again). The setup page lists everything learned for each side, to delete mistakes.
 
 **Setting it up.** Open `http://localhost:8080/inspection` (linked from the Look up a board screen).
 For each side:

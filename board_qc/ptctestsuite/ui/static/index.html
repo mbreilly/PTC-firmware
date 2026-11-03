@@ -158,6 +158,12 @@ textarea.field { font: 1.05em var(--g-font); height: 140px; width: 100%; max-wid
 .insp-img { display: block; width: min(100%, 540px); border: 1px solid var(--g-line); border-radius: var(--g-r); }
 .insp-side { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 12px; }
 .insp-sum { font-size: 1.05em; }
+.insp-pic { position: relative; width: min(100%, 540px); }
+.insp-pic.picking img { cursor: crosshair; outline: 2px solid var(--g-accent); }
+.miss-mark { position: absolute; border: 2px solid var(--g-fail); border-radius: 2px; pointer-events: none; box-shadow: 0 0 0 2px rgba(0,0,0,.5); }
+.miss { display: flex; flex-direction: column; gap: 8px; }
+.miss select { max-width: 100%; }
+.flag-why { font-size: .88em; color: var(--g-dim); }
 .flag { border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 10px 12px; background: var(--g-field); display: flex; flex-direction: column; gap: 8px; }
 .flag-h { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .flag-h b { font-family: var(--g-mono); font-size: 1.1em; }
@@ -391,19 +397,57 @@ function checklistHTML(a) {
   }).join("");
   return `<div class="clh"><b>Checklist</b><span id="ckcount"></span></div><div class="cl">${rows}</div>`;
 }
-const FLAG_TEXT = { reversed: "May not be correct", rotated: "May not be correct", check: "Doesn’t match the reference" };
+const FLAG_TEXT = { reversed: "May not be correct", rotated: "May not be correct", check: "Doesn’t match the reference", known_fault: "Looks like a fault seen before", missed: "Flagged by you" };
 function inspectHTML(a) {
   if (!a.aligned) return `<div class="warnbox">${esc(a.message)}</div>
     <div class="entry"><button class="btn pri" data-a="retake" type="button">Retake photo</button><button class="btn" data-a="skipcheck" type="button">Carry on without the check</button></div>`;
   const ok = a.checked - a.flagged.length;
   const flags = a.flagged.map(f => `<div class="flag">
       <div class="flag-h"><b>${esc(f.ref)}</b><span>${esc(f.kind_name)}</span><span class="flag-st ${esc(f.status)}">${FLAG_TEXT[f.status]}</span></div>
+      ${f.why ? `<div class="flag-why">Last time: ${esc(f.why)}</div>` : ""}
       <div class="flag-crops"><figure>Reference<img src="${f.crops.reference}" alt="${esc(f.ref)} on the reference board"></figure><figure>This board<img src="${f.crops.board}" alt="${esc(f.ref)} on this board"></figure></div>
       <div class="flag-btns"><button class="btn opt y" type="button" data-ans="correct" data-ref="${esc(f.ref)}" aria-pressed="false">Correct</button><button class="btn opt f" type="button" data-ans="not_correct" data-ref="${esc(f.ref)}" aria-pressed="false">Not correct</button></div>
       <textarea class="field flag-note" data-note="${esc(f.ref)}" hidden placeholder="What’s wrong with ${esc(f.ref)}? For example: reversed, turned, missing, wrong part, lifted pin, solder bridge" aria-label="What’s wrong with ${esc(f.ref)}"></textarea></div>`).join("");
-  return `<div class="insp"><a href="inspect/${a.side}?v=${a.id}" target="_blank" rel="noopener"><img class="insp-img" src="inspect/${a.side}?v=${a.id}" alt="The ${a.side} photo with each checked part outlined"></a>
+  const others = (a.others || []).slice().sort((p, q) => p.ref.localeCompare(q.ref, undefined, { numeric: true }));
+  const miss = `<div class="miss"><div><button class="btn small" id="miss-add" type="button">Flag a part the check missed</button></div>
+      <div class="hint" id="miss-hint" hidden>Click the part on the photo, or choose it: <select class="field" id="miss-sel"><option value="">Choose a part…</option>${others.map(o => `<option value="${esc(o.ref)}">${esc(o.ref)} (${esc(o.kind_name)})</option>`).join("")}</select></div>
+      <div id="miss-list" class="miss"></div></div>`;
+  return `<div class="insp"><div class="insp-pic" id="insp-pic"><a href="inspect/${a.side}?v=${a.id}" target="_blank" rel="noopener"><img class="insp-img" style="width:100%" src="inspect/${a.side}?v=${a.id}" alt="The ${a.side} photo with each checked part outlined"></a><div id="miss-marks"></div></div>
     <div class="insp-side"><div class="insp-sum">${a.flagged.length ? `${a.checked} parts checked: ${ok} look right, <b>${a.flagged.length} to confirm</b>.` : `All ${a.checked} parts look the right way round.`}</div>
-      ${flags}<div><button class="btn small" data-a="retake" type="button">Retake photo</button></div></div></div>`;
+      ${flags}${miss}<div><button class="btn small" data-a="retake" type="button">Retake photo</button></div></div></div>`;
+}
+// flagging a part the check missed: click it on the photo, or choose it from the list
+function bindMissed(a) {
+  const before = pend.missed || [];   // the page was drawn again: put back the parts already flagged
+  pend.missed = [];
+  const pic = $("insp-pic"), others = a.others || [];
+  let picking = false;
+  const setPicking = on => { picking = on; pic.classList.toggle("picking", on); $("miss-hint").hidden = !on; };
+  const marks = () => { $("miss-marks").innerHTML = pend.missed.map(ref => { const o = others.find(p => p.ref === ref); if (!o) return "";
+    const [x, y, w, h] = o.box; return `<div class="miss-mark" style="left:calc(${x * 100}% - 4px);top:calc(${y * 100}% - 4px);width:calc(${w * 100}% + 8px);height:calc(${h * 100}% + 8px)"></div>`; }).join(""); };
+  const add = ref => {
+    setPicking(false); $("miss-sel").value = "";
+    if (!ref || pend.missed.includes(ref)) return;
+    const o = others.find(p => p.ref === ref); if (!o) return;
+    pend.missed.push(ref);
+    const card = document.createElement("div"); card.className = "flag"; card.dataset.miss = ref;
+    card.innerHTML = `<div class="flag-h"><b>${esc(ref)}</b><span>${esc(o.kind_name)}</span><span class="flag-st reversed">${FLAG_TEXT.missed}</span><button class="btn small" type="button" data-unmiss="${esc(ref)}">Remove</button></div>
+      <textarea class="field flag-note" data-mnote="${esc(ref)}" placeholder="What’s wrong with ${esc(ref)}? For example: reversed, turned, missing, wrong part" aria-label="What’s wrong with ${esc(ref)}"></textarea>`;
+    card.querySelector("[data-unmiss]").onclick = () => { pend.missed = pend.missed.filter(r => r !== ref); card.remove(); marks(); updateNext(); };
+    $("miss-list").appendChild(card); card.querySelector("textarea").focus(); marks(); updateNext();
+  };
+  $("miss-add").onclick = () => setPicking(!picking);
+  $("miss-sel").onchange = e => add(e.target.value);
+  pic.querySelector("a").addEventListener("click", e => {
+    if (!picking) return;
+    e.preventDefault();
+    const r = e.target.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+    const dist = o => { const [x, y, w, h] = o.box; const dx = Math.max(x - fx, 0, fx - x - w), dy = Math.max(y - fy, 0, fy - y - h); return Math.hypot(dx, dy); };
+    const best = others.reduce((b, o) => (!b || dist(o) < dist(b) ? o : b), null);
+    if (best && dist(best) < 0.03) add(best.ref); else $("miss-hint").firstChild.textContent = "No checked part there. Click nearer a part, or choose it: ";
+  });
+  before.forEach(add);
+  marks();
 }
 // ---- several checks on one page ----
 function pageValue(f) {   // the current answer for a field, from the page
@@ -518,7 +562,7 @@ function ready(a) {
       if (!a.aligned) return { ok: false, hint: "Retake the photo, or carry on without the check." };
       const left = a.flagged.filter(f => !pend.answers[f.ref]).length;
       if (left) return { ok: false, hint: `${left} flagged ${left === 1 ? "part" : "parts"} to answer.` };
-      return Object.values(pend.answers).includes("not_correct") ? { ok: true, warn: true, hint: "Parts marked not correct are saved as FAIL, with your notes." } : { ok: true };
+      return Object.values(pend.answers).includes("not_correct") || (pend.missed || []).length ? { ok: true, warn: true, hint: "Parts marked not correct are saved as FAIL, with your notes. The check learns from them." } : { ok: true };
     }
     case "page": {
       const states = a.fields.map(pageState), left = states.filter(x => x === "empty").length;
@@ -549,7 +593,8 @@ function nextValue(a) {
     case "inspect": {
       const notes = {};
       document.querySelectorAll("[data-note]").forEach(t => { if (pend.answers[t.dataset.note] === "not_correct" && t.value.trim()) notes[t.dataset.note] = t.value.trim(); });
-      return { answers: { ...pend.answers }, notes };
+      const missed = (pend.missed || []).map(ref => ({ ref, note: (document.querySelector(`[data-mnote="${CSS.escape(ref)}"]`) || {}).value?.trim() || "" }));
+      return { answers: { ...pend.answers }, notes, missed };
     }
     case "choice": return pend.opt;
     case "files": return { files: pend.files.map(f => ({ name: f.name, data: f.data })) };
@@ -738,6 +783,7 @@ function bindMain() {
     b.parentElement.querySelectorAll("[data-pkey]").forEach(o => { const on = (o.dataset.pv === "1") === v; o.classList.toggle("on", on); o.setAttribute("aria-pressed", on); o.textContent = (on ? "✓ " : "") + o.dataset.label; });
     updateNext();
   });
+  if (a.kind === "inspect" && a.aligned) bindMissed(a);
   screen.querySelectorAll("[data-ans]").forEach(b => b.onclick = () => {
     pend.answers[b.dataset.ref] = b.dataset.ans;
     const note = b.closest(".flag").querySelector("[data-note]");

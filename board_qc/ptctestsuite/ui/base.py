@@ -222,8 +222,8 @@ class TesterUI:
 
     async def ask_inspection(self, step: Step, result) -> dict:
         """The orientation check of a board photo (result is utils.inspection.Inspection). Returns
-        {"answers": {ref: "correct" | "not_correct"}, "notes": {ref: what the tester says is wrong}} for the
-        flagged parts, {"retake": True} to take
+        {"answers": {ref: "correct" | "not_correct"}, "notes": {ref: what the tester says is wrong},
+        "missed": [{"ref", "note"}] for parts the check passed but the tester says are wrong}, {"retake": True} to take
         the photo again, or {"skip": True} to carry on without the check when it couldn't run."""
         raise NotImplementedError
 

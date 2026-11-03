@@ -15,6 +15,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
 body { background: var(--g-bg); color: var(--g-ink); font: 15px/1.4 var(--g-font); display: flex; flex-direction: column; }
 .top { display: flex; align-items: center; gap: 20px; padding: 10px 22px; border-bottom: 1px solid var(--g-line); background: var(--g-side); }
@@ -51,6 +52,11 @@ input, select { background: var(--g-field); color: var(--g-ink); border: 1px sol
 .mono { font-family: var(--g-mono); }
 .clickbar { position: sticky; top: 0; z-index: 2; margin-bottom: 10px; padding: 10px 14px; border: 1px solid var(--g-accent); border-radius: var(--g-r); background: color-mix(in srgb, var(--g-accent) 18%, var(--g-panel)); display: flex; gap: 12px; align-items: center; }
 .clickbar b { font-family: var(--g-mono); }
+.ex { display: grid; grid-template-columns: 64px 1fr auto; gap: 8px; align-items: center; padding: 6px 8px; border-top: 1px solid var(--g-line); font-size: .88em; }
+.ex:first-child { border-top: 0; }
+.ex img { width: 64px; height: 40px; object-fit: contain; background: #000; border-radius: 3px; }
+.ex .good { color: var(--g-pass); } .ex .bad { color: var(--g-fail); }
+.ex b { color: var(--g-ink); }
 </style>
 </head>
 <body>
@@ -95,6 +101,12 @@ input, select { background: var(--g-field); color: var(--g-ink); border: 1px sol
       <input type="file" id="tryfile" accept="image/jpeg,image/png" hidden>
       <div class="result" id="result"></div>
     </section>
+    <section>
+      <h2>What the check has learned</h2>
+      <div class="hint">Each time a tester answers Correct or Not correct, or flags a part the check missed, that part's closeup is kept here. Later boards are compared with these too. Delete any that were answered by mistake.</div>
+      <div id="wrong" style="margin-top:8px"></div>
+      <div class="list" id="exlist" style="margin-top:8px; max-height: 360px"></div>
+    </section>
   </div>
 </div>
 <script>
@@ -109,7 +121,7 @@ function setDirty(d) { dirty = d; $("dirty").textContent = d ? "Unsaved changes"
 function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); else say("Not connected to the test station.", "err"); }
 function connect() {
   ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + location.pathname.replace(/[^/]*$/, "") + "setup");
-  ws.onopen = () => { $("conn").textContent = ""; send({ type: "get", side }); };
+  ws.onopen = () => { $("conn").textContent = ""; send({ type: "get", side }); send({ type: "examples", side }); };
   ws.onclose = () => { $("conn").textContent = "Reconnecting…"; setTimeout(connect, 1000); };
   ws.onmessage = e => handle(JSON.parse(e.data));
 }
@@ -141,6 +153,16 @@ function handle(m) {
     $("result").innerHTML = m.aligned
       ? `<div class="msg ${m.flagged.length ? "warn" : "ok"}">${m.checked} parts checked. ${m.flagged.length ? "Flagged: " + m.flagged.map(f => `${esc(f.ref)} (${esc(f.status)}, ${f.score} as placed, ${f.turned_score} turned)`).join(", ") : "Nothing flagged."}</div><img src="${m.overlay}" alt="The photo with each part outlined">`
       : `<div class="msg err">${esc(m.message)}</div>`;
+  } else if (m.type === "examples" && m.side === side) {
+    $("wrong").innerHTML = m.reference_wrong.length ? `<div class="hint">A tester said the reference photo shows these parts wrong, so the reference turned round counts as their right look:</div>
+      <div class="row" style="margin-top:6px">${m.reference_wrong.map(r => `<button class="btn" type="button" data-trust="${esc(r)}" title="Trust the reference for this part again">${esc(r)} ✕</button>`).join("")}</div>` : "";
+    const ex = m.examples.slice().sort((a, b) => a.ref.localeCompare(b.ref, undefined, { numeric: true }) || b.date.localeCompare(a.date));
+    $("exlist").innerHTML = ex.length ? ex.map(e => `<div class="ex"><img src="inspection/example/${side}/${encodeURIComponent(e.id)}" alt="${esc(e.ref)}, ${e.label}">
+      <span><b class="mono">${esc(e.ref)}</b> <span class="${e.label}">${e.label === "good" ? "Correct" : "Not correct"}</span>${e.note ? ` · ${esc(e.note)}` : ""}<br><span class="k">${esc(e.serial || "")} ${esc(e.date)}</span></span>
+      <button class="btn danger" type="button" data-delex="${esc(e.id)}">Delete</button></div>`).join("")
+      : `<div class="hint" style="padding:10px">Nothing learned for the ${side} yet.</div>`;
+    $("exlist").querySelectorAll("[data-delex]").forEach(b => b.onclick = () => { if (confirm("Delete this example?")) send({ type: "delete_example", side, id: b.dataset.delex }); });
+    $("wrong").querySelectorAll("[data-trust]").forEach(b => b.onclick = () => send({ type: "trust_reference", side, ref: b.dataset.trust }));
   } else if (m.type === "error") say(m.message, "err");
 }
 
@@ -249,7 +271,7 @@ window.addEventListener("resize", () => { if (!cv.hidden) layout(); });
 document.querySelectorAll("[data-side]").forEach(b => b.onclick = () => {
   if (dirty && !confirm("Leave without saving the parts for this side?")) return;
   side = b.dataset.side; document.querySelectorAll("[data-side]").forEach(x => x.classList.toggle("on", x === b));
-  $("result").innerHTML = ""; say(""); send({ type: "get", side });
+  $("result").innerHTML = ""; say(""); send({ type: "get", side }); send({ type: "examples", side });
 });
 $("uselast").onclick = () => { if (!parts.length || confirm("Replace the reference photo? The marked parts stay where they are, so check they still line up.")) send({ type: "reference", side, source: "last" }); };
 $("pickref").onclick = () => $("reffile").click();

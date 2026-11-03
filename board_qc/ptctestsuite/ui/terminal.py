@@ -172,7 +172,18 @@ class TerminalUI(TesterUI):
             else:
                 answers[r.ref] = "not_correct"
                 notes[r.ref] = (await self.session.prompt_async(f"What’s wrong with {r.ref}? ")).strip()
-        return {"answers": answers, "notes": notes}
+        checked = {r.ref for r in result.results} - set(answers)
+        missed = []
+        while True:   # parts the check passed that the tester can see are wrong; the check learns from them
+            ref = (await self.session.prompt_async("Any other part that isn’t right? Its reference, or Enter for none: ")).strip().upper()
+            if not ref:
+                break
+            if ref not in checked:
+                print(f"{ref} isn’t one of the other checked parts on the {result.side}.")
+                continue
+            missed.append({"ref": ref, "note": (await self.session.prompt_async(f"What’s wrong with {ref}? ")).strip()})
+            checked.discard(ref)
+        return {"answers": answers, "notes": notes, "missed": missed}
 
     async def ask_files(self, step: Step, max_files: int = 5) -> list:
         from ptctestsuite.utils.photos import PhotoError, document_from_file

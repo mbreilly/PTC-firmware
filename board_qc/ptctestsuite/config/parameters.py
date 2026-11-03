@@ -95,6 +95,7 @@ inspection_min_matches = 60        # fewer matching features than this: the phot
 inspection_search_px = 8           # placement tolerance when comparing a part with the reference
 inspection_reverse_margin = 0.10   # turned round must match this much better to flag "reversed"
 inspection_min_match = 0.60        # below this a part doesn't look like the reference: "check it"
+inspection_learned_margin = 0.03   # a learned example must match this much better than the other kind to decide
 # Tune these on real boards photographed on the camera stand before relying on the check.
 
 # The board design for the orientation check: polarised parts, fiducials and outline, made by

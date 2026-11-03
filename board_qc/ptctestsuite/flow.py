@@ -600,13 +600,21 @@ async def take_and_check_photo(ui: TesterUI, q: qc_record, side: str, step: Step
         return photo, None
     answers = answer.get("answers") or {}
     notes = answer.get("notes") or {}
+    flagged = {r.ref for r in result.flagged}
+    kinds = {r.ref: r.kind for r in result.results}
+    # parts the check passed but the tester says are wrong
+    missed = [m for m in answer.get("missed") or [] if m.get("ref") in kinds and m["ref"] not in flagged]
     # each part the tester says isn't right, with what they wrote about it, goes in the record and the HWDB
-    not_correct = [{"ref": r.ref, "kind": inspection.KINDS.get(r.kind, r.kind), "note": notes.get(r.ref, "")}
-                   for r in result.flagged if answers.get(r.ref) != "correct"]
+    not_correct = [{"ref": r.ref, "kind": inspection.KINDS.get(r.kind, r.kind), "note": notes.get(r.ref, ""),
+                    "found_by": "check"} for r in result.flagged if answers.get(r.ref) != "correct"]
+    not_correct += [{"ref": m["ref"], "kind": inspection.KINDS.get(kinds[m["ref"]], kinds[m["ref"]]),
+                     "note": m.get("note", ""), "found_by": "tester"} for m in missed]
     confirmed = [r.ref for r in result.flagged if answers.get(r.ref) == "correct"]
     q.add_result(key, qc_result.FAIL if not_correct else qc_result.PASS,
                  {"checked": len(result.results), "not_correct": not_correct, "flagged_but_correct": confirmed})
-    return photo, inspection.overlay_from(result, answers)
+    # the check learns from every answer (utils/inspection.py, learned examples)
+    await asyncio.to_thread(inspection.learn, result, answers, notes, missed, q.serial_number)
+    return photo, inspection.overlay_from(result, {**answers, **{m["ref"]: "not_correct" for m in missed}})
 
 
 # ---- test stand checklist ------------------------------------------------------

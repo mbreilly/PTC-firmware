@@ -16,6 +16,7 @@ parameters (inspection_*) and should be tuned on real boards photographed on the
 import base64
 import itertools
 import json
+import time
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
@@ -41,11 +42,12 @@ class PartResult:
     ref: str
     kind: str
     box: list
-    status: str                 # ok, reversed, rotated, check
+    status: str                 # ok, reversed, rotated, check, or known_fault (looks like a learned bad example)
     score: float                # match with the reference as placed
     best_turn: int              # 0, 90, 180 or 270: the turn that matched best
     turned_score: float
     crops: dict = field(default_factory=dict)   # {"reference": data URL, "board": data URL} for flagged parts
+    why: str = ""               # for known_fault, the tester's note on the bad example it looks like
 
 
 @dataclass
@@ -102,11 +104,116 @@ def save_reference(side: str, jpeg_or_png: bytes) -> tuple[int, int]:
         raise ValueError("That image couldn’t be read.")
     _dir(side).mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(reference_path(side)), img, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    d = load_examples(side)
+    if d["reference_wrong"]:   # a new reference is trusted again everywhere; the examples stay
+        d["reference_wrong"] = []
+        _save_examples(side, d)
     lg.info(f"Saved a new {side} inspection reference ({img.shape[1]}x{img.shape[0]})")
     return img.shape[1], img.shape[0]
 
 def is_set_up(side: str) -> bool:
     return reference_path(side).is_file() and bool(load_parts(side))
+
+
+# ---- learned examples ----------------------------------------------------------------
+# Every answer the tester gives teaches the check: a flagged part confirmed Correct is kept as a good
+# example of that part, and a part marked Not correct (flagged by the check, or one it missed) as a bad
+# example with the tester's note. Later boards are compared with these as well as the reference, so a
+# fault seen once is caught again, and a false alarm confirmed once isn't raised again. When the tester
+# flags a part the check passed, the reference itself shows that part wrong, so its look there no longer
+# counts as good (the reference turned round counts instead). Kept in inspection_dir/<side>/examples/.
+
+MAX_EXAMPLES = 20   # of each kind (good, bad) for each part; the oldest go first
+
+
+def _examples_dir(side: str) -> Path:
+    return _dir(side) / "examples"
+
+
+def load_examples(side: str) -> dict:
+    """{"examples": [{id, ref, label: good|bad, note, serial, date, file}], "reference_wrong": [ref, ...]}"""
+    p = _examples_dir(side) / "examples.json"
+    try:
+        d = json.loads(p.read_text())
+        return {"examples": d.get("examples", []), "reference_wrong": d.get("reference_wrong", [])}
+    except (OSError, ValueError):
+        return {"examples": [], "reference_wrong": []}
+
+
+def _save_examples(side: str, d: dict):
+    _examples_dir(side).mkdir(parents=True, exist_ok=True)
+    (_examples_dir(side) / "examples.json").write_text(json.dumps(d, indent=1))
+
+
+def example_path(side: str, ex_id: str) -> Path | None:
+    ex = next((e for e in load_examples(side)["examples"] if e["id"] == ex_id), None)
+    return _examples_dir(side) / ex["file"] if ex else None
+
+
+def add_example(side: str, aligned: np.ndarray, part: Part, label: str, note: str = "", serial: str = ""):
+    """Keeps the part's area of a lined-up board photo as a good or bad example."""
+    x, y, w, h = part.box
+    crop = aligned[y:y + h, x:x + w]
+    if crop.size == 0:
+        return
+    d = load_examples(side)
+    ex_id = f"{part.ref}-{label}-{time.strftime('%Y%m%d-%H%M%S')}-{len(d['examples'])}"
+    _examples_dir(side).mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(_examples_dir(side) / f"{ex_id}.jpg"), crop, [cv2.IMWRITE_JPEG_QUALITY, 95])
+    d["examples"].append({"id": ex_id, "ref": part.ref, "label": label, "note": note.strip(), "serial": serial,
+                          "date": time.strftime("%Y-%m-%d %H:%M"), "file": f"{ex_id}.jpg"})
+    same = [e for e in d["examples"] if e["ref"] == part.ref and e["label"] == label]
+    for old in same[:-MAX_EXAMPLES]:
+        delete_example(side, old["id"], d)
+    _save_examples(side, d)
+    lg.info(f"Learned a {label} example of {part.ref} on the {side}" + (f": {note}" if note else ""))
+
+
+def delete_example(side: str, ex_id: str, d: dict | None = None):
+    own = d is None
+    d = d or load_examples(side)
+    ex = next((e for e in d["examples"] if e["id"] == ex_id), None)
+    if ex:
+        d["examples"].remove(ex)
+        (_examples_dir(side) / ex["file"]).unlink(missing_ok=True)
+        if own:
+            _save_examples(side, d)
+
+
+def set_reference_wrong(side: str, ref: str, wrong: bool = True):
+    d = load_examples(side)
+    refs = set(d["reference_wrong"])
+    refs = refs | {ref} if wrong else refs - {ref}
+    d["reference_wrong"] = sorted(refs)
+    _save_examples(side, d)
+
+
+def _example_images(side: str) -> dict:
+    """{ref: {"good": [gray image], "bad": [(gray image, note)]}} for check_part."""
+    out = {}
+    for e in load_examples(side)["examples"]:
+        im = cv2.imread(str(_examples_dir(side) / e["file"]))
+        if im is None:
+            continue
+        slot = out.setdefault(e["ref"], {"good": [], "bad": []})
+        slot[e["label"]].append(_gray(im) if e["label"] == "good" else (_gray(im), e["note"]))
+    return out
+
+
+def learn(insp: "Inspection", answers: dict, notes: dict, missed: list, serial: str = ""):
+    """Keeps what the tester said about one checked photo. answers: {ref: correct|not_correct} for the
+    flagged parts; missed: [{ref, note}] for parts the check passed but the tester says are wrong."""
+    aligned = getattr(insp, "_aligned", None)
+    if aligned is None:
+        return
+    parts = {p.ref: p for p in load_parts(insp.side)}
+    for ref, ans in answers.items():
+        if ref in parts:
+            add_example(insp.side, aligned, parts[ref], "good" if ans == "correct" else "bad", notes.get(ref, ""), serial)
+    for m in missed:
+        if m.get("ref") in parts:
+            add_example(insp.side, aligned, parts[m["ref"]], "bad", m.get("note", ""), serial)
+            set_reference_wrong(insp.side, m["ref"])
 
 
 # ---- suggestions -------------------------------------------------------------------
@@ -378,7 +485,9 @@ def _crop_url(img, box, pad):
     return "data:image/jpeg;base64," + base64.b64encode(buf.tobytes()).decode()
 
 
-def check_part(aligned, ref, part: Part) -> PartResult:
+def check_part(aligned, ref, part: Part, learned: dict | None = None, reference_wrong: bool = False) -> PartResult:
+    """Compares one part with the reference (as placed and turned round) and with its learned
+    examples: {"good": [gray], "bad": [(gray, note)]}."""
     x, y, w, h = part.box
     body = _gray(ref[y:y + h, x:x + w])
     m = parameters.inspection_search_px
@@ -402,7 +511,22 @@ def check_part(aligned, ref, part: Part) -> PartResult:
         status = "check"
     else:
         status = "ok"
-    return PartResult(part.ref, part.kind, part.box, status, round(same, 3), best_turn, round(turned, 3))
+    why = ""
+    learned = learned or {}
+    # the closest good look: confirmed-good examples, and the reference unless the tester said it shows
+    # this part wrong (then the reference turned round is the likely right look)
+    good = [score(t) for t in learned.get("good", [])] + [turned if reference_wrong else same]
+    bad = [(score(t), note) for t, note in learned.get("bad", [])]
+    best_good = max(good)
+    best_bad, bad_note = max(bad, key=lambda v: v[0]) if bad else (-1.0, "")
+    m = parameters.inspection_learned_margin
+    if best_bad >= parameters.inspection_min_match and best_bad > best_good + m:
+        status, why = "known_fault", bad_note
+    elif status != "ok" and learned.get("good") and best_good >= parameters.inspection_min_match and best_good > best_bad + m:
+        status = "ok"   # looks like a part the tester already confirmed is right
+    elif reference_wrong and status == "reversed":
+        status = "ok"   # matches the reference turned round, which is the right look here
+    return PartResult(part.ref, part.kind, part.box, status, round(same, 3), best_turn, round(turned, 3), why=why)
 
 
 def inspect(side: str, photo_bytes: bytes) -> Inspection | None:
@@ -416,7 +540,8 @@ def inspect(side: str, photo_bytes: bytes) -> Inspection | None:
     aligned, msg = align(photo, ref)
     if aligned is None:
         return Inspection(side, False, msg)
-    results = [check_part(aligned, ref, p) for p in load_parts(side)]
+    learned, wrong = _example_images(side), set(load_examples(side)["reference_wrong"])
+    results = [check_part(aligned, ref, p, learned.get(p.ref), p.ref in wrong) for p in load_parts(side)]
     pad = max(12, int(ref.shape[1] / 120))
     for r in results:
         if r.status != "ok":
@@ -432,7 +557,8 @@ def overlay_from(insp: Inspection, answers: dict) -> bytes | None:
     return overlay(aligned, insp.results, answers) if aligned is not None else insp.overlay
 
 
-COLOURS = {"ok": (80, 190, 80), "reversed": (60, 60, 230), "rotated": (60, 60, 230), "check": (40, 170, 240)}
+COLOURS = {"ok": (80, 190, 80), "reversed": (60, 60, 230), "rotated": (60, 60, 230), "check": (40, 170, 240),
+           "known_fault": (60, 60, 230)}
 
 def overlay(img, results, answers: dict | None = None, width: int = 1400) -> bytes:
     """A JPEG of the photo with each part outlined: green fine, red reversed, orange to check."""
@@ -445,7 +571,7 @@ def overlay(img, results, answers: dict | None = None, width: int = 1400) -> byt
         if answers and r.ref in answers:
             status = "ok" if answers[r.ref] == "correct" else "reversed"
         cv2.rectangle(vis, (x - 4, y - 4), (x + w + 4, y + h + 4), COLOURS[status], t)
-        if r.status != "ok":
+        if status != "ok":
             cv2.putText(vis, r.ref, (x, max(12, y - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOURS[status], 2)
     ok, buf = cv2.imencode(".jpg", vis, [cv2.IMWRITE_JPEG_QUALITY, 85])
     return buf.tobytes()
