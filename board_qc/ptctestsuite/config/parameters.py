@@ -106,6 +106,11 @@ board_design_file = "board_design.json"   # in ptctestsuite/config/, beside this
 inspection_orientation = {"front": ("top", 1, -1), "back": ("bot", -1, -1)}
 inspection_min_part_px = 14        # parts smaller than this in the photo can't be checked
 
+# Stuffing review (utils/stuffing.py): every BOM part of a board beside a board known to work
+stuffing_dir = "stuffing"
+design_odb = "design/ptc4a_v1j_odb.tgz"
+design_bom = "design/PTC_CORE_ENG_BILL_OF_MATERIALS.CSV"
+
 # Vendor certificates uploaded with bare and assembled PCB shipments are also kept here
 shipment_docs_dir = "shipment_documents"
 max_certificate_files = 5

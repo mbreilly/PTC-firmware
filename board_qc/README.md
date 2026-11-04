@@ -262,6 +262,30 @@ type its name says, kept in `shipment_documents/` and uploaded to the delivery's
 "Vendor certificate"; the file names are recorded with the delivery. `hwdb_check` tries a PDF
 upload, as the HWDB's image endpoint may not take every file type.
 
+## Stuffing review
+
+`http://localhost:8080/stuffing` (linked from the Look up a board screen) shows every BOM part of a
+board beside the same part on a board known to work, grouped by BOM line, to find stuffing errors:
+parts missing, fitted against the BOM, or the wrong value.
+
+1. Open a board by its serial and choose a front and a back photo, ticking the box if the D-sub is at
+   the bottom. Click its fiducials; if a tag string hides one, three are enough. The clicks snap to the
+   pads.
+2. Open the working board and press **Use this board as the working reference**. Every board is then
+   compared with it.
+3. On each part press **OK**, or **Problem** with what's wrong and a note. **All OK** calls a whole BOM
+   line at once, which also makes an odd one out in a line easy to spot. Click a closeup for a wider view.
+
+Calls are kept per board in `stuffing/<serial>/review.json`. **Show the list** and **Export CSV** give the
+problems on all boards. They aren't uploaded to the HWDB.
+
+The result is the tester's calls, not the software's. "Looks different" marks the tenth of the parts
+with the largest colour difference from the reference, as a place to start, and it misses things: on
+PTC002 against BRD006 it caught 4 of 11 known differences and none of the wrong fuses, whose only
+difference is the printed value. Look through every line.
+
+The design comes from `design/` (`design_odb`, `design_bom` in `config/parameters.py`).
+
 ## Board history, retests and repairs
 
 The PTC serial number is how every board is found, and each serial has exactly one HWDB entry.

@@ -857,7 +857,7 @@ function renderStart() {
         <div class="msg" id="msg" role="status"></div>
         <button class="btn pri" id="go" type="button">Show history</button>
         <div class="keys">Read-only. Board history comes from the HWDB, and from this station’s records if the HWDB can’t be reached.</div>
-        <div class="keys">Engineers: <a href="inspection" style="color:var(--g-accent)">set up the orientation check</a> (reference photos and the parts to check).</div>
+        <div class="keys">Engineers: <a href="inspection" style="color:var(--g-accent)">set up the orientation check</a> (reference photos and the parts to check), or <a href="stuffing" style="color:var(--g-accent)">review a board’s stuffing</a> against the BOM.</div>
       </div><div style="display:flex;flex-direction:column;gap:18px">
         <div><div class="sh">Waiting for a retest</div>${list(boards.waiting, "No boards are waiting for a retest.")}</div>
         <div><div class="sh">Recently tested on this station</div>${list(boards.recent, "No boards tested on this station yet.")}</div>

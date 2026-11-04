@@ -21,11 +21,12 @@ from websockets.http11 import Response
 
 from ptctestsuite.config import parameters
 from ptctestsuite.ui.base import TesterUI, Step, TestAborted, format_value
-from ptctestsuite.utils import canon, photos, inspection, labels
+from ptctestsuite.utils import canon, photos, inspection, labels, stuffing
 
 PAGE = Path(__file__).with_name("static") / "index.html"
 FONTS = PAGE.with_name("fonts")
 SETUP_PAGE = PAGE.with_name("inspection.html")
+STUFFING_PAGE = PAGE.with_name("stuffing.html")
 DESIGNER = Path(__file__).with_name("designer") / "ptc-gui-designer.html"
 
 
@@ -82,6 +83,8 @@ class GuiUI(TesterUI):
             return await self._canon(path)
         if path.startswith("/labels/"):
             return await self._labels(path, request.path)
+        if path == "/stuffing" or path.startswith("/stuffing/"):
+            return await self._stuffing_http(path, request.path)
         if path == "/inspection":
             body = SETUP_PAGE.read_bytes()
             return Response(200, "OK", Headers([("Content-Type", "text/html; charset=utf-8"),
@@ -272,8 +275,54 @@ class GuiUI(TesterUI):
         return {"mode": v["mode"], "tester": self.state["tester"], "serial": str(v.get("serial", "")),
                 "po": str(v.get("po", "")), "batch": str(v.get("batch", "")).strip()}
 
+    # ---- stuffing review page (/stuffing) -------------------------------------------
+    async def _stuffing_http(self, path: str, full_path: str):
+        if path == "/stuffing":
+            return self._file_response(STUFFING_PAGE.read_bytes(), "text/html; charset=utf-8")
+        if path == "/stuffing/problems.csv":
+            return self._file_response(await asyncio.to_thread(stuffing.problems_csv), "text/csv; charset=utf-8")
+        bits = path.split("/")[2:]   # photo/<serial>/<side> or crop/<serial>/<side>/<ref>
+        body = None
+        if len(bits) >= 3 and bits[2] in photos.BOARD_SIDES:
+            if bits[0] == "photo" and len(bits) == 3:
+                f = stuffing._board(bits[1]) / f"{bits[2]}-photo.jpg"
+                body = f.read_bytes() if f.is_file() else None
+            elif bits[0] == "crop" and len(bits) == 4:
+                wide = "wide" in full_path.split("?", 1)[-1]
+                body = await asyncio.to_thread(stuffing.crop, bits[1], bits[2], bits[3], True, 150 if wide else stuffing.CROP_PAD)
+        if body is None:
+            return Response(404, "Not Found", Headers([("Content-Length", "0")]), b"")
+        return self._file_response(body, "image/jpeg")
+
+    async def _stuffing_message(self, ws, m: dict):
+        kind, serial, side = m["type"], m.get("serial", ""), m.get("side")
+        send = lambda d: ws.send(json.dumps(d, default=str))
+        if kind == "stuff_photo":
+            if side not in photos.BOARD_SIDES:
+                raise ValueError("Choose the front or back of the board.")
+            photo = photos.from_data_url(side, m.get("image"), "file")
+            r = await asyncio.to_thread(stuffing.save_photo, serial, side, photo.data, bool(m.get("turn")))
+            await send({"type": "stuff_photo", "serial": serial, "side": side, **r})
+            return
+        if kind == "stuff_lineup":
+            await asyncio.to_thread(stuffing.line_up, serial, side, m.get("points"))
+        elif kind == "stuff_reference":
+            stuffing.set_reference(serial)
+        elif kind == "stuff_call":
+            stuffing.set_calls(serial, m.get("refs") or [], m.get("call"), m.get("note", ""))
+            await send({"type": "stuff_saved", "refs": m.get("refs") or [], "call": m.get("call"), "note": m.get("note", ""),
+                        "boards": await asyncio.to_thread(stuffing.boards), "problems": await asyncio.to_thread(stuffing.problems)})
+            return
+        out = {"type": "stuff_view", "boards": await asyncio.to_thread(stuffing.boards), "reference": stuffing.reference(),
+               "problems": await asyncio.to_thread(stuffing.problems)}
+        if serial:
+            out["board"] = await asyncio.to_thread(stuffing.board_view, serial)
+        await send(out)
+
     # ---- inspection setup page (/inspection) ---------------------------------------
     async def _setup_message(self, ws, m: dict):
+        if str(m.get("type", "")).startswith("stuff_"):
+            return await self._stuffing_message(ws, m)
         side = m.get("side")
         if side not in photos.BOARD_SIDES:
             return

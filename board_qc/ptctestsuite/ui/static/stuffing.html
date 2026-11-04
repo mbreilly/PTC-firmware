@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stuffing review</title>
+<style>
+@font-face { font-family: "IBM Plex Sans"; font-weight: 400; src: url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Sans"; font-weight: 600; src: url(fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2"); }
+@font-face { font-family: "IBM Plex Mono"; font-weight: 400; src: url(fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); }
+:root {
+  --g-bg: #0F1418; --g-panel: #172026; --g-side: #121A1F; --g-line: #2A363E; --g-ink: #E6EDF1; --g-dim: #8A9AA5;
+  --g-accent: #3BA7C9; --g-pass: #3FB767; --g-fail: #E5534B; --g-warn: #E0A33A; --g-field: #0B1013; --g-r: 6px;
+  --g-font: "IBM Plex Sans", "Segoe UI", Ubuntu, Arial, sans-serif; --g-mono: "IBM Plex Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--g-bg); color: var(--g-ink); font: 15px/1.4 var(--g-font); display: flex; flex-direction: column; }
+.top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px 22px; border-bottom: 1px solid var(--g-line); background: var(--g-side); }
+.top h1 { font-size: 1.15em; margin: 0; font-weight: 600; }
+.top a { color: var(--g-accent); margin-left: auto; }
+.body { flex: 1; min-height: 0; display: flex; }
+.panel { width: 300px; flex: none; overflow: auto; padding: 16px 18px; border-right: 1px solid var(--g-line); background: var(--g-side); display: flex; flex-direction: column; gap: 18px; }
+.panel h2 { font-size: .78em; font-weight: 600; color: var(--g-dim); letter-spacing: .05em; text-transform: uppercase; margin: 0 0 8px; }
+.main { flex: 1; min-width: 0; overflow: auto; padding: 16px 20px; background: var(--g-panel); display: flex; flex-direction: column; gap: 14px; }
+.btn { font: 600 .92em var(--g-font); color: var(--g-ink); background: transparent; border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 7px 11px; cursor: pointer; }
+.btn:hover:not(:disabled) { border-color: var(--g-dim); }
+.btn.pri { background: var(--g-accent); border-color: var(--g-accent); color: #0B0D0E; }
+.btn.ok.on { background: var(--g-pass); border-color: var(--g-pass); color: #0B0D0E; }
+.btn.bad.on { background: var(--g-fail); border-color: var(--g-fail); color: #0B0D0E; }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--g-accent); outline-offset: 1px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+input, select, textarea { background: var(--g-field); color: var(--g-ink); border: 1px solid var(--g-line); border-radius: var(--g-r); font: 1em var(--g-font); padding: 7px 9px; }
+textarea { width: 100%; min-height: 48px; resize: vertical; }
+.hint { font-size: .84em; color: var(--g-dim); }
+.msg { font-size: .9em; min-height: 1.3em; }
+.msg.err { color: var(--g-fail); } .msg.ok { color: var(--g-pass); } .msg.warn { color: var(--g-warn); }
+.mono { font-family: var(--g-mono); }
+.blist { display: flex; flex-direction: column; border: 1px solid var(--g-line); border-radius: var(--g-r); overflow: hidden; }
+.blist button { text-align: left; background: var(--g-field); color: var(--g-ink); border: 0; border-top: 1px solid var(--g-line); padding: 7px 10px; font: .9em var(--g-font); cursor: pointer; }
+.blist button:first-child { border-top: 0; }
+.blist button.sel { background: color-mix(in srgb, var(--g-accent) 22%, var(--g-field)); }
+.blist small { display: block; color: var(--g-dim); }
+.card { border: 1px solid var(--g-line); border-radius: var(--g-r); background: var(--g-side); padding: 12px 14px; }
+.lh { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; margin-bottom: 10px; }
+.lh b { font-size: 1.02em; }
+.lh .d { color: var(--g-dim); font-size: .86em; flex: 1; min-width: 200px; }
+.tag { font-size: .76em; font-weight: 600; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--g-warn); color: var(--g-warn); }
+.parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
+.part { border: 1px solid var(--g-line); border-radius: var(--g-r); padding: 8px; background: var(--g-panel); display: flex; flex-direction: column; gap: 6px; }
+.part.bad { border-color: var(--g-fail); }
+.ph { display: flex; gap: 8px; align-items: baseline; }
+.ph b { font-family: var(--g-mono); }
+.ph .k { color: var(--g-dim); font-size: .8em; }
+.ph .diff { color: var(--g-warn); font-size: .78em; font-weight: 600; margin-left: auto; }
+.cr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cr figure { margin: 0; font-size: .74em; color: var(--g-dim); }
+.cr .pic { display: block; height: 150px; background: #000; border-radius: 4px; overflow: hidden; }
+.cr img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.none { display: flex; height: 150px; align-items: center; justify-content: center; text-align: center; background: var(--g-field); border-radius: 4px; color: var(--g-dim); padding: 6px; }
+.stage { display: flex; flex-direction: column; gap: 10px; }
+.stage canvas { display: block; max-width: 100%; border: 1px solid var(--g-line); border-radius: var(--g-r); cursor: crosshair; }
+.prompt { padding: 10px 14px; border: 1px solid var(--g-accent); border-radius: var(--g-r); background: color-mix(in srgb, var(--g-accent) 18%, var(--g-panel)); }
+table { border-collapse: collapse; width: 100%; font-size: .88em; }
+th, td { border-top: 1px solid var(--g-line); padding: 5px 7px; text-align: left; vertical-align: top; }
+th { color: var(--g-dim); font-weight: 600; }
+@media (max-width: 800px) { .body { flex-direction: column; } .panel { width: auto; border-right: 0; border-bottom: 1px solid var(--g-line); } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>Stuffing review</h1>
+  <span class="hint" id="conn"></span>
+  <a href="./">Back to the test station</a>
+</div>
+<div class="body">
+  <div class="panel">
+    <section>
+      <h2>Board</h2>
+      <div class="row"><input id="serial" autocomplete="off" placeholder="Serial, like PTC002" style="flex:1;min-width:0" aria-label="Board serial"><button class="btn pri" id="open" type="button">Open</button></div>
+      <div class="blist" id="boards" style="margin-top:8px"></div>
+    </section>
+    <section id="sec-photos" hidden>
+      <h2>Photos of this board</h2>
+      <div class="hint" id="sides"></div>
+      <label class="hint row" style="margin:8px 0"><input type="checkbox" id="turn"> The D-sub is at the bottom of the photo</label>
+      <div class="row"><button class="btn" id="pick-front" type="button">Front photo…</button><button class="btn" id="pick-back" type="button">Back photo…</button></div>
+      <input type="file" id="file" accept="image/jpeg,image/png" hidden>
+    </section>
+    <section id="sec-ref" hidden>
+      <h2>Compared against</h2>
+      <div class="hint" id="refinfo"></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="setref" type="button">Use this board as the working reference</button></div>
+    </section>
+    <section id="sec-filter" hidden>
+      <h2>Show</h2>
+      <div class="row">
+        <select id="f-state" aria-label="Which parts"><option value="all">All parts</option><option value="todo">Not called yet</option><option value="bad">Problems</option><option value="different">Look most different</option></select>
+        <select id="f-side" aria-label="Which side"><option value="all">Both sides</option><option value="front">Front</option><option value="back">Back</option></select>
+        <input id="f-text" placeholder="Part or value" style="flex:1;min-width:120px" aria-label="Find a part or value">
+      </div>
+      <div class="hint" id="count" style="margin-top:8px"></div>
+    </section>
+    <section>
+      <h2>Problems on all boards</h2>
+      <div class="row"><button class="btn" id="showall" type="button">Show the list</button><a class="btn" href="stuffing/problems.csv" download="stuffing-problems.csv" style="text-decoration:none">Export CSV</a></div>
+    </section>
+    <div class="msg" id="msg" role="status"></div>
+  </div>
+  <div class="main" id="main"><div class="hint">Enter a board’s serial, or choose one from the list.</div></div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let ws, board = null, boards = [], problems = [], reference = "", view = "review", lining = null, pickSide = "front", photo = new Image(), scale = 1;
+
+function say(t, k) { $("msg").textContent = t; $("msg").className = "msg " + (k || ""); }
+function send(m) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)); else say("Not connected to the test station.", "err"); }
+function connect() {
+  ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + location.pathname.replace(/[^/]*$/, "") + "setup");
+  ws.onopen = () => { $("conn").textContent = ""; send({ type: "stuff_view", serial: board ? board.serial : "" }); };
+  ws.onclose = () => { $("conn").textContent = "Reconnecting…"; setTimeout(connect, 1000); };
+  ws.onmessage = e => handle(JSON.parse(e.data));
+}
+
+function handle(m) {
+  if (m.type === "stuff_view") {
+    boards = m.boards; problems = m.problems; reference = m.reference;
+    if (m.board) { board = m.board; lining = null; view = "review"; say(""); }
+    renderPanel(); renderMain();
+  } else if (m.type === "stuff_saved") {
+    boards = m.boards; problems = m.problems; renderBoards();
+    const set = new Set(m.refs);
+    board.lines.forEach(l => l.parts.forEach(p => { if (set.has(p.ref)) { p.call = m.call === "clear" ? "" : m.call; p.note = m.call === "clear" ? "" : m.note; } }));
+    if (m.refs.length > 1) renderMain(); else { m.refs.forEach(refreshPart); renderCount(); }
+  } else if (m.type === "stuff_photo") {
+    lining = { side: m.side, list: m.fiducials, i: 0, points: {} };
+    photo = new Image(); photo.onload = renderMain; photo.src = `stuffing/photo/${encodeURIComponent(m.serial)}/${m.side}?v=${Date.now()}`;
+    say("");
+  } else if (m.type === "error") say(m.message, "err");
+}
+
+// ---- left panel --------------------------------------------------------------------------------
+function renderBoards() {
+  $("boards").innerHTML = boards.map(b => `<button type="button" data-b="${esc(b.serial)}" class="${board && board.serial === b.serial ? "sel" : ""}"><span class="mono">${esc(b.serial)}</span>${b.serial === reference ? " · reference" : ""}<small>${b.called} of ${b.total} called, ${b.problems} ${b.problems === 1 ? "problem" : "problems"}</small></button>`).join("") || `<div class="hint" style="padding:8px">No boards yet.</div>`;
+  $("boards").querySelectorAll("[data-b]").forEach(x => x.onclick = () => openBoard(x.dataset.b));
+}
+function renderPanel() {
+  renderBoards();
+  ["sec-photos", "sec-ref", "sec-filter"].forEach(id => $(id).hidden = !board);
+  if (!board) return;
+  $("serial").value = board.serial;
+  $("sides").textContent = `Front ${board.sides.front ? "lined up" : "not added yet"}. Back ${board.sides.back ? "lined up" : "not added yet"}.`;
+  $("refinfo").textContent = reference ? (reference === board.serial ? "This board is the reference." : reference) : "No reference board yet. Choose one that is known to work.";
+  $("setref").disabled = reference === board.serial;
+}
+function openBoard(s) { s = s.trim(); if (s) send({ type: "stuff_view", serial: s }); else say("Enter a board serial first.", "err"); }
+$("open").onclick = () => openBoard($("serial").value);
+$("serial").onkeydown = e => { if (e.key === "Enter") openBoard($("serial").value); };
+$("setref").onclick = () => { if (confirm(`Compare every board against ${board.serial}?`)) send({ type: "stuff_reference", serial: board.serial }); };
+$("showall").onclick = () => { view = "all"; lining = null; renderMain(); };
+["f-state", "f-side"].forEach(id => $(id).onchange = renderMain);
+$("f-text").oninput = renderMain;
+
+// ---- choosing a photo and clicking its fiducials --------------------------------------------------
+$("pick-front").onclick = () => { pickSide = "front"; $("file").click(); };
+$("pick-back").onclick = () => { pickSide = "back"; $("file").click(); };
+$("file").onchange = e => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f || !board) return;
+  if (!/^image\/(jpeg|png)$/.test(f.type)) { say("Choose a JPEG or PNG image.", "err"); return; }
+  say("Sending the photo…");
+  const r = new FileReader();
+  r.onload = () => send({ type: "stuff_photo", serial: board.serial, side: pickSide, turn: $("turn").checked, image: r.result });
+  r.readAsDataURL(f);
+};
+function renderLining() {
+  const f = lining.list[lining.i], n = Object.keys(lining.points).length;
+  $("main").innerHTML = `<div class="stage">
+    <div class="prompt" role="status">${f ? `Click fiducial <b class="mono">${esc(f.ref)}</b>, near the <b>${esc(f.corner.replace("-", " "))}</b> corner of the ${lining.side}.` : "That’s all the fiducials."} ${n} clicked; at least 3 are needed.</div>
+    <div class="row"><button class="btn" id="skip" type="button" ${f ? "" : "disabled"}>Can’t see this one</button><button class="btn pri" id="done" type="button" ${n >= 3 ? "" : "disabled"}>Line up</button><button class="btn" id="cancel" type="button">Cancel</button></div>
+    <canvas id="cv"></canvas></div>`;
+  const cv = $("cv"), w = Math.min(Math.max(320, $("main").clientWidth - 44), photo.naturalWidth);
+  scale = w / photo.naturalWidth; cv.width = Math.round(w); cv.height = Math.round(photo.naturalHeight * scale);
+  const g = cv.getContext("2d"); g.drawImage(photo, 0, 0, cv.width, cv.height);
+  Object.entries(lining.points).forEach(([ref, [x, y]]) => { g.strokeStyle = "#3BA7C9"; g.lineWidth = 3; g.beginPath(); g.arc(x * scale, y * scale, 9, 0, 2 * Math.PI); g.stroke(); g.fillStyle = "#fff"; g.fillText(ref, x * scale + 12, y * scale + 4); });
+  cv.onclick = e => {
+    if (!f) return;
+    const r = cv.getBoundingClientRect();
+    lining.points[f.ref] = [(e.clientX - r.left) * cv.width / r.width / scale, (e.clientY - r.top) * cv.height / r.height / scale];
+    lining.i++; renderLining();
+  };
+  $("skip").onclick = () => { lining.i++; renderLining(); };
+  $("done").onclick = () => { say("Lining up and comparing…"); send({ type: "stuff_lineup", serial: board.serial, side: lining.side, points: lining.points }); };
+  $("cancel").onclick = () => { lining = null; renderMain(); };
+}
+
+// ---- the parts -------------------------------------------------------------------------------------
+function partHTML(p) {
+  const crop = s => `stuffing/crop/${encodeURIComponent(s)}/${p.side}/${encodeURIComponent(p.ref)}`;
+  const fig = (label, s, there) => `<figure>${esc(label)}${there ? `<a class="pic" href="${crop(s)}?wide" target="_blank" rel="noopener"><img loading="lazy" src="${crop(s)}" alt="${esc(p.ref)} on ${esc(s)}"></a>` : `<div class="none">No ${p.side} photo</div>`}</figure>`;
+  const refThere = reference && (boards.find(b => b.serial === reference) || {})[p.side];
+  const bad = p.call && p.call !== "ok";
+  return `<div class="part ${bad ? "bad" : ""}" data-part="${esc(p.ref)}">
+    <div class="ph"><b>${esc(p.ref)}</b><span class="k">${p.side}</span>${p.different ? '<span class="diff">Looks different</span>' : ""}</div>
+    <div class="cr">${reference && reference !== board.serial ? fig(`Reference ${reference}`, reference, refThere) : ""}${fig(`This board`, board.serial, board.sides[p.side])}</div>
+    <div class="row"><button class="btn ok ${p.call === "ok" ? "on" : ""}" type="button" data-ok="${esc(p.ref)}">OK</button><button class="btn bad ${bad ? "on" : ""}" type="button" data-bad="${esc(p.ref)}">Problem</button>
+      <select data-kind="${esc(p.ref)}" aria-label="What is wrong with ${esc(p.ref)}" ${bad ? "" : "hidden"}>${Object.entries(board.calls).filter(([k]) => k !== "ok").map(([k, v]) => `<option value="${k}" ${p.call === k ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></div>
+    <textarea data-note="${esc(p.ref)}" ${bad ? "" : "hidden"} placeholder="What’s wrong with ${esc(p.ref)}?" aria-label="Note on ${esc(p.ref)}">${esc(p.note)}</textarea></div>`;
+}
+function shown(l, p) {
+  const st = $("f-state").value, sd = $("f-side").value, tx = $("f-text").value.trim().toUpperCase();
+  if (sd !== "all" && p.side !== sd) return false;
+  if (st === "todo" && p.call) return false;
+  if (st === "bad" && (!p.call || p.call === "ok")) return false;
+  if (st === "different" && !p.different) return false;
+  return !tx || p.ref.toUpperCase().includes(tx) || l.value.toUpperCase().includes(tx) || l.description.toUpperCase().includes(tx) || l.mpn.toUpperCase().includes(tx);
+}
+function bindPart(root) {
+  const save = (ref, call) => { const n = root.querySelector(`[data-note="${CSS.escape(ref)}"]`); send({ type: "stuff_call", serial: board.serial, refs: [ref], call, note: n && call !== "ok" ? n.value : "" }); };
+  root.querySelectorAll("[data-ok]").forEach(b => b.onclick = () => save(b.dataset.ok, "ok"));
+  root.querySelectorAll("[data-bad]").forEach(b => b.onclick = () => {
+    const ref = b.dataset.bad, k = root.querySelector(`[data-kind="${CSS.escape(ref)}"]`);
+    save(ref, k.value);
+  });
+  root.querySelectorAll("[data-kind]").forEach(s => s.onchange = () => save(s.dataset.kind, s.value));
+  root.querySelectorAll("[data-note]").forEach(t => t.onchange = () => { const s = root.querySelector(`[data-kind="${CSS.escape(t.dataset.note)}"]`); save(t.dataset.note, s.value); });
+}
+function refreshPart(ref) {
+  const el = document.querySelector(`[data-part="${CSS.escape(ref)}"]`); if (!el) return;
+  const p = board.lines.flatMap(l => l.parts).find(q => q.ref === ref);
+  const focusNote = p.call && p.call !== "ok" && el.querySelector("[data-note]").hidden;
+  const t = document.createElement("div"); t.innerHTML = partHTML(p);
+  const fresh = t.firstElementChild;
+  fresh.querySelectorAll("img").forEach((im, i) => { const old = el.querySelectorAll("img")[i]; if (old) im.src = old.src; });
+  el.replaceWith(fresh); bindPart(fresh);
+  if (focusNote) fresh.querySelector("[data-note]").focus();
+}
+function renderCount() {
+  const all = board.lines.flatMap(l => l.parts), called = all.filter(p => p.call).length, bad = all.filter(p => p.call && p.call !== "ok").length;
+  $("count").textContent = `${called} of ${all.length} parts called, ${bad} ${bad === 1 ? "problem" : "problems"}.`;
+}
+function renderAll() {
+  $("main").innerHTML = `<div class="row"><b>Problems on all boards</b>${board ? '<button class="btn" id="back" type="button">Back to the board</button>' : ""}</div>` + (problems.length
+    ? `<table><tr><th>Board</th><th>Part</th><th>BOM value</th><th>Problem</th><th>Note</th><th>Date</th></tr>${problems.map(p => `<tr><td class="mono">${esc(p.serial)}</td><td class="mono">${esc(p.ref)}</td><td>${esc(p.value)}</td><td>${esc(p.call)}</td><td>${esc(p.note)}</td><td>${esc(p.date)}</td></tr>`).join("")}</table>`
+    : `<div class="hint">No problems called yet.</div>`);
+  if ($("back")) $("back").onclick = () => { view = "review"; renderMain(); };
+}
+function renderMain() {
+  if (lining) return photo.complete && photo.naturalWidth ? renderLining() : undefined;
+  if (view === "all") return renderAll();
+  if (!board) return;
+  renderCount();
+  if (!board.sides.front && !board.sides.back) { $("main").innerHTML = `<div class="hint">Add a front or back photo of ${esc(board.serial)} to start.</div>`; return; }
+  const cards = board.lines.map(l => {
+    const parts = l.parts.filter(p => shown(l, p));
+    if (!parts.length) return "";
+    const refs = parts.map(p => p.ref).join(",");
+    return `<div class="card"><div class="lh"><b>${esc(l.value)}</b>${l.dnp ? '<span class="tag">BOM: no-stuff</span>' : ""}<span class="d">${esc(l.description)} ${esc(l.mpn)}</span><button class="btn" type="button" data-allok="${esc(refs)}">All ${parts.length} OK</button></div><div class="parts">${parts.map(partHTML).join("")}</div></div>`;
+  }).join("");
+  $("main").innerHTML = cards || `<div class="hint">No parts match.</div>`;
+  bindPart($("main"));
+  $("main").querySelectorAll("[data-allok]").forEach(b => b.onclick = () => send({ type: "stuff_call", serial: board.serial, refs: b.dataset.allok.split(","), call: "ok", note: "" }));
+}
+connect();
+</script>
+</body>
+</html>
