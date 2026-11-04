@@ -213,14 +213,14 @@ reference and parts, its check is skipped.
 **The board design.** `ptctestsuite/config/board_design.json` lists every polarised part of the
 PTC4a v1j design: position, rotation, side, outline and pin 1 from the ODB++, and the kind from
 the BOM (ICs, oscillators and crystals, tantalum and polymer capacitors, LEDs, the Schottky diode;
-the bidirectional SMCJ12CA TVS and PGB1010603 ESD diodes aren't polarised). That's 74 parts on the
+the bidirectional SMCJ12CA TVS and PGB1010603 ESD diodes aren't polarised). That's 72 parts on the
 front and 18 on the back. The seven LTM8064 converters are checked too, because the photos are
 taken before their heatsinks are fitted. Parts too small for the camera (the 0603 LEDs, about
 0.8 mm wide) are left out when placing; a reversed LED won't light, so the LED tests catch it.
 The ODB++ and BOM it was made from are kept in `design/`. When the design changes, put the new
 ones there and rebuild the file:
 
-    python -m ptctestsuite.design_import --odb design/ptc4a_v1j_odb.tgz --bom design/PTC_CORE_ENG_BILL_OF_MATERIALS.CSV
+    python -m ptctestsuite.design_import --odb design/ptc4a_v1j_odb.tgz --bom design/PTCv4A_BOM_v1.0_20260519.csv
 
 On the preproduction photos the placement is accurate to about 0.5 mm between anchors.
 

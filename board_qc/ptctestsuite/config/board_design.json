@@ -875,7 +875,7 @@
    ],
    "kind": "tantalum",
    "value": "150UF",
-   "description": "CAP TANT 150UF 20% 6.3V 2917",
+   "description": "CAP TANT 150UF 10% 10V 2312",
    "hidden": null
   },
   {
@@ -898,7 +898,7 @@
    ],
    "kind": "tantalum",
    "value": "150UF",
-   "description": "CAP TANT 150UF 20% 6.3V 2917",
+   "description": "CAP TANT 150UF 10% 10V 2312",
    "hidden": null
   },
   {
@@ -967,7 +967,7 @@
    ],
    "kind": "tantalum",
    "value": "150UF",
-   "description": "CAP TANT 150UF 20% 6.3V 2917",
+   "description": "CAP TANT 150UF 10% 10V 2312",
    "hidden": null
   },
   {
@@ -990,7 +990,7 @@
    ],
    "kind": "tantalum",
    "value": "150UF",
-   "description": "CAP TANT 150UF 20% 6.3V 2917",
+   "description": "CAP TANT 150UF 10% 10V 2312",
    "hidden": null
   },
   {
@@ -1060,26 +1060,6 @@
    "kind": "led",
    "value": "LTST-S270KGKT",
    "description": "LED GREEN CLEAR CHIP SMD R/A",
-   "hidden": null
-  },
-  {
-   "ref": "DT12",
-   "side": "top",
-   "x": 8.047,
-   "y": 2.672,
-   "rot": 180.0,
-   "mirror": false,
-   "package": "SOD123",
-   "bbox": [
-    -0.10039,
-    -0.04331,
-    0.10039,
-    0.04331
-   ],
-   "pin1": null,
-   "kind": "diode",
-   "value": "1N6263W-7-F",
-   "description": "DIODE SCHOTTKY 60V 15MA SOD123",
    "hidden": null
   },
   {
@@ -1263,7 +1243,7 @@
    ],
    "kind": "ic",
    "value": "XMC4300",
-   "description": "MCU 32-Bit ARM\u00c2\u00ae Cortex\u00c2\u00ae-M4",
+   "description": "MCU 32-Bit ARM\u00ae Cortex\u00ae-M4",
    "hidden": null
   },
   {
@@ -1286,7 +1266,7 @@
    ],
    "kind": "ic",
    "value": "TMP117NAIDRVR",
-   "description": "Temperature Sensor Digital, Local -55\u00c2\u00b0C ~ 150\u00c2\u00b0C 16 b 6-WSON (2x2)",
+   "description": "Temperature Sensor Digital, Local -55\u00b0C ~ 150\u00b0C 16 b 6-WSON (2x2)",
    "hidden": null
   },
   {
@@ -1423,8 +1403,8 @@
     3.28
    ],
    "kind": "ic",
-   "value": "LTM4622AEV#PBF",
-   "description": "DC DC CONVERTER 1.5-12V 1.5-12V",
+   "value": "LTM4622EV#PBF",
+   "description": "DC DC CNVRTR 0.6-5.5V 0.6-5.5V",
    "hidden": null
   },
   {
@@ -1447,7 +1427,7 @@
    ],
    "kind": "ic",
    "value": "TMP117NAIDRVR",
-   "description": "Temperature Sensor Digital, Local -55\u00c2\u00b0C ~ 150\u00c2\u00b0C 16 b 6-WSON (2x2)",
+   "description": "Temperature Sensor Digital, Local -55\u00b0C ~ 150\u00b0C 16 b 6-WSON (2x2)",
    "hidden": null
   },
   {
@@ -1493,7 +1473,7 @@
    ],
    "kind": "ic",
    "value": "TMP117NAIDRVR",
-   "description": "Temperature Sensor Digital, Local -55\u00c2\u00b0C ~ 150\u00c2\u00b0C 16 b 6-WSON (2x2)",
+   "description": "Temperature Sensor Digital, Local -55\u00b0C ~ 150\u00b0C 16 b 6-WSON (2x2)",
    "hidden": null
   },
   {
@@ -1677,7 +1657,7 @@
    ],
    "kind": "ic",
    "value": "TMP117NAIDRVR",
-   "description": "Temperature Sensor Digital, Local -55\u00c2\u00b0C ~ 150\u00c2\u00b0C 16 b 6-WSON (2x2)",
+   "description": "Temperature Sensor Digital, Local -55\u00b0C ~ 150\u00b0C 16 b 6-WSON (2x2)",
    "hidden": null
   },
   {
@@ -1769,7 +1749,7 @@
    ],
    "kind": "ic",
    "value": "TMP117NAIDRVR",
-   "description": "Temperature Sensor Digital, Local -55\u00c2\u00b0C ~ 150\u00c2\u00b0C 16 b 6-WSON (2x2)",
+   "description": "Temperature Sensor Digital, Local -55\u00b0C ~ 150\u00b0C 16 b 6-WSON (2x2)",
    "hidden": null
   },
   {
@@ -1792,7 +1772,7 @@
    ],
    "kind": "ic",
    "value": "TMP117NAIDRVR",
-   "description": "Temperature Sensor Digital, Local -55\u00c2\u00b0C ~ 150\u00c2\u00b0C 16 b 6-WSON (2x2)",
+   "description": "Temperature Sensor Digital, Local -55\u00b0C ~ 150\u00b0C 16 b 6-WSON (2x2)",
    "hidden": null
   },
   {
@@ -2068,7 +2048,7 @@
    ],
    "kind": "ic",
    "value": "TMP117NAIDRVR",
-   "description": "Temperature Sensor Digital, Local -55\u00c2\u00b0C ~ 150\u00c2\u00b0C 16 b 6-WSON (2x2)",
+   "description": "Temperature Sensor Digital, Local -55\u00b0C ~ 150\u00b0C 16 b 6-WSON (2x2)",
    "hidden": null
   },
   {
@@ -2091,7 +2071,7 @@
    ],
    "kind": "ic",
    "value": "TMP117NAIDRVR",
-   "description": "Temperature Sensor Digital, Local -55\u00c2\u00b0C ~ 150\u00c2\u00b0C 16 b 6-WSON (2x2)",
+   "description": "Temperature Sensor Digital, Local -55\u00b0C ~ 150\u00b0C 16 b 6-WSON (2x2)",
    "hidden": null
   },
   {

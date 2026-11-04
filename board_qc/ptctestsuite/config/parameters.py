@@ -109,7 +109,7 @@ inspection_min_part_px = 14        # parts smaller than this in the photo can't 
 # Stuffing review (utils/stuffing.py): every BOM part of a board beside a board known to work
 stuffing_dir = "stuffing"
 design_odb = "design/ptc4a_v1j_odb.tgz"
-design_bom = "design/PTC_CORE_ENG_BILL_OF_MATERIALS.CSV"
+design_bom = "design/PTCv4A_BOM_v1.0_20260519.csv"   # the production BOM; the older design BOM is kept beside it
 
 # Vendor certificates uploaded with bare and assembled PCB shipments are also kept here
 shipment_docs_dir = "shipment_documents"

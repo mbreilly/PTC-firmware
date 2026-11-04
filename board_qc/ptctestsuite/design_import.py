@@ -76,7 +76,7 @@ def classify(desc: str, part_type: str) -> str | None:
         return "led"
     if "SCHOTTKY" in d or ("DIODE" in d and "TVS" not in d):
         return "diode"
-    if d.startswith("IC") or any(k in d for k in ("CONVERTER", "MCU", "SENSOR", "MULTIPLEXER", "OSC", "CRYSTAL")):
+    if d.startswith("IC") or any(k in d for k in ("CONVERTER", "CNVRTR", "MCU", "SENSOR", "MULTIPLEXER", "OSC", "CRYSTAL")):
         return "ic"
     return None   # passives, connectors, switches, bidirectional TVS/ESD, transistors (can't go in reversed)
 

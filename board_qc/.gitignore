@@ -8,3 +8,5 @@
 !ptctestsuite/config/*.json
 !design/*.tgz
 !design/*.CSV
+!design/*.csv
+!design/*.xlsx
