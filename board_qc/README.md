@@ -284,6 +284,14 @@ with the largest colour difference from the reference, as a place to start, and 
 PTC002 against BRD006 it caught 4 of 11 known differences and none of the wrong fuses, whose only
 difference is the printed value. Look through every line.
 
+**Is the part there?** Load photos of an unpopulated PCB as a board called `BARE`. Each part is then also
+shown on the bare PCB, and for two-pad parts the page checks whether the gap between the pads is still
+solder-mask green, and tags any that disagree with the BOM. **Show: Don't match the BOM** lists them. On
+BRD006 it found 12 of 13 known empty parts and RB9 and RB13, with about 16 false alarms; on PTC002 all 18
+tags were false alarms when looked at. It judges about two thirds of the parts (not ICs, connectors, or
+footprints whose pads run together, like some 0402 pairs), and pairs of side-by-side 0402s can confuse it, so
+it's a place to start and the tester's calls are the result.
+
 The design comes from `design/` (`design_odb`, `design_bom` in `config/parameters.py`).
 
 ## Board history, retests and repairs

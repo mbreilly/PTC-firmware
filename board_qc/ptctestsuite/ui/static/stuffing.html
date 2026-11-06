@@ -56,7 +56,8 @@ textarea { width: 100%; min-height: 48px; resize: vertical; }
 .ph b { font-family: var(--g-mono); }
 .ph .k { color: var(--g-dim); font-size: .8em; }
 .ph .diff { color: var(--g-warn); font-size: .78em; font-weight: 600; margin-left: auto; }
-.cr { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.ph .mism { color: var(--g-fail); font-size: .78em; font-weight: 600; margin-left: auto; }
+.cr { display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 6px; }
 .cr figure { margin: 0; font-size: .74em; color: var(--g-dim); }
 .cr .pic { display: block; height: 150px; background: #000; border-radius: 4px; overflow: hidden; }
 .cr img { display: block; width: 100%; height: 100%; object-fit: contain; }
@@ -98,7 +99,7 @@ th { color: var(--g-dim); font-weight: 600; }
     <section id="sec-filter" hidden>
       <h2>Show</h2>
       <div class="row">
-        <select id="f-state" aria-label="Which parts"><option value="all">All parts</option><option value="todo">Not called yet</option><option value="bad">Problems</option><option value="different">Look most different</option></select>
+        <select id="f-state" aria-label="Which parts"><option value="all">All parts</option><option value="todo">Not called yet</option><option value="bad">Problems</option><option value="mismatch">Don’t match the BOM</option><option value="different">Look most different</option></select>
         <select id="f-side" aria-label="Which side"><option value="all">Both sides</option><option value="front">Front</option><option value="back">Back</option></select>
         <input id="f-text" placeholder="Part or value" style="flex:1;min-width:120px" aria-label="Find a part or value">
       </div>
@@ -205,8 +206,8 @@ function partHTML(p) {
   const refThere = reference && (boards.find(b => b.serial === reference) || {})[p.side];
   const bad = p.call && p.call !== "ok";
   return `<div class="part ${bad ? "bad" : ""}" data-part="${esc(p.ref)}">
-    <div class="ph"><b>${esc(p.ref)}</b><span class="k">${p.side}</span>${p.different ? '<span class="diff">Looks different</span>' : ""}</div>
-    <div class="cr">${reference && reference !== board.serial ? fig(`Reference ${reference}`, reference, refThere) : ""}${fig(`This board`, board.serial, board.sides[p.side])}</div>
+    <div class="ph"><b>${esc(p.ref)}</b><span class="k">${p.side}</span>${p.mismatch ? `<span class="mism">${p.looks === "empty" ? "Looks empty, BOM says fitted" : "Looks fitted, BOM says no-stuff"}</span>` : p.different ? '<span class="diff">Looks different</span>' : ""}</div>
+    <div class="cr">${reference && reference !== board.serial ? fig(`Reference ${reference}`, reference, refThere) : ""}${fig(`This board`, board.serial, board.sides[p.side])}${board.bare[p.side] ? fig("Bare PCB", "BARE", true) : ""}</div>
     <div class="row"><button class="btn ok ${p.call === "ok" ? "on" : ""}" type="button" data-ok="${esc(p.ref)}">OK</button><button class="btn bad ${bad ? "on" : ""}" type="button" data-bad="${esc(p.ref)}">Problem</button>
       <select data-kind="${esc(p.ref)}" aria-label="What is wrong with ${esc(p.ref)}" ${bad ? "" : "hidden"}>${Object.entries(board.calls).filter(([k]) => k !== "ok").map(([k, v]) => `<option value="${k}" ${p.call === k ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></div>
     <textarea data-note="${esc(p.ref)}" ${bad ? "" : "hidden"} placeholder="What’s wrong with ${esc(p.ref)}?" aria-label="Note on ${esc(p.ref)}">${esc(p.note)}</textarea></div>`;
@@ -217,6 +218,7 @@ function shown(l, p) {
   if (st === "todo" && p.call) return false;
   if (st === "bad" && (!p.call || p.call === "ok")) return false;
   if (st === "different" && !p.different) return false;
+  if (st === "mismatch" && !p.mismatch) return false;
   return !tx || p.ref.toUpperCase().includes(tx) || l.value.toUpperCase().includes(tx) || l.description.toUpperCase().includes(tx) || l.mpn.toUpperCase().includes(tx);
 }
 function bindPart(root) {
@@ -254,6 +256,7 @@ function renderMain() {
   if (view === "all") return renderAll();
   if (!board) return;
   renderCount();
+  if (!["all", "todo", "bad", "different", "mismatch"].includes($("f-state").value)) $("f-state").value = "all";
   if (!board.sides.front && !board.sides.back) { $("main").innerHTML = `<div class="hint">Add a front or back photo of ${esc(board.serial)} to start.</div>`; return; }
   const cards = board.lines.map(l => {
     const parts = l.parts.filter(p => shown(l, p));

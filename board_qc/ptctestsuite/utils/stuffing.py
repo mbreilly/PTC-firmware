@@ -10,6 +10,7 @@ most small capacitors have none. So the score here only marks the parts that loo
 the tester's calls are the result.
 
     stuffing_dir/reference.json             {"serial": the board compared against}
+    stuffing_dir/BARE/                      an unpopulated PCB, shown beside each part and used to judge if it's there
     stuffing_dir/<serial>/<side>-photo.jpg  the photo, turned so the D-sub is at the top
     stuffing_dir/<serial>/<side>.jpg        lined up with the design
     stuffing_dir/<serial>/<side>-scores.json  offset and difference of each part from the reference
@@ -40,6 +41,8 @@ PPI = 500            # scale of a lined-up photo: pixels per inch of board
 CROP_PAD = 30        # board around a part in its closeup, in lined-up pixels
 CALLS = {"ok": "OK", "missing": "Missing", "wrong": "Wrong value or part", "reversed": "Reversed",
          "dnp_fitted": "Fitted, BOM says no-stuff", "damaged": "Damaged or bad solder", "other": "Other"}
+BARE = "BARE"        # the board folder holding photos of an unpopulated PCB
+EMPTY_BELOW = -7     # how green (LAB a) the gap between a part's pads must be to look empty; tested on PTC002 and BRD006
 NOT_PARTS = ("FID", "MH", "ZT", "GTP", "TP")   # fiducials, holes and test points: nothing to stuff
 _lock = threading.Lock()   # review.json and reference.json are read, changed and written whole
 
@@ -144,7 +147,7 @@ def boards() -> list[dict]:
         return []
     total = len(design()["parts"])
     out = []
-    for d in sorted(p for p in _root().iterdir() if p.is_dir()):
+    for d in sorted(p for p in _root().iterdir() if p.is_dir() and p.name != BARE):
         calls = load_review(d.name)
         out.append({"serial": d.name, "front": (d / "front.jpg").is_file(), "back": (d / "back.jpg").is_file(), "total": total,
                     "called": len(calls), "problems": sum(c["call"] != "ok" for c in calls.values())})
@@ -209,6 +212,7 @@ def line_up(serial: str, side: str, points: dict) -> int:
     cv2.imwrite(str(_board(serial) / f"{side}.jpg"), out, [cv2.IMWRITE_JPEG_QUALITY, 93])
     _image.cache_clear()
     (_board(serial) / f"{side}-scores.json").unlink(missing_ok=True)
+    (_board(serial) / f"{side}-presence.json").unlink(missing_ok=True)
     lg.info(f"Lined up the {side} of {clean_serial(serial)} from {len(src)} fiducials")
     return len(src)
 
@@ -296,16 +300,88 @@ def crop(serial: str, side: str, ref: str, offset: bool = True, pad: int = CROP_
     return cv2.imencode(".jpg", c, [cv2.IMWRITE_JPEG_QUALITY, 88])[1].tobytes()
 
 
+# ---- is the part there? ----------------------------------------------------------------------------
+# The bare PCB shows exactly where the gap between each two-pad part's pads is. On a populated board that
+# gap is covered by the part, or still solder-mask green if the part is missing. Photos are matched on
+# the silkscreen, which solder and parts don't change much.
+
+def _silk(img):
+    l, a, b = [c.astype(np.int16) for c in cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2LAB))]
+    around = cv2.blur(l.astype(np.float32), (31, 31))
+    mask = (l - around > 18) & (np.abs(b - 128) < 22) & (a - 128 > -22)
+    return cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 1.2)
+
+
+def _pad_gap(bare, box):
+    """The rectangle between a part's two gold pads on the bare board, or None if they can't be told apart."""
+    x0, y0, x1, y1 = box[0] - 4, box[1] - 4, box[2] + 4, box[3] + 4
+    lab = cv2.cvtColor(bare[max(0, y0):y1, max(0, x0):x1], cv2.COLOR_BGR2LAB).astype(np.int16)
+    gold = ((lab[..., 2] - 128 > 18) & (lab[..., 1] - 128 > -14)).astype(np.uint8)
+    n, _, st, _ = cv2.connectedComponentsWithStats(gold)
+    big = sorted(range(1, n), key=lambda i: -st[i][4])[:2]
+    if len(big) < 2 or st[big[1]][4] < 25:
+        return None
+    a, b = st[big[0]], st[big[1]]
+    if abs(a[0] - b[0]) > abs(a[1] - b[1]):
+        l, r = (a, b) if a[0] < b[0] else (b, a)
+        gx0, gx1, gy0, gy1 = l[0] + l[2], r[0], max(l[1], r[1]), min(l[1] + l[3], r[1] + r[3])
+    else:
+        t, u = (a, b) if a[1] < b[1] else (b, a)
+        gx0, gx1, gy0, gy1 = max(t[0], u[0]), min(t[0] + t[2], u[0] + u[2]), t[1] + t[3], u[1]
+    if gx1 - gx0 < 3 or gy1 - gy0 < 3:
+        return None
+    return max(0, x0) + int(gx0), max(0, y0) + int(gy0), max(0, x0) + int(gx1), max(0, y0) + int(gy1)
+
+
+def presence(serial: str, side: str) -> dict:
+    """{ref: "empty" | "fitted"} for the small two-pad parts that can be judged; kept until a photo changes."""
+    path = _board(serial) / f"{side}-presence.json"
+    bare, img = _image(BARE, side), _image(clean_serial(serial), side)
+    if bare is None or img is None or clean_serial(serial) == BARE:
+        return {}
+    bare_time = (_board(BARE) / f"{side}.jpg").stat().st_mtime
+    try:
+        cached = json.loads(path.read_text())
+        if cached.get("bare") == bare_time:
+            return cached["parts"]
+    except (OSError, ValueError, KeyError):
+        pass
+    sb, si = _silk(bare), _silk(img)
+    green = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)[..., 1].astype(np.int16) - 128
+    H, W = green.shape
+    out = {}
+    for p in design()["parts"]:
+        b = p["box"]
+        if p["side"] != side or p["ref"][0] not in "RCL" or (b[2] - b[0]) * (b[3] - b[1]) > 6000:
+            continue
+        gap = _pad_gap(bare, b)
+        if not gap:
+            continue
+        X0, Y0, X1, Y1 = max(0, b[0] - 40), max(0, b[1] - 40), min(W, b[2] + 40), min(H, b[3] + 40)
+        t, ax, ay = sb[Y0:Y1, X0:X1], max(0, X0 - 40), max(0, Y0 - 40)
+        area, ox, oy = si[ay:min(H, Y1 + 40), ax:min(W, X1 + 40)], 0, 0
+        if t.std() > .02 and area.shape[0] >= t.shape[0] and area.shape[1] >= t.shape[1]:
+            _, _, _, loc = cv2.minMaxLoc(cv2.matchTemplate(area, t, cv2.TM_CCOEFF_NORMED))
+            ox, oy = ax + loc[0] - X0, ay + loc[1] - Y0
+        vals = [float(np.percentile(r, 70)) for dy in (-2, 0, 2) for dx in (-2, 0, 2)
+                for r in [green[gap[1] + oy + dy:gap[3] + oy + dy, gap[0] + ox + dx:gap[2] + ox + dx]] if r.size]
+        if vals:
+            out[p["ref"]] = "empty" if min(vals) <= EMPTY_BELOW else "fitted"
+    path.write_text(json.dumps({"bare": bare_time, "parts": out}))
+    return out
+
+
 # ---- what the page and the export show --------------------------------------------------------
 
 def board_view(serial: str) -> dict:
     des = design()
     calls = load_review(serial)
     sides = {"front": (_board(serial) / "front.jpg").is_file(), "back": (_board(serial) / "back.jpg").is_file()}
-    diffs = {}
+    diffs, looks = {}, {}
     for side, there in sides.items():
         if there:
             diffs.update(scores(serial, side))
+            looks.update(presence(serial, side))
     ranked = sorted((v["diff"] for v in diffs.values()), reverse=True)
     cut = ranked[len(ranked) // 10] if ranked else None   # the tenth that look most different
     where = {p["ref"]: p["side"] for p in des["parts"]}
@@ -313,8 +389,11 @@ def board_view(serial: str) -> dict:
     for ln in des["lines"]:
         lines.append({**{k: ln[k] for k in ("item", "value", "dnp", "description", "mpn")},
                       "parts": [{"ref": r, "side": where[r], "call": calls.get(r, {}).get("call", ""), "note": calls.get(r, {}).get("note", ""),
-                                 "different": bool(cut is not None and r in diffs and diffs[r]["diff"] >= cut)} for r in ln["refs"]]})
-    return {"serial": clean_serial(serial), "sides": sides, "reference": reference(), "lines": lines, "calls": CALLS}
+                                 "different": bool(cut is not None and r in diffs and diffs[r]["diff"] >= cut),
+                                 "looks": looks.get(r, ""),
+                                 "mismatch": looks.get(r, "") == ("fitted" if ln["dnp"] else "empty")} for r in ln["refs"]]})
+    return {"serial": clean_serial(serial), "sides": sides, "reference": reference(), "lines": lines, "calls": CALLS,
+            "bare": {s: (_board(BARE) / f"{s}.jpg").is_file() for s in LAYER}}
 
 
 def problems() -> list[dict]:
