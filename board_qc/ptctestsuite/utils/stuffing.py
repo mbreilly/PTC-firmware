@@ -200,7 +200,7 @@ def line_up(serial: str, side: str, points: dict) -> int:
         xy = np.float32(xy)
         if len(dots):
             dist = np.linalg.norm(dots - xy, axis=1)
-            xy = dots[dist.argmin()] if dist.min() < img.shape[1] / 150 else xy   # snap to the pad near the click
+            xy = dots[dist.argmin()] if dist.min() < img.shape[1] / 400 else xy   # snap to the pad right under the click
         src.append(xy)
         dst.append(_to_px(fids[r]["x"], fids[r]["y"], side, des["outline"]))
     src, dst = np.float32(src), np.float32(dst)
