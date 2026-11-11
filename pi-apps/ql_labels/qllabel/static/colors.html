@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label Designer Colours</title>
+<link rel="stylesheet" href="static/app.css">
+<style>
+  .wrap { display: flex; gap: 0; align-items: flex-start; padding: 18px 24px 40px; }
+  .left { flex: 0 0 380px; padding-right: 18px; }
+  .right { flex: 1; min-width: 0; padding-left: 18px; border-left: 1px solid var(--panelEdge); }
+  iframe { width: 100%; height: calc(100vh - 110px); border: 1px solid var(--panelEdge); border-radius: 4px; background: var(--panelEdge); }
+  .tok { display: grid; grid-template-columns: 38px 1fr 86px; gap: 4px 10px; align-items: center; margin: 6px 0; }
+  .tok input[type=color] { width: 38px; height: 30px; border: 1px solid var(--panelEdge); background: none; padding: 0; cursor: pointer; }
+  .tok b { font-size: 12px; } .tok span { font-size: 11px; color: var(--dimInk); opacity: .7; display: block; font-weight: 400; }
+  .tok input.hex { width: 86px; font-family: ui-monospace, Menlo, monospace; }
+  .tok input.hex.bad { border-color: #FF6B5B; }
+  .presets { display: flex; gap: 6px; flex-wrap: wrap; }
+  .presets button { height: 30px; font-size: 12px; }
+  #summary { height: 190px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  @media (max-width: 900px) { .wrap { flex-direction: column; } .left { flex: none; width: 100%; padding: 0; } .right { border: 0; padding: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<div class="panel">
+  <header>
+    <h1>LABEL DESIGNER COLOURS</h1>
+    <div class="sub">8 tokens  ·  live preview  ·  saved in this browser</div>
+    <i class="screw tl"></i><i class="screw tr"></i>
+  </header>
+  <div class="wrap">
+    <div class="left">
+      <h2>PRESETS</h2>
+      <div class="presets" id="presets"></div>
+      <h2>TOKENS</h2>
+      <div id="tokens"></div>
+      <h2>TITLE</h2>
+      <input id="title" style="width:100%" value="QL LABEL DESIGNER">
+      <div class="row"><button id="apply" class="accent">USE IN THE DESIGNER</button><button id="reset">BACK TO DEFAULT</button></div>
+      <p class="dim">“Use” saves the colours in this browser, so the designer opens with them. To make them the default
+        for everyone, copy the summary below into the chat.</p>
+      <h2>SUMMARY</h2>
+      <textarea id="summary" readonly></textarea>
+      <div class="row"><button id="copy">COPY SUMMARY</button><a class="btn" href="./">BACK TO THE DESIGNER</a></div>
+    </div>
+    <div class="right"><iframe id="ui" src="./"></iframe></div>
+  </div>
+  <i class="screw bl"></i><i class="screw br"></i>
+</div>
+<script>
+"use strict";
+const TOKENS = [
+  ["panel", "Panel", "main background"], ["panelEdge", "Header & boxes", "title bar, inputs, the label stage"],
+  ["ink", "Text", "title, labels, values, knob pointers"], ["dimInk", "Dim text", "subtitle, section labels, idle buttons"],
+  ["accent", "Accent", "stripe, active buttons, knob arcs, selection"], ["knobBody", "Knob body", "bakelite knobs"],
+  ["buttonOff", "Buttons", "unselected buttons"], ["screw", "Screws", "corner screws"]];
+const PRESETS = {
+  "Current": { panel: "#20232C", panelEdge: "#131416", ink: "#E3E3E3", dimInk: "#E3E3E3", accent: "#E0A33A", knobBody: "#1C1B17", buttonOff: "#2E2F23", screw: "#8A8768" },
+  "Black hardware": { panel: "#1B1B1C", panelEdge: "#0B0B0C", ink: "#F2F2EE", dimInk: "#8E8E8A", accent: "#E8492E", knobBody: "#0A0A0A", buttonOff: "#151516", screw: "#7A7C80" },
+  "Army olive": { panel: "#4A4C37", panelEdge: "#23241A", ink: "#EEE8CF", dimInk: "#A9A483", accent: "#E0A33A", knobBody: "#1A1A15", buttonOff: "#2E2F23", screw: "#8A8768" },
+  "Steel blue": { panel: "#38424C", panelEdge: "#161B21", ink: "#E6ECF1", dimInk: "#8C9AA6", accent: "#F07B2C", knobBody: "#12161A", buttonOff: "#202830", screw: "#76838F" },
+  "Bone & ink": { panel: "#5B5750", panelEdge: "#1E1C19", ink: "#F4EEDF", dimInk: "#B4AC98", accent: "#C8352A", knobBody: "#191816", buttonOff: "#3A3732", screw: "#9A9282" },
+};
+const $ = s => document.querySelector(s);
+let cur = { ...PRESETS.Current };
+try { const s = JSON.parse(localStorage.getItem("qllabel-colors") || "{}"); Object.assign(cur, s.tokens || {}); if (s.title) $("#title").value = s.title; } catch (e) { /* defaults */ }
+
+$("#presets").innerHTML = Object.keys(PRESETS).map(p => `<button data-p="${p}">${p.toUpperCase()}</button>`).join("");
+$("#presets").addEventListener("click", e => { const p = e.target.dataset.p; if (p) { cur = { ...PRESETS[p] }; draw(); push(); } });
+$("#tokens").innerHTML = TOKENS.map(([k, n, w]) =>
+  `<div class="tok"><input type="color" data-k="${k}"><b>${n}<span>${w}</span></b><input class="hex" data-h="${k}" spellcheck="false"></div>`).join("");
+document.querySelectorAll("[data-k]").forEach(i => i.addEventListener("input", () => { cur[i.dataset.k] = i.value.toUpperCase(); draw(); push(); }));
+document.querySelectorAll("[data-h]").forEach(i => i.addEventListener("input", () => {
+  const ok = /^#[0-9a-fA-F]{6}$/.test(i.value); i.classList.toggle("bad", !ok);
+  if (ok) { cur[i.dataset.h] = i.value.toUpperCase(); draw(i); push(); }
+}));
+$("#title").addEventListener("input", push);
+
+function draw(skip) {
+  for (const [k] of TOKENS) {
+    document.querySelector(`[data-k="${k}"]`).value = cur[k].toLowerCase();
+    const h = document.querySelector(`[data-h="${k}"]`); if (h !== skip) { h.value = cur[k]; h.classList.remove("bad"); }
+    document.documentElement.style.setProperty("--" + k, cur[k]);
+  }
+  const w = Math.max(...TOKENS.map(t => t[1].length)) + 2;
+  $("#summary").value = "QL Label Designer UI colors:\n" + TOKENS.map(([k, n]) => `  ${(n + ":").padEnd(w)} ${cur[k]}   (${k})`).join("\n") +
+    `\n  ${"Title:".padEnd(w)} ${$("#title").value}`;
+}
+function push() {
+  draw();
+  try {
+    const d = $("#ui").contentDocument;
+    for (const [k] of TOKENS) d.documentElement.style.setProperty("--" + k, cur[k]);
+    d.getElementById("title").textContent = $("#title").value;
+  } catch (e) { /* frame not ready */ }
+}
+$("#ui").addEventListener("load", push);
+$("#apply").addEventListener("click", () => {
+  try { localStorage.setItem("qllabel-colors", JSON.stringify({ tokens: cur, title: $("#title").value })); $("#apply").textContent = "SAVED"; }
+  catch (e) { $("#apply").textContent = "STORAGE BLOCKED"; }
+  setTimeout(() => { $("#apply").textContent = "USE IN THE DESIGNER"; }, 1500);
+});
+$("#reset").addEventListener("click", () => {
+  cur = { ...PRESETS.Current }; $("#title").value = "QL LABEL DESIGNER";
+  try { localStorage.removeItem("qllabel-colors"); } catch (e) { /* fine */ }
+  push();
+});
+$("#copy").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("#summary").value); } catch (e) { $("#summary").select(); document.execCommand("copy"); }
+  $("#copy").textContent = "COPIED"; setTimeout(() => { $("#copy").textContent = "COPY SUMMARY"; }, 1500);
+});
+draw();
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+pillow
+zxing-cpp
+numpy
+markdown

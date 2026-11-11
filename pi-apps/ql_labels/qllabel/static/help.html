@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label Designer Help</title>
+<link rel="stylesheet" href="static/app.css">
+<style>
+  .doc { max-width: 900px; margin: 0 auto; padding: 8px 28px 60px; font-size: 15px; line-height: 1.55; }
+  .doc h1 { display: none; }
+  .doc h2 { font-size: 17px; letter-spacing: .05em; text-transform: uppercase; margin: 34px 0 10px; padding-top: 10px;
+    border-top: 1px solid var(--panelEdge); color: var(--accent); }
+  .doc h3 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink); margin: 22px 0 6px; }
+  .doc p, .doc li { color: var(--ink); }
+  .doc li { margin: 4px 0; }
+  .doc b, .doc strong { color: #fff; }
+  .doc code, .doc pre { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; background: color-mix(in srgb, var(--panelEdge) 70%, transparent);
+    border-radius: 3px; }
+  .doc code { padding: 1px 5px; }
+  .doc pre { padding: 12px 14px; overflow-x: auto; }
+  .doc pre code { background: none; padding: 0; }
+  .doc a { color: var(--accent); }
+  .doc img { max-width: 100%; border: 1px solid var(--panelEdge); border-radius: 4px; display: block; margin: 10px 0; }
+  .doc table { border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+  .doc th, .doc td { border: 1px solid var(--panelEdge); padding: 6px 10px; vertical-align: top; text-align: left; }
+  .doc th { background: var(--panelEdge); }
+  .doc .toc { background: color-mix(in srgb, var(--panelEdge) 45%, transparent); border-left: 3px solid var(--accent); padding: 8px 16px; margin: 16px 0; }
+  .doc .toc .toctitle { font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 12px; color: var(--dimInk); }
+  .doc .toc ul { margin: 4px 0; padding-left: 18px; } .doc .toc li { margin: 2px 0; }
+  .top { display: flex; gap: 8px; padding: 18px 28px 0; max-width: 900px; margin: 0 auto; }
+  @media print {
+    html, body, .panel { background: #fff !important; color: #000 !important; }
+    header, .top, .screw { display: none !important; }
+    .doc p, .doc li, .doc b, .doc strong, .doc th, .doc td { color: #000 !important; }
+    .doc h2 { color: #000; page-break-after: avoid; } .doc img, .doc table, .doc pre { page-break-inside: avoid; }
+    .doc th { background: #eee; }
+  }
+</style>
+</head>
+<body>
+<div class="panel">
+  <header>
+    <h1>QL LABEL DESIGNER  ·  HELP</h1>
+    <div class="sub">how to make and print labels</div>
+    <i class="screw tl"></i><i class="screw tr"></i>
+  </header>
+  <div class="top"><a class="btn" href="./">BACK TO THE DESIGNER</a><button onclick="print()">PRINT THIS PAGE</button></div>
+  <article class="doc">
+<!--BODY-->
+  </article>
+  <i class="screw bl"></i><i class="screw br"></i>
+</div>
+</body>
+</html>
